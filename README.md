@@ -1,46 +1,43 @@
 # ROM Tracker
 
-A webcam goniometer for home use, for anyone at any age. You do your exercises in front of a laptop camera, pose estimation measures joint range of motion (ROM) in degrees, the app counts reps and sets, times the rest, flags fading range, and shows your trend over weeks. Several people can share one install, each with their own profile. This is a personal tool, not a clinical one: no doctor or therapist sees the data.
+A webcam goniometer for home use, for anyone at any age. A separate **camera app** (built by the computer-vision teammates) watches you exercise, measures joint range of motion (ROM) in degrees, counts reps and sets, and stores each session in MongoDB. **This repository is the web app and API around that data**: accounts, one profile per person in the household, and dashboards that show progress over weeks. It is a personal tool, not a clinical one: no doctor or therapist sees the data.
 
-This repository holds the **full-stack, end-to-end part**: the data model, the REST API, the React app, and the exercise engine (rep counting, fatigue proxy, session flow). The **computer-vision module is built separately by the CV teammates** and plugs in through one small interface (see [Where the camera plugs in](#where-the-camera-plugs-in)). Until it lands, a built-in simulated user drives the whole flow so everything can be developed and demoed.
-
-Stack: MongoDB · Express 5 · React 19 · Node 20 (MERN), TypeScript everywhere, Vite, Vitest.
+Stack: MongoDB Atlas · Express 5 · React 19 · Node 20 (MERN), TypeScript everywhere, Vite, Vitest.
 
 ---
 
 ## 1. Quick start
 
-Prerequisites: **Node 20.19 or newer** (`.nvmrc` says 20; `nvm use` picks it), npm 10, and a MongoDB database: the team's hosted **MongoDB Atlas** cluster (ask for the connection string) or a local MongoDB.
+Prerequisites: **Node 20.19 or newer** (`.nvmrc` says 20; `nvm use` picks it), npm 10, and the team's MongoDB Atlas connection string.
 
 ```bash
 git clone <this repo> && cd Hackknight
-npm install            # installs all three workspaces; first run also downloads a MongoDB test binary (~150 MB)
-cp .env.example .env   # then paste the Atlas connection string into MONGODB_URI
-npm run dev            # starts the API on :8787 and the web app on :5173
+npm install            # all three workspaces; first run also downloads a MongoDB test binary (~150 MB)
+cp .env.example .env   # fill in MONGODB_URI, JWT_SECRET and CV_API_KEY (see below)
+npm run dev            # API on :8787, web app on :5173
 ```
 
-The API exits immediately if `MONGODB_URI` is missing. If the cluster cannot be reached it prints why (bad credentials, IP not on the Atlas access list) and retries every 10 seconds, so fixing Atlas is enough: no restart needed.
+Open <http://localhost:5173>. You land on **/signup**; create an account (one per household). Then:
 
-Open <http://localhost:5173>. The nav bar shows "API connected" when the server and database are up. Both dev servers listen on every network interface, so teammates and phones on the same Wi-Fi can open `http://<your-machine's-IP>:5173` (Vite prints the Network URL on start).
+1. **Profiles** → **Add a profile** for each person who exercises, or **Load demo data** for a profile with six weeks of seeded sessions.
+2. **Dashboard** → pick who you're looking at and the exercise. You get peak ROM per session with your goal line, the latest session rep by rep, the fatigue proxy per session, sessions per week, and a table of recent sessions (click one for the set-by-set view). Set or change your plan (sets, reps, rest, goal angle) in the panel on the right.
 
-First time in the app:
-
-1. **Profiles** page → click **Load demo data** (creates "Demo Profile" with six weeks of sessions), or **Add a profile** for yourself.
-2. **Session** page → pick who is exercising, check the plan, click **Start session**. The simulated user starts moving; reps count up, the rest timer runs between sets, and the session is saved when the last set ends.
-3. **Dashboard** page → see your trend, the rep-by-rep view of the latest session, the fatigue proxy, and sessions per week. Set or change your plan (sets, reps, rest, goal angle) in the panel on the right.
+Real sessions arrive when the camera app records them (section 4). The API refuses to start without the three secrets and prints what is missing.
 
 ## 2. Configuration
 
-Copy `.env.example` to `.env` at the repo root. Only the server reads it.
+Copy `.env.example` to `.env` at the repo root. Only the backend reads it.
 
-| Variable | Default | Meaning |
-|---|---|---|
-| `MONGODB_URI` | **required** | The hosted cluster: `mongodb+srv://<user>:<password>@<cluster>.mongodb.net/ptg?retryWrites=true&w=majority`. A local server also works: `mongodb://127.0.0.1:27017/ptg`. |
-| `PORT` | `8787` | API port. The Vite dev server proxies `/api/*` here. |
-| `CORS_ORIGINS` | any origin | Comma-separated browser origins allowed in production, e.g. `https://app.yourdomain.com`. |
-| `NODE_ENV` | | `production` disables `/api/dev/*`. |
+| Variable | Meaning |
+|---|---|
+| `MONGODB_URI` | **Required.** `mongodb+srv://<user>:<password>@<cluster>.mongodb.net/ptg?retryWrites=true&w=majority`. A local server also works: `mongodb://127.0.0.1:27017/ptg`. If the cluster refuses the connection the API prints why and retries every 10 s. |
+| `JWT_SECRET` | **Required.** Signs login tokens. Any long random string: `openssl rand -hex 32`. |
+| `CV_API_KEY` | Shared secret the camera app sends as `x-api-key` when it stores sessions or reads a plan. `openssl rand -hex 32`. Without it the camera app cannot write. |
+| `PORT` | API port, default `8787`. The Vite dev server proxies `/api/*` here. |
+| `CORS_ORIGINS` | Comma-separated browser origins allowed in production, e.g. `https://app.yourdomain.com`. |
+| `NODE_ENV` | `production` disables `/api/dev/*`. |
 
-`npm run seed` loads the demo data into the database named by `MONGODB_URI` (the in-app button does the same through `POST /api/dev/seed`).
+`npm run seed -- you@example.com` loads the demo profile into the account with that email (the in-app button does the same through `POST /api/dev/seed`).
 
 ## 3. Everyday commands
 
@@ -49,27 +46,60 @@ Run from the repo root.
 | Command | What it does |
 |---|---|
 | `npm run dev` | API + web app with hot reload (`npm run dev:backend` / `npm run dev:frontend` for one of them) |
-| `npm test` | All test suites: shared engine, server API (against an in-memory MongoDB), client |
+| `npm test` | All test suites: shared engine, API (against a throwaway in-memory MongoDB), frontend |
 | `npm run test:watch -w dependencies` (or `-w backend`, `-w frontend`) | Watch mode for one workspace while doing TDD |
 | `npm run typecheck` | TypeScript across all workspaces |
-| `npm run build` | Production build of the client into `frontend/dist` |
-| `npm run seed` | Seed demo data into `MONGODB_URI` |
+| `npm run build` | Production build of the web app into `frontend/dist` |
+| `npm run seed -- <email>` | Seed demo data into that account |
 
-## 4. How the app works
+## 4. How sessions get into the database
 
-### Session flow
+The camera app owns the measurement: it tracks the joint, counts reps and sets, and sends each finished session to this API. Recommended path: **`POST /api/sessions` with the `x-api-key` header**, because the server validates the body, recomputes the fatigue proxy and the summary from the raw reps, and the dashboard needs nothing else.
 
+```http
+POST /api/sessions
+x-api-key: <CV_API_KEY>
+content-type: application/json
+
+{
+  "profileId": "<id from GET /api/profiles>",
+  "exercise": "elbow_flexion",
+  "side": "right",
+  "startedAt": 1760000000000,
+  "endedAt": 1760000600000,
+  "plan": { "sets": 3, "reps": 8, "restSeconds": 45, "targetDeg": 140 },
+  "sets": [
+    {
+      "setNumber": 1,
+      "reps": [
+        { "index": 1, "peakDeg": 131.5, "startedAt": 1760000001000, "endedAt": 1760000003200, "durationMs": 2200 }
+      ],
+      "fatigue": { "index": 0, "romDecay": 0, "tempoDrift": 0, "romDropDeg": 0, "sampleReps": 0 },
+      "startedAt": 1760000001000,
+      "endedAt": 1760000030000,
+      "endedEarly": false
+    }
+  ]
+}
 ```
-idle → align → active → rest → align → active → … → complete
-                 ▲        │
-                 └─ pause / resume (counting and the countdown both stop)
-```
 
-- **align**: the app waits until the joint is tracked for 1.5 s ("get into position") before counting.
-- **active**: each rep is one excursion of the exercise metric past the *enter* threshold and back to the *exit* threshold (hysteresis, so a wobble never double-counts; movements shorter than `minRepMs` are ignored as jitter). The peak and the duration of each rep are recorded.
-- **rest**: countdown from the plan's rest seconds, then the next set.
-- A set ends when the planned rep count is reached, when you press **End set**, or when the **fatigue proxy** crosses the early-rest line.
-- **complete**: the session is `POST`ed to the API and the summary links to the dashboard.
+- Timestamps are milliseconds since the epoch. `fatigue` may be zeros; the server overwrites it.
+- With the API key the camera app can also read any profile (`GET /api/profiles`, `GET /api/profiles/:id/plan`) to know who is exercising and what their plan is.
+- The exact schema is `CreateSessionSchema` in `dependencies/src/api.ts`; the TypeScript types are in `dependencies/src/engine/types.ts`. Writing straight into the `sessions` collection also works if the documents follow `backend/src/models/Session.ts`, but then nothing recomputes the summary.
+
+### What the engine defines for the camera app
+
+`@ptg/dependencies` is pure TypeScript shared by the server and (if the camera app is JavaScript) the camera app:
+
+- `EXERCISES` (`dependencies/src/engine/exercises.ts`): for each exercise, which three landmarks form the angle, how the inner angle becomes the metric (`metricFromInnerAngle`, always "more degrees = deeper into the rep"), the rep thresholds (`enterDeg`, `exitDeg`), the jitter floor (`minRepMs`), the default goal, and the cue that tells the user how to face the camera.
+- `RepCounter`: the hysteresis rep counter (leave rest, pass `enterDeg`, return to `exitDeg` = one rep; shorter than `minRepMs` = ignored). `OneEuroFilter` smooths the angle stream first.
+- `estimateFatigue`: the proxy below. `summarizeSets`: the per-session roll-up.
+
+| Exercise | Joint (landmarks) | Metric shown and counted | Enter / exit | Default goal |
+|---|---|---|---|---|
+| Elbow flexion | shoulder – elbow – wrist | 180° − inner angle (0 = straight) | 90° / 40° | 140° |
+| Shoulder abduction | hip – shoulder – elbow | inner angle (arm at side ≈ 10°) | 70° / 30° | 160° |
+| Seated knee extension | hip – knee – ankle | inner angle (seated ≈ 90°, straight = 180°) | 150° / 110° | 175° |
 
 ### Fatigue proxy (not a clinical measure)
 
@@ -81,91 +111,76 @@ tempoDrift = (mean duration of last k − mean duration of first k) / mean durat
 index      = clamp(0.6 · romDecay + 0.4 · tempoDrift, 0, 1)       (only losses count)
 ```
 
-`index ≥ 0.12` shows a nudge ("reach full range"); `index ≥ 0.25` ends the set early and starts the rest. The UI and the dashboard say "ROM decay" and "tempo drift" instead of claiming to measure fatigue. The server recomputes these numbers from the raw reps when a session is saved; it never trusts the client's.
-
-### Exercises
-
-| Exercise | Joint (landmarks) | Metric shown and counted | Enter / exit | Default goal |
-|---|---|---|---|---|
-| Elbow flexion | shoulder – elbow – wrist | 180° − inner angle (0 = straight) | 90° / 40° | 140° |
-| Shoulder abduction | hip – shoulder – elbow | inner angle (arm at side ≈ 10°) | 70° / 30° | 160° |
-| Seated knee extension | hip – knee – ankle | inner angle (seated ≈ 90°, straight = 180°) | 150° / 110° | 175° |
-
-All three are defined in `dependencies/src/engine/exercises.ts`, including the cue that tells you how to face the camera.
-
-### Where the camera plugs in
-
-Everything downstream of the camera consumes one interface, `MotionSource` in `frontend/src/motion/types.ts`:
-
-```ts
-interface MotionSample { metricDeg: number; tMs: number; tracked: boolean }
-interface MotionSource { label: string; start(onSample: (s: MotionSample) => void): void; stop(): void }
-```
-
-`frontend/src/motion/CameraMotionSource.ts` is the placeholder the CV team replaces. It should open the webcam, run pose estimation, compute the inner angle at the joint named by `EXERCISES[id].joints[side]` (from `@ptg/dependencies`), convert it with `metricFromInnerAngle`, and call `onSample` once per frame with `tracked: false` whenever a landmark is missing. `frontend/src/motion/SimulatedMotionSource.ts` is the stand-in used today; the Session page's "Simulated user" panel controls its tempo, peak and how fast its range decays, which is how to demo the fatigue logic.
+The dashboard draws `0.12` (nudge) and `0.25` (early rest) as reference lines and labels the quantity "ROM decay + tempo drift", never "fatigue" as a diagnosis.
 
 ## 5. API reference
 
-Base URL in development: `http://localhost:8787`. All bodies are JSON. Validation errors return `400 { error: "Invalid request", issues: [...] }`; unknown ids return `404`.
+Base URL in development: `http://localhost:8787`. All bodies are JSON. Validation errors return `400 { error: "Invalid request", issues: [...] }`; unknown or foreign ids return `404`; missing credentials return `401`.
+
+**Credentials.** Browser requests send `Authorization: Bearer <token>` (from signup or login, valid 7 days). The camera app sends `x-api-key: <CV_API_KEY>` instead and may access every profile. Users only ever see their own profiles.
 
 | Method & path | Body | Returns |
 |---|---|---|
-| `GET /api/health` | | `{ ok, db: "connected" \| "disconnected", uptime }` |
-| `GET /api/profiles` | | profiles, newest first |
-| `POST /api/profiles` | `{ name, email?, notes? }` | `201` profile |
+| `GET /api/health` | | `{ ok, db: "connected" \| "disconnected", uptime }` (open) |
+| `POST /api/auth/signup` | `{ name, email, password (≥ 8) }` | `201 { token, user }`; `409` if the email exists (open) |
+| `POST /api/auth/login` | `{ email, password }` | `{ token, user }`; `401` on a bad pair (open) |
+| `GET /api/auth/me` | | the signed-in user |
+| `GET /api/profiles` | | your profiles, newest first (API key: all profiles) |
+| `POST /api/profiles` | `{ name, email?, notes? }` | `201` profile (users only) |
 | `GET /api/profiles/:id` | | profile |
+| `DELETE /api/profiles/:id` | | `204`; also deletes its plans and sessions |
 | `GET /api/profiles/:id/plan` | | active plan (`404` if none) |
 | `PUT /api/profiles/:id/plan` | `{ exercise, side, sets, reps, restSeconds, targetDeg }` | `201` new active plan; the previous one is kept inactive |
 | `PATCH /api/profiles/:id/plan` | any subset of the plan fields | updated active plan |
 | `GET /api/profiles/:id/plans` | | plan history, newest first |
-| `POST /api/sessions` | see `CreateSessionSchema` in `dependencies/src/api.ts` | `201` session with server-computed fatigue and summary |
+| `POST /api/sessions` | see section 4 | `201` session with server-computed fatigue and summary |
 | `GET /api/profiles/:id/sessions?exercise=` | | sessions, newest first, optional exercise filter |
 | `GET /api/sessions/:id` | | one session |
 | `GET /api/profiles/:id/progress?exercise=` | | dashboard series: peak/mean/fatigue per session (oldest first), sessions per week, latest session rep by rep, plan goal |
-| `POST /api/dev/seed` | | `201`/`200` `{ profileId, sessions, created }`; dev only |
+| `POST /api/dev/seed` | | `201`/`200` `{ profileId, sessions, created }`; your demo profile; dev only |
 
-Exercise ids: `elbow_flexion`, `shoulder_abduction`, `seated_knee_extension`. Sides: `left`, `right`. Timestamps are milliseconds since the epoch.
+Exercise ids: `elbow_flexion`, `shoulder_abduction`, `seated_knee_extension`. Sides: `left`, `right`.
 
 ## 6. Repository layout
 
 ```
-dependencies/  @ptg/dependencies  pure TypeScript used by both sides: domain types, exercise configs,
-               rep counter, One Euro filter, fatigue proxy, session state machine, zod API schemas
-backend/       @ptg/backend       Express 5 + Mongoose: models (Profile, Plan, Session), routes, services
-               src/app.ts builds the app; src/index.ts connects the DB and listens; test/ holds API tests
-frontend/      @ptg/frontend      Vite + React 19: pages (Session, Dashboard, Profiles), components, hooks,
-               api/client.ts (typed fetch wrapper), motion/ (camera contract + simulator)
+dependencies/  @ptg/dependencies  pure TypeScript shared by both sides: domain types, exercise configs,
+               rep counter, One Euro filter, fatigue proxy, session summary, zod API schemas
+backend/       @ptg/backend       Express 5 + Mongoose: models (User, Profile, Plan, Session), auth,
+               routes, services; src/app.ts builds the app, src/index.ts connects and listens, test/ = API tests
+frontend/      @ptg/frontend      Vite + React 19: auth (token, context, route guards), pages (Signup, Login,
+               Dashboard, Profiles, SessionDetail), components, api/client.ts (typed fetch wrapper)
 docs/          backlog, sprint plan, definition of done, architecture decision records
 .github/       CI workflow and issue / PR templates
 ```
 
-The three packages are npm workspaces. `@ptg/dependencies` is consumed as TypeScript source, so a change there is picked up by both the server and the client without a build step.
+The three packages are npm workspaces. `@ptg/dependencies` is consumed as TypeScript source, so a change there is picked up by both sides without a build step.
 
 ## 7. Testing and the development process
 
-The project is developed **test-first**: write the failing test, make it pass, then clean up. `npm test` must be green before a pull request is opened, and CI (`.github/workflows/ci.yml`) runs typecheck, tests and the client build on every push and PR.
+The project is developed **test-first**: write the failing test, make it pass, then clean up. `npm test` must be green before a pull request is opened, and CI (`.github/workflows/ci.yml`) runs typecheck, tests and the build on every push and PR.
 
-- `dependencies/src/**/*.test.ts`: engine behaviour (rep counting, hysteresis, jitter rejection, fatigue arithmetic, the full session flow, schema validation).
-- `backend/test/*.test.ts`: every API route through supertest against a throw-away in-memory MongoDB (no mocks of the database).
-- `frontend/src/**/*.test.ts(x)`: the simulated motion source driving the real rep counter, the API wrapper, and component behaviour with Testing Library.
+- `dependencies/src/**/*.test.ts`: engine behaviour (rep counting, hysteresis, jitter rejection, fatigue arithmetic, summaries, schema validation).
+- `backend/test/*.test.ts`: every API route through supertest against a throwaway in-memory MongoDB, including sign-up, login, token checks, API-key access and profile isolation between accounts. Tests never touch the cluster in `.env`.
+- `frontend/src/**/*.test.ts(x)`: the API wrapper (token header, 401 handling), the route guards (visitors land on `/signup`), and the sign-up / login form.
 
 How the team works (sprints, stories, definition of done, PR checklist) is in [CONTRIBUTING.md](CONTRIBUTING.md) and [docs/](docs/).
 
 ## 8. Deployment and the domain
 
-The domain is registered at **GoDaddy**. The app is two deployables plus a database:
+The domain is registered at **GoDaddy**. The app is two deployables plus the database:
 
-1. **Database**: MongoDB Atlas free tier. Put its connection string in `MONGODB_URI`.
-2. **API** (`backend/`): any Node host (Render, Railway, Fly.io). Start command `npm run start -w backend`; set `NODE_ENV=production`, `MONGODB_URI`, `CORS_ORIGINS=https://app.<domain>`.
-3. **Web app** (`frontend/`): `npm run build` produces `frontend/dist`; host it on Vercel/Netlify/Cloudflare Pages and rewrite `/api/*` to the API host (or set the API to serve `frontend/dist`).
-4. **DNS at GoDaddy**: a CNAME `app` → the web host, a CNAME `api` → the API host, as each host's dashboard instructs. The camera and microphone only work over **HTTPS** (or on localhost), so both hosts must serve TLS; the hosts above do this automatically once the DNS records resolve.
+1. **Database**: the MongoDB Atlas cluster. Put its connection string in `MONGODB_URI` and allow the API host's address under *Network Access*.
+2. **API** (`backend/`): any Node host (Render, Railway, Fly.io). Start command `npm run start -w backend`; set `NODE_ENV=production`, `MONGODB_URI`, `JWT_SECRET`, `CV_API_KEY`, `CORS_ORIGINS=https://app.<domain>`.
+3. **Web app** (`frontend/`): `npm run build` produces `frontend/dist`; host it on Vercel/Netlify/Cloudflare Pages and rewrite `/api/*` to the API host.
+4. **DNS at GoDaddy**: a CNAME `app` → the web host, a CNAME `api` → the API host, as each host's dashboard instructs. Both hosts provide HTTPS once the records resolve. Give the camera app `https://api.<domain>` and the `CV_API_KEY`.
 
 ## 9. Troubleshooting
 
 - **"API unreachable" in the nav bar**: the server is not running or crashed on start. Run `npm run dev:backend` alone and read its output.
-- **`npm install` fails with "Cannot read properties of null (reading 'edgesOut')"**: an npm 10 bug with workspaces. The repo's `.npmrc` already sets `legacy-peer-deps=true`, which avoids it; make sure the file is present.
-- **API logs "Could not connect to MongoDB … IP that isn't whitelisted"**: in Atlas open *Network Access* → *Add IP Address* → *Allow access from anywhere* (`0.0.0.0/0`, fine for the hackathon; tighten later). The API keeps retrying every 10 s and connects on its own once the rule is active (about a minute). Also check the user and password in the connection string.
-- **API exits with "MONGODB_URI is not set"**: create `.env` at the repo root from `.env.example` and paste the connection string.
-- **Backend tests fail at `MongoMemoryServer.create` the first time**: the MongoDB test binary is still downloading. Run `npm test -w backend` again; it is cached afterwards (`node_modules/.cache/mongodb-memory-server`). Tests always use this throwaway instance and never touch the cluster in `.env`.
-- **Engine warnings during `npm install`** about Node 22: informational. Everything here is pinned to versions that support Node 20.19+.
-- **Camera does nothing**: expected until the CV module replaces `CameraMotionSource`; the Session page uses the simulator today.
+- **API exits with "MONGODB_URI is not set" / "JWT_SECRET is not set"**: create `.env` at the repo root from `.env.example`.
+- **API logs "Could not connect to MongoDB … IP that isn't whitelisted"**: in Atlas open *Network Access* → *Add IP Address* → *Allow access from anywhere* (`0.0.0.0/0`, fine for the hackathon). The API retries every 10 s and connects on its own once the rule is active.
+- **Camera app gets 401**: it must send `x-api-key` with the exact value of `CV_API_KEY` in the API's `.env`.
+- **`npm install` fails with "Cannot read properties of null (reading 'edgesOut')"**: an npm 10 workspace bug; the repo's `.npmrc` (`legacy-peer-deps=true`) avoids it.
+- **CI fails with "Cannot find native binding" for rolldown**: the lockfile was generated without the Linux build of Vite's bundler. Regenerate it from a clean install (`rm -rf node_modules package-lock.json && npm install`) and commit `package-lock.json`.
+- **Backend tests fail at `MongoMemoryServer.create` the first time**: the MongoDB test binary is still downloading. Run `npm test -w backend` again.

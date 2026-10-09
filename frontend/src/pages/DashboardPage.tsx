@@ -1,5 +1,6 @@
 import { EXERCISE_LIST, EXERCISES, type ExerciseId, type PlanDto, type ProgressDto, type SessionDto } from '@ptg/dependencies'
 import { useEffect, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { api } from '../api/client'
 import { ProfilePicker } from '../components/ProfilePicker'
 import { PlanEditor } from '../components/PlanEditor'
@@ -64,9 +65,9 @@ export function DashboardPage() {
       <div className="layout">
         <section className="main">
           <div className="card">
-            <h3>Recent sessions</h3>
+            <h3>Recent sessions <span className="muted small">(recorded by the camera app)</span></h3>
             {sessions.length === 0 ? (
-              <p className="muted">None yet.</p>
+              <p className="muted">None yet. Sessions appear here once the camera app records them for this profile.</p>
             ) : (
               <table className="table">
                 <thead>
@@ -83,7 +84,7 @@ export function DashboardPage() {
                   {sessions.slice(0, 12).map((s) => (
                     <tr key={s.id}>
                       <td>
-                        {formatDateTime(s.startedAt)} {s.demo && <span className="badge">demo</span>}
+                        <Link to={`/sessions/${s.id}`}>{formatDateTime(s.startedAt)}</Link> {s.demo && <span className="badge">demo</span>}
                       </td>
                       <td>{EXERCISES[s.exercise].name}</td>
                       <td>{s.summary.totalReps}</td>

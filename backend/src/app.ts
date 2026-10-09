@@ -1,12 +1,14 @@
 import cors from 'cors'
 import express, { type Express } from 'express'
 import mongoose from 'mongoose'
+import { authenticate } from './auth.ts'
 import { errorHandler, notFound } from './http.ts'
+import { authRouter } from './routes/auth.ts'
 import { devRouter } from './routes/dev.ts'
-import { profilesRouter } from './routes/profiles.ts'
 import { plansRouter } from './routes/plans.ts'
+import { profilesRouter } from './routes/profiles.ts'
 import { progressRouter } from './routes/progress.ts'
-import { sessionsRouter } from './routes/sessions.ts'
+import { profileSessionsRouter, sessionsRouter } from './routes/sessions.ts'
 
 export interface AppOptions {
   /** Mount /api/dev (seeding). Defaults to true outside production. */
@@ -22,15 +24,19 @@ export function createApp(opts: AppOptions = {}): Express {
   app.use(cors({ origin: opts.corsOrigins && opts.corsOrigins.length ? opts.corsOrigins : true }))
   app.use(express.json({ limit: '2mb' }))
 
+  // Open routes
   app.get('/api/health', (_req, res) => {
     res.json({ ok: true, db: mongoose.connection.readyState === 1 ? 'connected' : 'disconnected', uptime: process.uptime() })
   })
+  app.use('/api/auth', authRouter)
 
-  app.use('/api/profiles', profilesRouter)
+  // Everything below needs a signed-in user or the CV module's API key
+  app.use('/api/profiles', authenticate, profilesRouter)
   app.use('/api/profiles', plansRouter)
   app.use('/api/profiles', progressRouter)
-  app.use('/api', sessionsRouter)
-  if (opts.allowDevRoutes ?? process.env.NODE_ENV !== 'production') app.use('/api/dev', devRouter)
+  app.use('/api/profiles', profileSessionsRouter)
+  app.use('/api/sessions', authenticate, sessionsRouter)
+  if (opts.allowDevRoutes ?? process.env.NODE_ENV !== 'production') app.use('/api/dev', authenticate, devRouter)
 
   app.use('/api', notFound)
   app.use(errorHandler)

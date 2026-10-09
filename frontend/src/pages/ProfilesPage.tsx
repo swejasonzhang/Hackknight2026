@@ -28,6 +28,21 @@ export function ProfilesPage() {
     }
   }
 
+  const remove = async (id: string, profileName: string) => {
+    if (!window.confirm(`Delete ${profileName} and all of their sessions? This cannot be undone.`)) return
+    setBusy(true)
+    setMessage(null)
+    try {
+      await api.profiles.delete(id)
+      await reload()
+      setMessage(`Deleted ${profileName}.`)
+    } catch (err) {
+      setMessage(err instanceof Error ? err.message : 'Could not delete profile')
+    } finally {
+      setBusy(false)
+    }
+  }
+
   const seed = async () => {
     setBusy(true)
     setMessage(null)
@@ -70,8 +85,11 @@ export function ProfilesPage() {
                       <td>{p.name}</td>
                       <td>{p.email ?? '–'}</td>
                       <td>{formatDateTime(p.createdAt)}</td>
-                      <td>
+                      <td className="row-actions">
                         {p.id === selectedId ? <span className="badge">selected</span> : <button onClick={() => setSelectedId(p.id)}>Select</button>}
+                        <button className="danger" disabled={busy} onClick={() => remove(p.id, p.name)}>
+                          Delete
+                        </button>
                       </td>
                     </tr>
                   ))}

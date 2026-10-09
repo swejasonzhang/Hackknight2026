@@ -6,6 +6,9 @@ import { MongoMemoryServer } from 'mongodb-memory-server'
 import mongoose from 'mongoose'
 import { afterAll, afterEach, beforeAll } from 'vitest'
 
+process.env.JWT_SECRET = 'test-secret-not-for-production'
+process.env.CV_API_KEY = 'test-cv-key'
+
 let mongod: MongoMemoryServer
 
 beforeAll(async () => {

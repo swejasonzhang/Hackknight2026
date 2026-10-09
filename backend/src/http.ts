@@ -40,6 +40,10 @@ export const errorHandler: ErrorRequestHandler = (err, _req, res, _next) => {
     res.status(400).json({ error: 'Invalid JSON' })
     return
   }
+  if (typeof err === 'object' && err !== null && 'code' in err && err.code === 11000) {
+    res.status(409).json({ error: 'Already exists' })
+    return
+  }
   console.error('[api] unhandled error', err)
   res.status(500).json({ error: 'Internal error' })
 }

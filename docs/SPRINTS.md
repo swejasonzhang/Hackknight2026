@@ -14,10 +14,10 @@ Delivered: monorepo (`dependencies`, `backend`, `frontend`), engine with tests, 
 
 | Owner | Stories |
 |---|---|
-| CV | C1 `CameraMotionSource`, C2 overlay |
-| FS | C4 source picker, D5 API-down handling, review CV PRs |
+| CV | C1 tracking + rep/set counting, C2 overlay |
+| FS | C4 ingestion end to end with the camera app, D5 API-down handling, review CV PRs |
 
-Demo script: set a goal on the dashboard → do 3 real elbow flexions → session saves → dashboard shows the point.
+Demo script: sign up → add a profile → set a goal on the dashboard → camera app records 3 real elbow flexions → the session appears on the dashboard.
 
 ## Sprint 2: alignment and trust
 

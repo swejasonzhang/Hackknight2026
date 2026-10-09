@@ -11,6 +11,14 @@ const corsOrigins = (process.env.CORS_ORIGINS ?? '')
   .map((s) => s.trim())
   .filter(Boolean)
 
+if (!process.env.JWT_SECRET) {
+  console.error('[api] JWT_SECRET is not set. Add a long random string to .env (see .env.example).')
+  process.exit(1)
+}
+if (!process.env.CV_API_KEY) {
+  console.warn('[api] CV_API_KEY is not set: the computer-vision module cannot store sessions until it is.')
+}
+
 const uri = process.env.MONGODB_URI
 if (!uri) {
   console.error('[api] MONGODB_URI is not set. Put the MongoDB Atlas connection string in .env at the repo root (see .env.example).')

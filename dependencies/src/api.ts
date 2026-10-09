@@ -8,6 +8,36 @@ import type { ExerciseId, SessionPlan, SessionRecord, Side } from './engine/type
 export const ExerciseIdSchema = z.enum(['elbow_flexion', 'shoulder_abduction', 'seated_knee_extension'])
 export const SideSchema = z.enum(['left', 'right'])
 
+// ---- accounts ----
+
+export const SignupSchema = z.object({
+  name: z.string().trim().min(1).max(80),
+  email: z.email().transform((e) => e.toLowerCase()),
+  password: z.string().min(8).max(200),
+})
+export type SignupInput = z.infer<typeof SignupSchema>
+
+export const LoginSchema = z.object({
+  email: z.email().transform((e) => e.toLowerCase()),
+  password: z.string().min(1).max(200),
+})
+export type LoginInput = z.infer<typeof LoginSchema>
+
+export interface UserDto {
+  id: string
+  name: string
+  email: string
+  createdAt: number
+}
+
+/** Returned by signup and login. Send the token as `Authorization: Bearer <token>`. */
+export interface AuthResponse {
+  token: string
+  user: UserDto
+}
+
+// ---- profiles, plans, sessions ----
+
 export const CreateProfileSchema = z.object({
   name: z.string().trim().min(1).max(80),
   email: z.email().optional(),
@@ -77,6 +107,8 @@ export type CreateSessionInput = z.infer<typeof CreateSessionSchema>
 
 export interface ProfileDto {
   id: string
+  /** Account that owns this profile */
+  ownerId: string
   name: string
   email?: string
   notes?: string

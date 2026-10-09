@@ -1,11 +1,16 @@
 import { useEffect, useState } from 'react'
 import { NavLink, Navigate, Route, Routes } from 'react-router-dom'
 import { api } from './api/client'
+import { useAuth } from './auth/AuthContext'
+import { PublicOnly, RequireAuth } from './auth/RequireAuth'
 import { DashboardPage } from './pages/DashboardPage'
+import { LoginPage } from './pages/LoginPage'
 import { ProfilesPage } from './pages/ProfilesPage'
-import { SessionPage } from './pages/SessionPage'
+import { SessionDetailPage } from './pages/SessionDetailPage'
+import { SignupPage } from './pages/SignupPage'
 
 export default function App() {
+  const { status, user, logout } = useAuth()
   const [apiStatus, setApiStatus] = useState<'checking' | 'ok' | 'down'>('checking')
 
   useEffect(() => {
@@ -19,18 +24,66 @@ export default function App() {
     <div className="app">
       <nav className="nav">
         <span className="brand">ROM Tracker</span>
-        <NavLink to="/session">Session</NavLink>
-        <NavLink to="/dashboard">Dashboard</NavLink>
-        <NavLink to="/profiles">Profiles</NavLink>
+        {status === 'signedIn' && (
+          <>
+            <NavLink to="/" end>
+              Dashboard
+            </NavLink>
+            <NavLink to="/profiles">Profiles</NavLink>
+          </>
+        )}
         <span className={`api-status api-${apiStatus}`} title="API and database status">
           {apiStatus === 'ok' ? 'API connected' : apiStatus === 'down' ? 'API unreachable: run npm run dev' : 'Checking API…'}
         </span>
+        {status === 'signedIn' && user && (
+          <span className="user-menu">
+            {user.name}
+            <button onClick={logout}>Log out</button>
+          </span>
+        )}
       </nav>
       <Routes>
-        <Route path="/" element={<Navigate to="/session" replace />} />
-        <Route path="/session" element={<SessionPage />} />
-        <Route path="/dashboard" element={<DashboardPage />} />
-        <Route path="/profiles" element={<ProfilesPage />} />
+        <Route
+          path="/signup"
+          element={
+            <PublicOnly>
+              <SignupPage />
+            </PublicOnly>
+          }
+        />
+        <Route
+          path="/login"
+          element={
+            <PublicOnly>
+              <LoginPage />
+            </PublicOnly>
+          }
+        />
+        <Route
+          path="/"
+          element={
+            <RequireAuth>
+              <DashboardPage />
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="/profiles"
+          element={
+            <RequireAuth>
+              <ProfilesPage />
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="/sessions/:id"
+          element={
+            <RequireAuth>
+              <SessionDetailPage />
+            </RequireAuth>
+          }
+        />
+        <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </div>
   )

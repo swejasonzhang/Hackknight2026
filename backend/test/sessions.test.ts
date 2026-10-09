@@ -1,13 +1,13 @@
 import { estimateFatigue } from '@ptg/dependencies'
-import request from 'supertest'
 import { describe, expect, it } from 'vitest'
-import { app, createProfile, makeSession } from './helpers.ts'
+import { createProfile, makeSession, signup } from './helpers.ts'
 
 describe('sessions', () => {
   it('POST /api/sessions stores a session and recomputes fatigue and the summary server-side', async () => {
-    const profileId = await createProfile()
+    const c = await signup()
+    const profileId = await createProfile(c)
     const body = makeSession(profileId)
-    const res = await request(app).post('/api/sessions').send(body)
+    const res = await c.post('/api/sessions').send(body)
     expect(res.status).toBe(201)
     expect(res.body).toMatchObject({ profileId, exercise: 'elbow_flexion', side: 'right', demo: false })
     expect(typeof res.body.id).toBe('string')
@@ -24,42 +24,43 @@ describe('sessions', () => {
   })
 
   it('rejects invalid bodies and unknown profiles', async () => {
-    const profileId = await createProfile()
-    expect((await request(app).post('/api/sessions').send({ ...makeSession(profileId), sets: [] })).status).toBe(400)
-    expect((await request(app).post('/api/sessions').send({ ...makeSession(profileId), endedAt: 1 })).status).toBe(400)
-    expect((await request(app).post('/api/sessions').send(makeSession('64b64b64b64b64b64b64b64b'))).status).toBe(404)
-    expect((await request(app).post('/api/sessions').send(makeSession('nope'))).status).toBe(404)
+    const c = await signup()
+    const profileId = await createProfile(c)
+    expect((await c.post('/api/sessions').send({ ...makeSession(profileId), sets: [] })).status).toBe(400)
+    expect((await c.post('/api/sessions').send({ ...makeSession(profileId), endedAt: 1 })).status).toBe(400)
+    expect((await c.post('/api/sessions').send(makeSession('64b64b64b64b64b64b64b64b'))).status).toBe(404)
+    expect((await c.post('/api/sessions').send(makeSession('nope'))).status).toBe(404)
   })
 
   it('GET /api/profiles/:id/sessions lists newest first and filters by exercise', async () => {
-    const profileId = await createProfile()
+    const c = await signup()
+    const profileId = await createProfile(c)
     const day = 24 * 3600 * 1000
     const t0 = Date.UTC(2026, 9, 1, 18)
-    await request(app).post('/api/sessions').send(makeSession(profileId, { startedAt: t0 }))
-    await request(app).post('/api/sessions').send(makeSession(profileId, { startedAt: t0 + 2 * day }))
-    await request(app)
-      .post('/api/sessions')
-      .send(makeSession(profileId, { startedAt: t0 + day, exercise: 'seated_knee_extension' }))
+    await c.post('/api/sessions').send(makeSession(profileId, { startedAt: t0 }))
+    await c.post('/api/sessions').send(makeSession(profileId, { startedAt: t0 + 2 * day }))
+    await c.post('/api/sessions').send(makeSession(profileId, { startedAt: t0 + day, exercise: 'seated_knee_extension' }))
 
-    const all = await request(app).get(`/api/profiles/${profileId}/sessions`)
+    const all = await c.get(`/api/profiles/${profileId}/sessions`)
     expect(all.status).toBe(200)
     expect(all.body.map((s: { startedAt: number }) => s.startedAt)).toEqual([t0 + 2 * day, t0 + day, t0])
 
-    const knee = await request(app).get(`/api/profiles/${profileId}/sessions?exercise=seated_knee_extension`)
+    const knee = await c.get(`/api/profiles/${profileId}/sessions?exercise=seated_knee_extension`)
     expect(knee.body).toHaveLength(1)
     expect(knee.body[0].exercise).toBe('seated_knee_extension')
 
-    const bad = await request(app).get(`/api/profiles/${profileId}/sessions?exercise=squat`)
+    const bad = await c.get(`/api/profiles/${profileId}/sessions?exercise=squat`)
     expect(bad.status).toBe(400)
   })
 
   it('GET /api/sessions/:id returns one session or 404', async () => {
-    const profileId = await createProfile()
-    const created = await request(app).post('/api/sessions').send(makeSession(profileId))
-    const ok = await request(app).get(`/api/sessions/${created.body.id}`)
+    const c = await signup()
+    const profileId = await createProfile(c)
+    const created = await c.post('/api/sessions').send(makeSession(profileId))
+    const ok = await c.get(`/api/sessions/${created.body.id}`)
     expect(ok.status).toBe(200)
     expect(ok.body.id).toBe(created.body.id)
     expect(ok.body.sets).toHaveLength(2)
-    expect((await request(app).get('/api/sessions/64b64b64b64b64b64b64b64b')).status).toBe(404)
+    expect((await c.get('/api/sessions/64b64b64b64b64b64b64b64b')).status).toBe(404)
   })
 })

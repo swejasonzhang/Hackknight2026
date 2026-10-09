@@ -1,4 +1,5 @@
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { clearToken, getToken, setToken, SIGNED_OUT_EVENT } from '../auth/token'
 import { api, ApiRequestError } from './client'
 
 function jsonResponse(body: unknown, status = 200): Response {
@@ -6,6 +7,7 @@ function jsonResponse(body: unknown, status = 200): Response {
 }
 
 describe('api client', () => {
+  beforeEach(() => clearToken())
   afterEach(() => vi.unstubAllGlobals())
 
   it('posts JSON and returns the parsed body', async () => {
@@ -31,5 +33,36 @@ describe('api client', () => {
     vi.stubGlobal('fetch', vi.fn().mockImplementation(() => Promise.resolve(jsonResponse({ error: 'Invalid request', issues: [] }, 400))))
     await expect(api.profiles.create({ name: '' })).rejects.toMatchObject({ status: 400, message: 'Invalid request' })
     await expect(api.profiles.create({ name: '' })).rejects.toBeInstanceOf(ApiRequestError)
+  })
+
+  it('sends the stored token as a Bearer header', async () => {
+    setToken('abc.def.ghi')
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse([]))
+    vi.stubGlobal('fetch', fetchMock)
+    await api.profiles.list()
+    expect(fetchMock.mock.calls[0]![1].headers.authorization).toBe('Bearer abc.def.ghi')
+  })
+
+  it('clears the token and announces sign-out on 401', async () => {
+    setToken('expired')
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse({ error: 'Not signed in' }, 401)))
+    const listener = vi.fn()
+    window.addEventListener(SIGNED_OUT_EVENT, listener)
+    await expect(api.profiles.list()).rejects.toMatchObject({ status: 401 })
+    expect(getToken()).toBeNull()
+    expect(listener).toHaveBeenCalledTimes(1)
+    window.removeEventListener(SIGNED_OUT_EVENT, listener)
+  })
+
+  it('auth.signup and auth.login post credentials and return the token with the user', async () => {
+    const body = { token: 't', user: { id: 'u1', name: 'Ada', email: 'ada@example.com', createdAt: 1 } }
+    const fetchMock = vi.fn().mockImplementation(() => Promise.resolve(jsonResponse(body, 201)))
+    vi.stubGlobal('fetch', fetchMock)
+    const res = await api.auth.signup({ name: 'Ada', email: 'ada@example.com', password: 'correct horse battery' })
+    expect(res.token).toBe('t')
+    expect(fetchMock.mock.calls[0]![0]).toBe('/api/auth/signup')
+    await api.auth.login({ email: 'ada@example.com', password: 'correct horse battery' })
+    expect(fetchMock.mock.calls[1]![0]).toBe('/api/auth/login')
+    expect(fetchMock.mock.calls[1]![1].method).toBe('POST')
   })
 })

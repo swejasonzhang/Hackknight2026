@@ -4,6 +4,7 @@ Drafted 2026-10-07. Updated 2026-10-09: scope narrowed to the full-stack end-to-
 
 ## Scope decisions (2026-10-09)
 
+- **The web app is a viewer** (2026-10-09): the camera app records reps, sets and sessions into MongoDB; the web app shows accounts, profiles, plans and dashboards. Visitors land on `/signup`. See ADR-0005.
 - **Personal use, not clinical.** No doctor or therapist sees the data. People are *profiles* (one per person in a household, any age) and set their own goals. Where the original pitch below says "patient" or "PT", read "you".
 - **Computer vision is built by the CV teammates**, not in this repo's full-stack work. The boundary is the `MotionSource` interface in `frontend/src/motion/types.ts`; a simulated patient stands in until the camera module lands.
 - **MERN stack**: MongoDB + Express + React + Node, as npm workspaces `dependencies` / `backend` / `frontend`.

@@ -1,14 +1,18 @@
 import type {
+  AuthResponse,
   CreateProfileInput,
-  CreateSessionInput,
   ExerciseId,
-  ProfileDto,
+  LoginInput,
   PlanDto,
   PlanInput,
+  ProfileDto,
   ProgressDto,
   SessionDto,
+  SignupInput,
   UpdatePlanInput,
+  UserDto,
 } from '@ptg/dependencies'
+import { getToken, signOutLocally } from '../auth/token'
 
 export class ApiRequestError extends Error {
   readonly status: number
@@ -22,18 +26,19 @@ export class ApiRequestError extends Error {
   }
 }
 
-interface RequestInit2 {
+interface RequestOptions {
   method?: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE'
   body?: unknown
 }
 
-async function request<T>(path: string, init: RequestInit2 = {}): Promise<T> {
+async function request<T>(path: string, init: RequestOptions = {}): Promise<T> {
   const hasBody = init.body !== undefined
-  const res = await fetch(path, {
-    method: init.method ?? 'GET',
-    headers: hasBody ? { 'content-type': 'application/json' } : {},
-    body: hasBody ? JSON.stringify(init.body) : undefined,
-  })
+  const token = getToken()
+  const headers: Record<string, string> = {}
+  if (hasBody) headers['content-type'] = 'application/json'
+  if (token) headers.authorization = `Bearer ${token}`
+
+  const res = await fetch(path, { method: init.method ?? 'GET', headers, body: hasBody ? JSON.stringify(init.body) : undefined })
   const text = await res.text()
   let data: unknown = null
   try {
@@ -42,6 +47,7 @@ async function request<T>(path: string, init: RequestInit2 = {}): Promise<T> {
     data = null
   }
   if (!res.ok) {
+    if (res.status === 401 && token) signOutLocally()
     const body = (data ?? {}) as { error?: unknown; issues?: unknown }
     const message = typeof body.error === 'string' ? body.error : `HTTP ${res.status}`
     throw new ApiRequestError(res.status, message, body.issues)
@@ -58,10 +64,16 @@ export interface SeedResult {
 /** Typed wrapper over the REST API. Every path matches a route in backend/src/routes. */
 export const api = {
   health: () => request<{ ok: boolean; db: string }>('/api/health'),
+  auth: {
+    signup: (input: SignupInput) => request<AuthResponse>('/api/auth/signup', { method: 'POST', body: input }),
+    login: (input: LoginInput) => request<AuthResponse>('/api/auth/login', { method: 'POST', body: input }),
+    me: () => request<UserDto>('/api/auth/me'),
+  },
   profiles: {
     list: () => request<ProfileDto[]>('/api/profiles'),
     get: (id: string) => request<ProfileDto>(`/api/profiles/${id}`),
     create: (input: CreateProfileInput) => request<ProfileDto>('/api/profiles', { method: 'POST', body: input }),
+    delete: (id: string) => request<void>(`/api/profiles/${id}`, { method: 'DELETE' }),
   },
   plan: {
     get: (profileId: string) => request<PlanDto>(`/api/profiles/${profileId}/plan`),
@@ -71,7 +83,6 @@ export const api = {
       request<PlanDto>(`/api/profiles/${profileId}/plan`, { method: 'PATCH', body: input }),
   },
   sessions: {
-    create: (input: CreateSessionInput) => request<SessionDto>('/api/sessions', { method: 'POST', body: input }),
     list: (profileId: string, exercise?: ExerciseId) =>
       request<SessionDto[]>(`/api/profiles/${profileId}/sessions${exercise ? `?exercise=${exercise}` : ''}`),
     get: (id: string) => request<SessionDto>(`/api/sessions/${id}`),

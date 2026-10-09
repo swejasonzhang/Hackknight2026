@@ -4,7 +4,11 @@ Prioritised top to bottom. Points are relative effort (1 = under an hour, 8 = mo
 
 Owners: **FS** = full-stack (this repo), **CV** = computer-vision teammates.
 
-## Epic A: Core session loop (FS) — DONE in sprint 0
+## Epic A: Core session loop (web) — REMOVED 2026-10-09
+
+The camera app runs sessions (reps, sets, rest, fatigue stop) and stores the result. The web app no longer has a session page. The engine behind A2 and A5 (rep counter, fatigue proxy) lives on in `dependencies/` for the camera app and the server; the stories below are kept for history.
+
+### Original stories (superseded)
 
 | # | Story | AC | Pts | Status |
 |---|---|---|---|---|
@@ -28,20 +32,22 @@ Owners: **FS** = full-stack (this repo), **CV** = computer-vision teammates.
 
 | # | Story | AC | Pts | Status |
 |---|---|---|---|---|
-| C1 | As a user the webcam tracks my joint angle | `CameraMotionSource` implements `MotionSource`; emits `metricDeg` from `EXERCISES[id].joints[side]` via `metricFromInnerAngle`; `tracked:false` when a landmark's visibility < 0.5 | 8 | Ready |
+| C1 | As a user the camera app tracks my joint angle and counts my reps and sets | angle from `EXERCISES[id].joints[side]` via `metricFromInnerAngle`; reps via the shared thresholds (`RepCounter` if JS); rest countdown and fatigue early-stop in the camera app | 13 | Ready |
 | C2 | As a user I see my skeleton and the measured angle drawn over the video | overlay follows the video at ≥ 15 fps on a laptop; highlighted joint triple | 3 | Ready |
 | C3 | As a user I'm told how to face the camera before a set | alignment check uses landmark visibility (and optionally the 2D/3D angle gap); cue text per exercise | 3 | Ready |
-| C4 | As a developer I can switch between simulator and camera | source picker on the Session page; simulator stays available for demos and tests | 1 | Ready |
+| C4 | As a user my finished session shows up on the dashboard | camera app `POST /api/sessions` with `x-api-key` (README section 4); session visible in the web app within seconds | 3 | Ready |
 
 ## Epic D: Hardening (FS)
 
 | # | Story | AC | Pts | Status |
 |---|---|---|---|---|
-| D1 | As a user I sign up and log in so my profiles are private to my household | email + password, bcrypt, JWT; `ownerId` on profiles; 401/404 tests | 8 | Backlog (deferred 2026-10-09: functionality first) |
+| D1 | As a user I sign up and log in so my profiles are private to my household | email + password, bcrypt, JWT (7 days); `ownerId` on profiles; visitors land on `/signup`; camera app uses `x-api-key`; 401/404 tests | 8 | Done |
 | D2 | As a family member I switch to my profile quickly | profile switcher remembered per device, optional PIN | 3 | Backlog |
 | D3 | As a team we deploy to the real domain | Atlas + API host + static host; DNS at GoDaddy; HTTPS; `CORS_ORIGINS` set; smoke test in CI | 5 | Backlog |
 | D4 | As a user I export my sessions as CSV | `GET /api/profiles/:id/sessions.csv`; test for header + rows | 2 | Backlog |
 | D5 | As a user I get helpful errors when the API is down | toast + retry; health badge already exists | 2 | Backlog |
+| D6 | As a user I delete a profile I no longer need | `DELETE /api/profiles/:id` cascades plans and sessions; confirm dialog | 1 | Done |
+| D7 | As a user I open one session and see it set by set | `/sessions/:id` page with per-rep bars and a set table | 2 | Done |
 
 ## Epic E: Parked (not in scope now)
 

@@ -1,11 +1,53 @@
 import type { CreateSessionInput, RepRecord, SetRecord } from '@ptg/dependencies'
-import request from 'supertest'
+import request, { type Test } from 'supertest'
 import { createApp } from '../src/app.ts'
 
 export const app = createApp({ allowDevRoutes: true })
 
-export async function createProfile(name = 'Ada Lovelace'): Promise<string> {
-  const res = await request(app).post('/api/profiles').send({ name })
+/** A supertest client that sends the same credentials on every request. */
+export interface Client {
+  token: string
+  userId: string
+  get(url: string): Test
+  post(url: string): Test
+  put(url: string): Test
+  patch(url: string): Test
+  delete(url: string): Test
+}
+
+function withHeader(name: string, value: string, token = '', userId = ''): Client {
+  const h = (t: Test) => t.set(name, value)
+  return {
+    token,
+    userId,
+    get: (u) => h(request(app).get(u)),
+    post: (u) => h(request(app).post(u)),
+    put: (u) => h(request(app).put(u)),
+    patch: (u) => h(request(app).patch(u)),
+    delete: (u) => h(request(app).delete(u)),
+  }
+}
+
+let counter = 0
+
+/** Signs up a fresh account and returns an authenticated client. */
+export async function signup(name = 'Ada Lovelace'): Promise<Client> {
+  const email = `user${++counter}@example.com`
+  const res = await request(app).post('/api/auth/signup').send({ name, email, password: 'correct horse battery' })
+  if (res.status !== 201) throw new Error(`signup failed: ${res.status} ${JSON.stringify(res.body)}`)
+  return withHeader('Authorization', `Bearer ${res.body.token}`, res.body.token, res.body.user.id)
+}
+
+/** The computer-vision module: no account, just the shared API key. */
+export function service(): Client {
+  return withHeader('x-api-key', process.env.CV_API_KEY ?? '')
+}
+
+/** Unauthenticated requests. */
+export const anon = request(app)
+
+export async function createProfile(c: Client, name = 'Ada Lovelace'): Promise<string> {
+  const res = await c.post('/api/profiles').send({ name })
   if (res.status !== 201) throw new Error(`createProfile failed: ${res.status} ${JSON.stringify(res.body)}`)
   return res.body.id as string
 }
