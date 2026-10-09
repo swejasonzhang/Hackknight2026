@@ -1,0 +1,121 @@
+/**
+ * Domain types shared by the server, the client and the computer-vision module.
+ * Everything in dependencies/src/engine is pure TypeScript: no DOM, no Node, no MediaPipe.
+ */
+
+export type Side = 'left' | 'right'
+
+export type ExerciseId = 'elbow_flexion' | 'shoulder_abduction' | 'seated_knee_extension'
+
+export const EXERCISE_IDS: readonly ExerciseId[] = ['elbow_flexion', 'shoulder_abduction', 'seated_knee_extension']
+
+/** Indices into MediaPipe's 33-landmark pose model. The CV module uses these; nothing else does. */
+export const LM = {
+  LEFT_SHOULDER: 11,
+  RIGHT_SHOULDER: 12,
+  LEFT_ELBOW: 13,
+  RIGHT_ELBOW: 14,
+  LEFT_WRIST: 15,
+  RIGHT_WRIST: 16,
+  LEFT_HIP: 23,
+  RIGHT_HIP: 24,
+  LEFT_KNEE: 25,
+  RIGHT_KNEE: 26,
+  LEFT_ANKLE: 27,
+  RIGHT_ANKLE: 28,
+} as const
+
+/** [proximal landmark, joint (vertex) landmark, distal landmark] */
+export type JointTriple = readonly [number, number, number]
+
+export interface ExerciseConfig {
+  id: ExerciseId
+  name: string
+  /** One-line instruction for the user, including how to face the camera. */
+  cue: string
+  /** Which landmarks the CV module measures the angle at, per side. */
+  joints: Record<Side, JointTriple>
+  /** Label for the number we display and count, e.g. "Elbow flexion" or "Knee angle". */
+  metricLabel: string
+  /**
+   * CONTRACT WITH THE CV MODULE: it converts the raw inner angle at the joint (0..180,
+   * 180 = straight) into this metric, which must INCREASE as the user moves deeper
+   * into the rep. Everything downstream (rep counter, fatigue, dashboard) uses the metric.
+   */
+  metricFromInnerAngle: (innerDeg: number) => number
+  /** A rep is "in" once the metric reaches enterDeg and completes when it falls back to exitDeg. */
+  enterDeg: number
+  exitDeg: number
+  /** Default goal for the metric, drawn on the dashboard. */
+  targetDeg: number
+  /** Reps shorter than this are treated as jitter and ignored. */
+  minRepMs: number
+}
+
+export interface RepRecord {
+  /** 1-based index within the set */
+  index: number
+  /** Peak metric reached during the rep, in degrees */
+  peakDeg: number
+  /** ms since epoch */
+  startedAt: number
+  endedAt: number
+  durationMs: number
+}
+
+/**
+ * A PROXY for fatigue, not a clinical measure: how much peak ROM shrank and how much rep
+ * tempo slowed between the first and last reps of a set.
+ */
+export interface FatigueEstimate {
+  /** 0..1 combined index; 0 = no change across the set */
+  index: number
+  /** Fraction of ROM lost from the first reps to the last reps (0.1 = lost 10%) */
+  romDecay: number
+  /** Fractional slowdown in rep duration (0.2 = reps take 20% longer) */
+  tempoDrift: number
+  /** Absolute ROM lost, in degrees */
+  romDropDeg: number
+  /** How many reps the estimate is based on */
+  sampleReps: number
+}
+
+export interface SetRecord {
+  setNumber: number
+  reps: RepRecord[]
+  fatigue: FatigueEstimate
+  startedAt: number
+  endedAt: number
+  /** True when the set ended before the planned rep count (fatigue stop or manual). */
+  endedEarly: boolean
+}
+
+export interface SessionPlan {
+  sets: number
+  reps: number
+  restSeconds: number
+  targetDeg: number
+}
+
+export interface SessionSummary {
+  totalReps: number
+  bestPeakDeg: number
+  meanPeakDeg: number
+  /** Mean fatigue index across sets that had enough reps */
+  fatigueIndex: number
+}
+
+/** One completed exercise session, as stored. */
+export interface SessionRecord {
+  id: string
+  profileId: string
+  exercise: ExerciseId
+  side: Side
+  startedAt: number
+  endedAt: number
+  plan: SessionPlan
+  sets: SetRecord[]
+  summary: SessionSummary
+  /** Seeded demo data, labelled on the dashboard. */
+  demo: boolean
+}

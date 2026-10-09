@@ -1,6 +1,16 @@
 # Hackknight: Webcam PT Goniometer
 
-Drafted 2026-10-07. Status: DRAFT, technical claims being verified.
+Drafted 2026-10-07. Updated 2026-10-09: scope narrowed to the full-stack end-to-end part (see "Scope decisions" below). How to run the app: [README.md](README.md). Backlog and sprints: [docs/](docs/).
+
+## Scope decisions (2026-10-09)
+
+- **The web app is a viewer** (2026-10-09): the camera app records reps, sets and sessions into MongoDB; the web app shows accounts, profiles, plans and dashboards. Visitors land on `/signup`. See ADR-0005.
+- **Personal use, not clinical.** No doctor or therapist sees the data. People are *profiles* (one per person in a household, any age) and set their own goals. Where the original pitch below says "patient" or "PT", read "you".
+- **Computer vision is built by the CV teammates**, not in this repo's full-stack work. The boundary is the `MotionSource` interface in `frontend/src/motion/types.ts`; a simulated patient stands in until the camera module lands.
+- **MERN stack**: MongoDB + Express + React + Node, as npm workspaces `dependencies` / `backend` / `frontend`.
+- **Voice AI PT and ElevenLabs are out of scope** for now (ADR-0003). The idea is kept below for the record and parked in the backlog as E1/E2.
+- **Domain at GoDaddy**; hosting plan in ADR-0004.
+- **TDD and agile**: see CONTRIBUTING.md, docs/BACKLOG.md, docs/SPRINTS.md, docs/DEFINITION_OF_DONE.md.
 
 ## Pitch
 
@@ -27,10 +37,10 @@ Patients do their prescribed physical-therapy exercises in front of a laptop cam
 - **Vision runs entirely in the browser:** MediaPipe Pose Landmarker (`@mediapipe/tasks-vision`) with the GPU delegate. No video leaves the laptop, which is a privacy selling point for health data.
 - **Angle engine:** a pure TypeScript module. Landmarks in, joint angle out per exercise config. Smooth with a One Euro filter. The rep counter is a state machine with hysteresis thresholds (flexed / extended) and a minimum rep duration to reject jitter. Record per-rep peak ROM and rep duration.
 - **Session state machine:** Idle -> Align -> Set active -> Rest countdown -> next set -> Complete. Pause/resume is a flag on the active state. Auto-advance to rest when target reps are hit or when the fatigue index crosses a threshold (adaptive rest).
-- **Storage:** localStorage or IndexedDB, unless the PT dashboard must run on a separate device during the demo; then Supabase (Postgres + auth) for the two roles.
+- **Storage:** MongoDB through the Express API (decided 2026-10-09; replaces the earlier localStorage / Supabase options).
 - **Dashboard:** Recharts. Four charts: peak ROM per session over time with the PT's target line; per-rep ROM within one session; fatigue index per session; sessions per week (adherence).
 
-## Voice AI PT
+## Voice AI PT (parked, see ADR-0003)
 
 - A button opens a voice panel. Browser SpeechRecognition (Web Speech API) for speech-to-text, Claude Messages API with streaming for the reasoning, browser speechSynthesis for the voice. Swap in ElevenLabs TTS for a nicer voice if time allows.
 - One small serverless function holds the Claude API key. Never put the key in browser code.
@@ -43,7 +53,7 @@ Patients do their prescribed physical-therapy exercises in front of a laptop cam
 | Exercise | Landmarks for the angle |
 |---|---|
 | Elbow flexion | shoulder - elbow - wrist |
-| Shoulder abduction | hip - shoulder - wrist |
+| Shoulder abduction | hip - shoulder - elbow (elbow rather than wrist, so a bent elbow does not distort the angle) |
 | Seated knee extension | hip - knee - ankle |
 
 All three work seated at a desk. A laptop camera at desk height cannot see a standing squat.
