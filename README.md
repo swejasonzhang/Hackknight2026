@@ -115,9 +115,10 @@ The dashboard draws `0.12` (nudge) and `0.25` (early rest) as reference lines an
 
 ## 4b. The camera app (Python)
 
-The computer-vision side lives at the repo root as a Python 3.12 project managed with [uv](https://docs.astral.sh/uv/): `main.py` starts `ExerciseTracker` from `movements.py`, which uses OpenCV and MediaPipe to track the joint, count reps against flex/extend thresholds and time rest.
+The computer-vision side lives in [`computer-vision/`](computer-vision/) as a Python 3.12 project managed with [uv](https://docs.astral.sh/uv/): `main.py` starts `ExerciseTracker` from `movements.py`, which uses OpenCV and MediaPipe to track the joint, count reps against flex/extend thresholds and time rest.
 
 ```bash
+cd computer-vision
 uv sync          # installs mediapipe and opencv into .venv
 uv run main.py   # opens the webcam window
 ```
@@ -161,11 +162,12 @@ backend/       @arc/backend       Express 5 + Mongoose: models (User, Profile, P
                routes, services; src/app.ts builds the app, src/index.ts connects and listens, test/ = API tests
 frontend/      @arc/frontend      Vite + React 19: auth (token, context, route guards), pages (Signup, Login,
                Dashboard, Profiles, SessionDetail), components, api/client.ts (typed fetch wrapper)
+computer-vision/  Python camera app (OpenCV + MediaPipe, uv): tracks the joint, counts reps, times rest
 docs/          backlog, sprint plan, definition of done, architecture decision records
 .github/       CI workflow and issue / PR templates
 ```
 
-The three packages are npm workspaces. `@arc/dependencies` is consumed as TypeScript source, so a change there is picked up by both sides without a build step.
+The three JavaScript packages are npm workspaces; the camera app is a separate Python project. `@arc/dependencies` is consumed as TypeScript source, so a change there is picked up by both sides without a build step.
 
 ## 7. Testing and the development process
 

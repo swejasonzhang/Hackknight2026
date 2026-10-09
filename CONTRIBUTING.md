@@ -5,7 +5,7 @@ How this team builds Arc. Short on ceremony, strict on two things: every change 
 ## The loop (TDD)
 
 1. Pick a story from [docs/BACKLOG.md](docs/BACKLOG.md) (or the board) and move it to **Doing**. One story per person at a time.
-2. Branch from `main`: `git checkout -b <area>/<short-story-name>` (areas: `dependencies`, `backend`, `frontend`, `cv`, `docs`).
+2. Branch from `main`: `git checkout -b <area>/<short-story-name>` (areas: `dependencies`, `backend`, `frontend`, `computer-vision`, `docs`).
 3. **Red**: write the smallest failing test that expresses the next piece of behaviour. Run it in watch mode: `npm run test:watch -w <workspace>`.
 4. **Green**: write the least code that makes it pass. No extra features "while you're there".
 5. **Refactor**: tidy names and structure with the test still green.
