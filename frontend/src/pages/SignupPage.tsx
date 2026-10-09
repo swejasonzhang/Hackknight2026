@@ -14,11 +14,11 @@ export function SignupPage() {
 
   return (
     <>
-      <div className="eyebrow">Get started</div>
-      <h2>Create your account</h2>
-      <p className="muted">One account per household. You'll add a profile for each person next.</p>
+      <div className="mb-1.5 text-[11px] font-bold tracking-[0.14em] text-primary uppercase">Get started</div>
+      <h2 className="text-[1.7rem] font-bold tracking-tight text-ink">Create your account</h2>
+      <p className="mt-1.5 text-[15px] text-muted">One account per household. You'll add a profile for each person next.</p>
       <AuthForm mode="signup" onSubmit={onSubmit} />
-      <p className="muted small auth-switch">
+      <p className="mt-5 text-[13px] text-muted">
         Already have an account? <Link to="/login">Log in</Link>
       </p>
     </>

@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { api } from '../api/client'
 import { IconCamera, IconUsers } from '../components/icons'
+import { AnimatedNumber, Item, Page, Stagger } from '../components/motion'
 import { PlanEditor } from '../components/PlanEditor'
 import { ProgressCharts } from '../components/ProgressCharts'
 import { Alert, Card, EmptyState, PageHeader, Segmented, Skeleton, StatTile } from '../components/ui'
@@ -63,9 +64,13 @@ export function DashboardPage() {
 
   if (!profilesLoading && profiles.length === 0) {
     return (
-      <div className="page">
+      <Page>
         <PageHeader eyebrow="Welcome" title="Let's set up the first profile" subtitle="A profile is one person who exercises. Everyone in the household gets their own." />
-        {error && <Alert tone="bad">{error}</Alert>}
+        {error && (
+          <div className="mb-4">
+            <Alert tone="bad">{error}</Alert>
+          </div>
+        )}
         <EmptyState
           icon={<IconUsers />}
           title="No profiles yet"
@@ -81,7 +86,7 @@ export function DashboardPage() {
             </>
           }
         />
-      </div>
+      </Page>
     )
   }
 
@@ -93,7 +98,7 @@ export function DashboardPage() {
   const fatigue = latest ? fatigueLabel(latest.fatigueIndex) : null
 
   return (
-    <div className="page">
+    <Page>
       <PageHeader
         eyebrow="Dashboard"
         title={selected?.name ?? 'Dashboard'}
@@ -101,18 +106,22 @@ export function DashboardPage() {
         actions={<Segmented label="Exercise" options={EXERCISE_OPTIONS} value={exercise} onChange={setExercise} />}
       />
 
-      {error && <Alert tone="bad">{error}</Alert>}
+      {error && (
+        <div className="mb-4">
+          <Alert tone="bad">{error}</Alert>
+        </div>
+      )}
 
       {loading && !progress && (
-        <div className="stat-grid">
+        <div className="mb-5 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
           {[0, 1, 2, 3].map((i) => (
-            <Skeleton key={i} height={96} />
+            <Skeleton key={i} height={104} />
           ))}
         </div>
       )}
 
       {progress && progress.sessions.length === 0 && (
-        <div style={{ marginBottom: 18 }}>
+        <div className="mb-5">
           <EmptyState
             icon={<IconCamera />}
             title={`No ${exerciseName.toLowerCase()} sessions for ${selected?.name ?? 'this profile'} yet`}
@@ -133,63 +142,71 @@ export function DashboardPage() {
 
       {progress && latest && fatigue && (
         <>
-          <div className="stat-grid">
-            <StatTile
-              label="Best range"
-              value={deg(bestAll)}
-              hint={goal == null ? 'no goal set' : bestAll >= goal ? `goal of ${deg(goal)} reached` : `${deg(goal - bestAll)} short of the ${deg(goal)} goal`}
-              tone={goal != null && bestAll >= goal ? 'good' : 'primary'}
-            />
-            <StatTile label="Latest session" value={deg(latest.bestPeakDeg)} hint={`${formatDate(latest.date)} · ${latest.totalReps} reps`} />
-            <StatTile label="Sessions this week" value={thisWeek} hint={`${progress.sessions.length} total for ${exerciseName.toLowerCase()}`} tone={thisWeek >= 3 ? 'good' : 'default'} />
-            <StatTile label="Fatigue proxy" value={latest.fatigueIndex.toFixed(2)} hint={fatigue.text} tone={fatigue.tone} />
-          </div>
+          <Stagger className="mb-5 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+            <Item>
+              <StatTile
+                label="Best range"
+                value={<AnimatedNumber value={bestAll} suffix="°" />}
+                hint={goal == null ? 'no goal set' : bestAll >= goal ? `goal of ${deg(goal)} reached` : `${deg(goal - bestAll)} short of the ${deg(goal)} goal`}
+                tone={goal != null && bestAll >= goal ? 'good' : 'primary'}
+              />
+            </Item>
+            <Item>
+              <StatTile label="Latest session" value={<AnimatedNumber value={latest.bestPeakDeg} suffix="°" />} hint={`${formatDate(latest.date)} · ${latest.totalReps} reps`} />
+            </Item>
+            <Item>
+              <StatTile label="Sessions this week" value={<AnimatedNumber value={thisWeek} />} hint={`${progress.sessions.length} total for ${exerciseName.toLowerCase()}`} tone={thisWeek >= 3 ? 'good' : 'default'} />
+            </Item>
+            <Item>
+              <StatTile label="Fatigue proxy" value={<AnimatedNumber value={latest.fatigueIndex} decimals={2} />} hint={fatigue.text} tone={fatigue.tone} />
+            </Item>
+          </Stagger>
           <ProgressCharts progress={progress} metricLabel={EXERCISES[exercise].metricLabel} />
         </>
       )}
 
-      <div className="layout">
-        <section className="main">
-          <Card title="Recent sessions" subtitle="All exercises, newest first. Open one for the set-by-set view.">
-            {sessions.length === 0 ? (
-              <p className="muted">None yet.</p>
-            ) : (
-              <div className="table-wrap">
-                <table className="table">
-                  <thead>
-                    <tr>
-                      <th>When</th>
-                      <th>Exercise</th>
-                      <th className="num">Reps</th>
-                      <th className="num">Best</th>
-                      <th className="num">Mean</th>
-                      <th className="num">Fatigue</th>
+      <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,2fr)_minmax(300px,1fr)]">
+        <Card title="Recent sessions" subtitle="All exercises, newest first. Open one for the set-by-set view.">
+          {sessions.length === 0 ? (
+            <p className="text-[14px] text-muted">None yet.</p>
+          ) : (
+            <div className="-mx-1 overflow-x-auto px-1">
+              <table className="table">
+                <thead>
+                  <tr>
+                    <th>When</th>
+                    <th>Exercise</th>
+                    <th className="num">Reps</th>
+                    <th className="num">Best</th>
+                    <th className="num">Mean</th>
+                    <th className="num">Fatigue</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {sessions.slice(0, 12).map((s) => (
+                    <tr key={s.id}>
+                      <td>
+                        <Link className="font-medium" to={`/sessions/${s.id}`}>
+                          {formatDateTime(s.startedAt)}
+                        </Link>
+                        {s.demo && <span className="badge">demo</span>}
+                      </td>
+                      <td>
+                        {EXERCISES[s.exercise].name} <span className="text-[12px] text-muted">· {s.side}</span>
+                      </td>
+                      <td className="num">{s.summary.totalReps}</td>
+                      <td className="num">{deg(s.summary.bestPeakDeg)}</td>
+                      <td className="num">{deg(s.summary.meanPeakDeg)}</td>
+                      <td className="num">{s.summary.fatigueIndex.toFixed(2)}</td>
                     </tr>
-                  </thead>
-                  <tbody>
-                    {sessions.slice(0, 12).map((s) => (
-                      <tr key={s.id}>
-                        <td>
-                          <Link to={`/sessions/${s.id}`}>{formatDateTime(s.startedAt)}</Link>
-                          {s.demo && <span className="badge">demo</span>}
-                        </td>
-                        <td>
-                          {EXERCISES[s.exercise].name} <span className="muted small">· {s.side}</span>
-                        </td>
-                        <td className="num">{s.summary.totalReps}</td>
-                        <td className="num">{deg(s.summary.bestPeakDeg)}</td>
-                        <td className="num">{deg(s.summary.meanPeakDeg)}</td>
-                        <td className="num">{s.summary.fatigueIndex.toFixed(2)}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </Card>
-        </section>
-        <aside className="side">{selectedId && <PlanEditor profileId={selectedId} plan={plan} onSaved={setPlan} />}</aside>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </Card>
+        {selectedId && <PlanEditor profileId={selectedId} plan={plan} onSaved={setPlan} />}
       </div>
-    </div>
+    </Page>
   )
 }

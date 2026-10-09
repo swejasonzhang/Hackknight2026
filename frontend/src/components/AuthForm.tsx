@@ -28,7 +28,7 @@ export function AuthForm({ mode, onSubmit }: Props) {
   }
 
   return (
-    <form className="form" onSubmit={submit}>
+    <form className="mt-6 flex flex-col gap-4" onSubmit={submit}>
       {mode === 'signup' && (
         <label className="field">
           Name
@@ -50,14 +50,14 @@ export function AuthForm({ mode, onSubmit }: Props) {
           value={password}
           onChange={(e) => setPassword(e.target.value)}
         />
-        {mode === 'signup' && <span className="field-hint">At least 8 characters.</span>}
+        {mode === 'signup' && <span className="text-[12px] font-normal text-muted">At least 8 characters.</span>}
       </label>
       {error && (
-        <p className="error" role="alert">
+        <p className="text-[14px] text-bad" role="alert">
           {error}
         </p>
       )}
-      <button className="btn btn-primary btn-block" type="submit" disabled={busy}>
+      <button className="btn btn-primary mt-1 w-full py-2.5" type="submit" disabled={busy}>
         {busy ? 'Please wait…' : mode === 'signup' ? 'Create account' : 'Log in'}
       </button>
     </form>

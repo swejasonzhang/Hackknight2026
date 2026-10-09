@@ -1,3 +1,4 @@
+import { motion } from 'motion/react'
 import { useEffect, useState } from 'react'
 import { Link, NavLink, Outlet } from 'react-router-dom'
 import { api } from '../api/client'
@@ -23,57 +24,72 @@ function ApiStatus() {
       clearInterval(id)
     }
   }, [])
+  const dot = state === 'ok' ? 'bg-good shadow-[0_0_0_3px_var(--good-soft)]' : state === 'down' ? 'bg-bad shadow-[0_0_0_3px_var(--bad-soft)]' : 'bg-muted'
   const text = state === 'ok' ? 'Connected' : state === 'down' ? 'API unreachable' : 'Checking…'
   return (
-    <div className={`api-status api-${state}`} title="API and database status">
-      <span className="dot" /> {text}
+    <div className="hidden items-center gap-2 text-[12px] text-muted md:flex" title="API and database status">
+      <span className={`h-2 w-2 rounded-full ${dot}`} /> {text}
     </div>
   )
 }
+
+const links = [
+  { to: '/', label: 'Dashboard', icon: IconChart, end: true },
+  { to: '/profiles', label: 'Profiles', icon: IconUsers, end: false },
+]
 
 /** Signed-in frame: sidebar navigation, top bar with the profile switcher, page outlet. */
 export function AppShell() {
   const { user, logout } = useAuth()
   return (
-    <div className="shell">
-      <aside className="sidebar">
-        <Link to="/" className="brand">
-          <Logo />
+    <div className="min-h-screen md:grid md:grid-cols-[248px_minmax(0,1fr)]">
+      <aside className="sticky top-0 z-20 flex items-center gap-3 border-b border-line bg-surface/85 px-4 py-3 backdrop-blur-md md:h-screen md:flex-col md:items-stretch md:gap-7 md:border-r md:border-b-0 md:px-4 md:py-6">
+        <Link to="/" className="flex items-center gap-2.5 text-[17px] font-extrabold tracking-tight text-ink no-underline hover:no-underline">
+          <Logo size={30} />
           <span>{APP_NAME}</span>
         </Link>
-        <nav className="sidenav" aria-label="Main">
-          <NavLink to="/" end>
-            <IconChart /> Dashboard
-          </NavLink>
-          <NavLink to="/profiles">
-            <IconUsers /> Profiles
-          </NavLink>
+
+        <nav className="flex gap-1 md:flex-col" aria-label="Main">
+          {links.map(({ to, label, icon: Icon, end }) => (
+            <NavLink key={to} to={to} end={end} className="relative rounded-xl px-3 py-2.5 text-[14px] font-semibold text-ink-2 no-underline transition-colors hover:text-ink hover:no-underline">
+              {({ isActive }) => (
+                <>
+                  {isActive && <motion.span layoutId="nav-pill" className="absolute inset-0 rounded-xl bg-primary-soft" transition={{ type: 'spring', stiffness: 500, damping: 40 }} />}
+                  <span className={`relative z-10 flex items-center gap-2.5 ${isActive ? 'text-primary' : ''}`}>
+                    <Icon /> {label}
+                  </span>
+                </>
+              )}
+            </NavLink>
+          ))}
         </nav>
-        <div className="sidebar-foot">
+
+        <div className="ml-auto flex items-center gap-3 md:mt-auto md:ml-0 md:flex-col md:items-stretch md:gap-3 md:border-t md:border-line md:pt-4">
           <ApiStatus />
           {user && (
-            <div className="user-chip">
-              <Avatar name={user.name} size={32} />
-              <div className="user-meta">
-                <div className="user-name">{user.name}</div>
-                <div className="muted small">{user.email}</div>
+            <div className="flex min-w-0 items-center gap-2.5">
+              <Avatar name={user.name} size={34} />
+              <div className="hidden min-w-0 md:block">
+                <div className="truncate text-[14px] font-semibold text-ink">{user.name}</div>
+                <div className="truncate text-[12px] text-muted">{user.email}</div>
               </div>
             </div>
           )}
-          <button className="btn btn-ghost btn-sm btn-block" onClick={logout}>
+          <button className="btn btn-ghost btn-sm whitespace-nowrap md:w-full" onClick={logout}>
             Log out
           </button>
         </div>
       </aside>
-      <div className="shell-main">
-        <header className="topbar">
+
+      <div className="flex min-w-0 flex-col">
+        <header className="sticky top-[57px] z-10 flex items-center gap-4 border-b border-line bg-canvas/80 px-5 py-3 backdrop-blur-md md:top-0 md:px-8">
           <ProfilePicker />
-          <span className="topbar-spacer" />
+          <span className="flex-1" />
           <Link className="btn btn-ghost btn-sm" to="/profiles">
             Manage profiles
           </Link>
         </header>
-        <main className="content">
+        <main className="w-full max-w-[1240px] px-5 py-7 md:px-8 md:py-8">
           <Outlet />
         </main>
       </div>

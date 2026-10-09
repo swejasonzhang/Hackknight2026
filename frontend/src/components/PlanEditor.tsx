@@ -38,8 +38,8 @@ export function PlanEditor({ profileId, plan, onSaved }: Props) {
 
   return (
     <Card title="Your plan" subtitle={plan ? 'The camera app reads this to know your sets, reps and goal.' : 'No plan yet. Save one so the camera app knows what to count.'}>
-      <form className="form" onSubmit={submit} style={{ marginTop: 0 }}>
-        <div className="grid-2">
+      <form className="flex flex-col gap-4" onSubmit={submit}>
+        <div className="grid grid-cols-2 gap-3">
           <label className="field">
             Exercise
             <select className="input" value={form.exercise} onChange={(e) => setForm({ ...form, exercise: e.target.value as ExerciseId })}>
@@ -74,12 +74,12 @@ export function PlanEditor({ profileId, plan, onSaved }: Props) {
             <input className="input" type="number" min={0} max={180} value={form.targetDeg} onChange={num('targetDeg')} />
           </label>
         </div>
-        {error && <p className="error">{error}</p>}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+        {error && <p className="text-[14px] text-bad">{error}</p>}
+        <div className="flex items-center gap-3">
           <button className="btn btn-primary" type="submit" disabled={saving}>
             {saving ? 'Saving…' : 'Save plan'}
           </button>
-          {savedAt && !saving && <span className="muted small">Saved.</span>}
+          {savedAt && !saving && <span className="text-[13px] text-good">Saved.</span>}
         </div>
       </form>
     </Card>

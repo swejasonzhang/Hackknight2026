@@ -1,12 +1,15 @@
+import { motion, useReducedMotion } from 'motion/react'
 import { useState, type FormEvent } from 'react'
 import { api } from '../api/client'
 import { IconPlus, IconSparkle, IconTrash, IconUsers } from '../components/icons'
+import { Item, Page, Stagger } from '../components/motion'
 import { Alert, Avatar, Card, EmptyState, PageHeader, Skeleton } from '../components/ui'
 import { formatDate } from '../format'
 import { useProfiles } from '../hooks/useProfiles'
 
 export function ProfilesPage() {
   const { profiles, selectedId, setSelectedId, reload, loading, error } = useProfiles()
+  const reduce = useReducedMotion()
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
   const [busy, setBusy] = useState(false)
@@ -54,17 +57,21 @@ export function ProfilesPage() {
     })
 
   return (
-    <div className="page">
+    <Page>
       <PageHeader eyebrow="Household" title="Profiles" subtitle="One profile per person who exercises. The selected profile is the one the dashboard shows." />
-      {error && <Alert tone="bad">{error}</Alert>}
-      {message && <Alert tone={message.tone}>{message.text}</Alert>}
+      {(error || message) && (
+        <div className="mb-5">
+          {error && <Alert tone="bad">{error}</Alert>}
+          {message && <Alert tone={message.tone}>{message.text}</Alert>}
+        </div>
+      )}
 
-      <div className="layout" style={{ marginTop: message || error ? 14 : 0 }}>
-        <section className="main">
+      <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,2fr)_minmax(300px,1fr)]">
+        <div>
           {loading && (
-            <div className="profile-grid">
-              {[0, 1, 2].map((i) => (
-                <Skeleton key={i} height={140} />
+            <div className="grid gap-4 sm:grid-cols-2">
+              {[0, 1].map((i) => (
+                <Skeleton key={i} height={150} />
               ))}
             </div>
           )}
@@ -72,40 +79,42 @@ export function ProfilesPage() {
             <EmptyState icon={<IconUsers />} title="No profiles yet" description="Add yourself or a family member using the form, or load the demo profile to explore." />
           )}
           {profiles.length > 0 && (
-            <div className="profile-grid">
+            <Stagger className="grid gap-4 sm:grid-cols-2">
               {profiles.map((p) => {
                 const isSelected = p.id === selectedId
                 return (
-                  <Card key={p.id} className={`profile-card ${isSelected ? 'selected' : ''}`}>
-                    <div className="profile-top">
-                      <Avatar name={p.name} size={44} />
-                      <div style={{ minWidth: 0 }}>
-                        <div className="profile-name">
-                          {p.name}
-                          {isSelected && <span className="badge tone-primary">viewing</span>}
+                  <Item key={p.id}>
+                    <motion.div whileHover={reduce ? undefined : { y: -3 }} transition={{ type: 'spring', stiffness: 400, damping: 30 }} className={`card flex h-full flex-col gap-4 transition-shadow ${isSelected ? 'ring-2 ring-primary/60' : 'hover:shadow-pop'}`}>
+                      <div className="flex items-center gap-3">
+                        <Avatar name={p.name} size={46} />
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-1 text-[16px] font-semibold text-ink">
+                            <span className="truncate">{p.name}</span>
+                            {isSelected && <span className="badge bg-primary-soft text-primary">viewing</span>}
+                          </div>
+                          <div className="truncate text-[13px] text-muted">{p.email ?? `Added ${formatDate(p.createdAt)}`}</div>
                         </div>
-                        <div className="muted small">{p.email ?? `Added ${formatDate(p.createdAt)}`}</div>
                       </div>
-                    </div>
-                    {p.notes && <div className="muted small">{p.notes}</div>}
-                    <div className="profile-actions">
-                      <button className="btn btn-sm" onClick={() => setSelectedId(p.id)} disabled={isSelected}>
-                        {isSelected ? 'Selected' : 'View dashboard'}
-                      </button>
-                      <button className="btn btn-sm btn-danger" disabled={busy} onClick={() => remove(p.id, p.name)} aria-label={`Delete ${p.name}`}>
-                        <IconTrash width={16} height={16} /> Delete
-                      </button>
-                    </div>
-                  </Card>
+                      {p.notes && <div className="text-[13px] text-muted">{p.notes}</div>}
+                      <div className="mt-auto flex gap-2">
+                        <button className="btn btn-sm" onClick={() => setSelectedId(p.id)} disabled={isSelected}>
+                          {isSelected ? 'Selected' : 'View dashboard'}
+                        </button>
+                        <button className="btn btn-sm btn-danger" disabled={busy} onClick={() => remove(p.id, p.name)} aria-label={`Delete ${p.name}`}>
+                          <IconTrash width={15} height={15} /> Delete
+                        </button>
+                      </div>
+                    </motion.div>
+                  </Item>
                 )
               })}
-            </div>
+            </Stagger>
           )}
-        </section>
+        </div>
 
-        <aside className="side">
-          <Card title="Add a profile" subtitle="Name is all that's needed.">
-            <form className="form" onSubmit={create} style={{ marginTop: 0 }}>
+        <div className="flex flex-col gap-5">
+          <Card title="Add a profile" subtitle="A name is all that's needed.">
+            <form className="flex flex-col gap-4" onSubmit={create}>
               <label className="field">
                 Name
                 <input className="input" type="text" required value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Grandma June" />
@@ -124,8 +133,8 @@ export function ProfilesPage() {
               <IconSparkle width={16} height={16} /> Load demo data
             </button>
           </Card>
-        </aside>
+        </div>
       </div>
-    </div>
+    </Page>
   )
 }
