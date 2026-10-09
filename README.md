@@ -197,7 +197,7 @@ The domain **getarc.health** is registered at Porkbun, which also serves its DNS
    | CNAME | `www` | `getarc-web.onrender.com` | 600 |
    | CNAME | `api` | `getarc-api.onrender.com` | 600 |
 
-   ALIAS is Porkbun's root-level CNAME, so you never have to copy an IP from Render. (If you prefer an `A` record for the root, use the IP Render shows on the Custom Domains screen.) Render verifies the domain within minutes and issues HTTPS; `www.getarc.health` redirects to the root automatically.
+   ALIAS is Porkbun's root-level CNAME, so you never have to copy an IP from Render. (If you prefer an `A` record for the root, Render's apex address is `216.24.57.1`, shown on the Custom Domains screen.) Render verifies the domain within minutes and issues HTTPS; `www.getarc.health` redirects to the root automatically.
 6. **Final check:** `https://api.getarc.health/api/health` and `https://getarc.health`.
 
 Production env on `getarc-api`: `NODE_ENV=production`, `MONGODB_URI`, `JWT_SECRET`, `CV_API_KEY`, `CORS_ORIGINS`. The camera app talks to `https://api.getarc.health` (or `https://getarc-api.onrender.com`) with the API key.
