@@ -19,7 +19,7 @@ export function Headline() {
     { text: 'week.' },
   ]
   return (
-    <motion.h1 className="mt-10 max-w-[13ch] text-[clamp(2.3rem,4.6vw,3.6rem)] leading-[1.04] font-extrabold tracking-[-0.03em] text-ink" variants={parent} initial={reduce ? 'show' : 'hidden'} animate="show">
+    <motion.h1 className="mt-10 max-w-[12ch] text-[clamp(3rem,6.2vw,5.4rem)] leading-[0.95] text-ink uppercase" variants={parent} initial={reduce ? 'show' : 'hidden'} animate="show">
       {parts.map((p, i) => (
         <motion.span key={i} className={`inline-block ${p.accent ? 'text-gradient-animated' : ''}`} variants={word}>
           {p.text}
