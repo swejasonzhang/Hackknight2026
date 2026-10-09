@@ -28,7 +28,7 @@ function ApiStatus() {
   const text = state === 'ok' ? 'Connected' : state === 'down' ? 'API unreachable' : 'Checking…'
   return (
     <div className="hidden items-center gap-2 text-[12px] text-muted md:flex" title="API and database status">
-      <span className={`h-2 w-2 rounded-full ${dot}`} /> {text}
+      <span className={`h-2 w-2 rounded-sm ${dot}`} /> {text}
     </div>
   )
 }
@@ -44,17 +44,17 @@ export function AppShell() {
   return (
     <div className="min-h-screen md:grid md:grid-cols-[248px_minmax(0,1fr)]">
       <aside className="sticky top-0 z-20 flex items-center gap-3 border-b border-line bg-surface/85 px-4 py-3 backdrop-blur-md md:h-screen md:flex-col md:items-stretch md:gap-7 md:border-r md:border-b-0 md:px-4 md:py-6">
-        <Link to="/dashboard" className="flex items-center gap-2.5 text-[17px] font-extrabold tracking-tight text-ink no-underline hover:no-underline">
+        <Link to="/dashboard" className="flex items-center gap-2.5 font-display text-[22px] font-extrabold tracking-wide text-ink uppercase no-underline hover:no-underline">
           <Logo size={30} />
           <span>{APP_NAME}</span>
         </Link>
 
         <nav className="flex gap-1 md:flex-col" aria-label="Main">
           {links.map(({ to, label, icon: Icon, end }) => (
-            <NavLink key={to} to={to} end={end} className="relative rounded-xl px-3 py-2.5 text-[14px] font-semibold text-ink-2 no-underline transition-colors hover:text-ink hover:no-underline">
+            <NavLink key={to} to={to} end={end} className="relative rounded-sm px-3 py-2.5 font-display text-[15px] font-bold tracking-[0.08em] text-ink-2 uppercase no-underline transition-colors hover:text-ink hover:no-underline">
               {({ isActive }) => (
                 <>
-                  {isActive && <motion.span layoutId="nav-pill" className="absolute inset-0 rounded-xl bg-primary-soft" transition={{ type: 'spring', stiffness: 500, damping: 40 }} />}
+                  {isActive && <motion.span layoutId="nav-pill" className="absolute inset-0 rounded-sm border-l-[3px] border-primary bg-primary-soft" transition={{ type: 'spring', stiffness: 500, damping: 40 }} />}
                   <span className={`relative z-10 flex items-center gap-2.5 ${isActive ? 'text-primary' : ''}`}>
                     <Icon /> {label}
                   </span>

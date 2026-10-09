@@ -85,10 +85,10 @@ export function LiveArc() {
         </text>
       </svg>
 
-      <div className="rounded-2xl border border-line bg-surface/90 p-4 shadow-pop backdrop-blur">
+      <div className="rounded-sm border border-line bg-surface/90 p-4 shadow-pop backdrop-blur">
         <div className="flex items-baseline justify-between">
-          <span className="text-[11px] font-bold tracking-[0.12em] text-muted uppercase">Live set</span>
-          <span className="text-[13px] font-semibold text-ink tabular-nums">
+          <span className="font-display text-[12px] font-bold tracking-[0.16em] text-muted uppercase">Live set</span>
+          <span className="font-display text-[15px] font-bold tracking-wide text-ink uppercase tabular-nums">
             Rep {peaks.length} <span className="text-muted">/ {PEAKS.length}</span>
           </span>
         </div>
@@ -97,10 +97,10 @@ export function LiveArc() {
             const p = peaks[i]
             const height = p == null ? 0 : Math.max(8, ((p - 100) / 40) * 100)
             return (
-              <div key={i} className="flex h-full flex-1 items-end rounded-md bg-surface-2">
+              <div key={i} className="flex h-full flex-1 items-end rounded-sm bg-surface-2">
                 {p != null && (
                   <motion.div
-                    className={`w-full rounded-md ${p < 127 ? 'bg-warn' : 'bg-good'}`}
+                    className={`w-full rounded-sm ${p < 127 ? 'bg-primary-2' : 'bg-accent'}`}
                     initial={reduce ? false : { height: 0 }}
                     animate={{ height: `${height}%` }}
                     transition={{ type: 'spring', stiffness: 260, damping: 22 }}
@@ -112,7 +112,7 @@ export function LiveArc() {
         </div>
         <div className="mt-3 h-5 text-[12px] font-semibold">
           {nudge && (
-            <motion.span key={peaks.length} initial={reduce ? false : { opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} className={nudge.tone === 'warn' ? 'text-warn' : 'text-good'}>
+            <motion.span key={peaks.length} initial={reduce ? false : { opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} className={`font-display tracking-[0.08em] uppercase ${nudge.tone === 'warn' ? 'text-primary-2' : 'text-accent'}`}>
               {nudge.text}
             </motion.span>
           )}

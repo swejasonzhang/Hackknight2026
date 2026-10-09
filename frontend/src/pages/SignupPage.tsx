@@ -14,8 +14,8 @@ export function SignupPage() {
 
   return (
     <>
-      <div className="mb-1.5 text-[11px] font-bold tracking-[0.14em] text-primary uppercase">Get started</div>
-      <h2 className="text-[1.7rem] font-bold tracking-tight text-ink">Create your account</h2>
+      <div className="mb-1.5 font-display text-[12px] font-bold tracking-[0.16em] text-primary uppercase">Get started</div>
+      <h2 className="text-[2.2rem] leading-none text-ink">Create your account</h2>
       <p className="mt-1.5 text-[15px] text-muted">One account per household. You'll add a profile for each person next.</p>
       <AuthForm mode="signup" onSubmit={onSubmit} />
       <p className="mt-5 text-[13px] text-muted">
