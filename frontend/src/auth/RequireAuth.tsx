@@ -1,11 +1,12 @@
 import type { ReactNode } from 'react'
+import { IconSpinner } from '../components/icons'
 import { Navigate, useLocation } from 'react-router-dom'
 import { useAuth } from './AuthContext'
 
 function Checking() {
   return (
-    <div className="flex min-h-[40vh] items-center justify-center text-[14px] text-muted" role="status">
-      Checking your session…
+    <div className="flex min-h-[40vh] items-center justify-center gap-2 text-[14px] font-semibold text-muted" role="status">
+      <IconSpinner size={16} className="animate-spin" aria-hidden="true" /> Checking your session…
     </div>
   )
 }

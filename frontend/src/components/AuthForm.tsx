@@ -1,5 +1,5 @@
 import { useId, useState, type FormEvent } from 'react'
-import { IconCheck } from './icons'
+import { IconCheck, IconSpinner } from './icons'
 import { PasswordField } from './PasswordField'
 
 export type AuthFormValues = { name?: string; email: string; password: string }
@@ -110,7 +110,7 @@ export function AuthForm({ mode, onSubmit }: Props) {
             {mismatch && 'Passwords do not match.'}
             {matched && (
               <>
-                <IconCheck width={14} height={14} /> Passwords match.
+                <IconCheck size={14} /> Passwords match.
               </>
             )}
           </span>
@@ -123,7 +123,8 @@ export function AuthForm({ mode, onSubmit }: Props) {
         </p>
       )}
 
-      <button className="btn btn-primary mt-1 w-full py-3" type="submit" disabled={busy || !valid} aria-busy={busy || undefined}>
+      <button className="btn btn-primary btn-lg mt-1 w-full" type="submit" disabled={busy || !valid} aria-busy={busy || undefined}>
+        {busy && <IconSpinner size={16} className="animate-spin" aria-hidden="true" />}
         {label}
       </button>
     </form>

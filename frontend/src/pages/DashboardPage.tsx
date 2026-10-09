@@ -2,7 +2,7 @@ import { EXERCISE_LIST, EXERCISES, type ExerciseId, type PlanDto, type ProgressD
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { api } from '../api/client'
-import { IconCamera, IconUsers } from '../components/icons'
+import { IconActivity, IconCalendar, IconCamera, IconFlame, IconTarget, IconUsers } from '../components/icons'
 import { AnimatedNumber, Item, Page, Stagger } from '../components/motion'
 import { PlanEditor } from '../components/PlanEditor'
 import { ProgressCharts } from '../components/ProgressCharts'
@@ -72,7 +72,7 @@ export function DashboardPage() {
           </div>
         )}
         <EmptyState
-          icon={<IconUsers />}
+          icon={<IconUsers size={44} strokeWidth={1.5} />}
           title="No profiles yet"
           description="Add yourself or a family member, or load the demo profile to see what six weeks of progress looks like."
           action={
@@ -107,7 +107,7 @@ export function DashboardPage() {
       />
 
       {error && (
-        <div className="mb-4">
+        <div className="mb-5">
           <Alert tone="bad">{error}</Alert>
         </div>
       )}
@@ -115,7 +115,7 @@ export function DashboardPage() {
       {loading && !progress && (
         <div className="mb-5 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
           {[0, 1, 2, 3].map((i) => (
-            <Skeleton key={i} height={104} />
+            <Skeleton key={i} height={128} />
           ))}
         </div>
       )}
@@ -123,7 +123,7 @@ export function DashboardPage() {
       {progress && progress.sessions.length === 0 && (
         <div className="mb-5">
           <EmptyState
-            icon={<IconCamera />}
+            icon={<IconCamera size={44} strokeWidth={1.5} />}
             title={`No ${exerciseName.toLowerCase()} sessions for ${selected?.name ?? 'this profile'} yet`}
             description={
               <>
@@ -132,7 +132,7 @@ export function DashboardPage() {
               </>
             }
             action={
-              <button className="btn" onClick={seedDemo} disabled={seeding}>
+              <button className="btn btn-primary" onClick={seedDemo} disabled={seeding}>
                 {seeding ? 'Loading…' : 'Load demo data'}
               </button>
             }
@@ -146,26 +146,27 @@ export function DashboardPage() {
             <Item>
               <StatTile
                 label="Best range"
+                icon={<IconTarget size={18} />}
                 value={<AnimatedNumber value={bestAll} suffix="°" />}
                 hint={goal == null ? 'no goal set' : bestAll >= goal ? `goal of ${deg(goal)} reached` : `${deg(goal - bestAll)} short of the ${deg(goal)} goal`}
                 tone={goal != null && bestAll >= goal ? 'good' : 'primary'}
               />
             </Item>
             <Item>
-              <StatTile label="Latest session" value={<AnimatedNumber value={latest.bestPeakDeg} suffix="°" />} hint={`${formatDate(latest.date)} · ${latest.totalReps} reps`} />
+              <StatTile label="Latest session" icon={<IconActivity size={18} />} value={<AnimatedNumber value={latest.bestPeakDeg} suffix="°" />} hint={`${formatDate(latest.date)} · ${latest.totalReps} reps`} tone="primary" />
             </Item>
             <Item>
-              <StatTile label="Sessions this week" value={<AnimatedNumber value={thisWeek} />} hint={`${progress.sessions.length} total for ${exerciseName.toLowerCase()}`} tone={thisWeek >= 3 ? 'good' : 'default'} />
+              <StatTile label="Sessions this week" icon={<IconCalendar size={18} />} value={<AnimatedNumber value={thisWeek} />} hint={`${progress.sessions.length} total for ${exerciseName.toLowerCase()}`} tone={thisWeek >= 3 ? 'good' : 'default'} />
             </Item>
             <Item>
-              <StatTile label="Fatigue proxy" value={<AnimatedNumber value={latest.fatigueIndex} decimals={2} />} hint={fatigue.text} tone={fatigue.tone} />
+              <StatTile label="Fatigue proxy" icon={<IconFlame size={18} />} value={<AnimatedNumber value={latest.fatigueIndex} decimals={2} />} hint={fatigue.text} tone={fatigue.tone} />
             </Item>
           </Stagger>
           <ProgressCharts progress={progress} metricLabel={EXERCISES[exercise].metricLabel} />
         </>
       )}
 
-      <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,2fr)_minmax(300px,1fr)]">
+      <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,2fr)_minmax(320px,1fr)]">
         <Card title="Recent sessions" subtitle="All exercises, newest first. Open one for the set-by-set view.">
           {sessions.length === 0 ? (
             <p className="text-[14px] text-muted">None yet.</p>
@@ -186,16 +187,16 @@ export function DashboardPage() {
                   {sessions.slice(0, 12).map((s) => (
                     <tr key={s.id}>
                       <td>
-                        <Link className="font-medium" to={`/sessions/${s.id}`}>
+                        <Link className="font-bold" to={`/sessions/${s.id}`}>
                           {formatDateTime(s.startedAt)}
                         </Link>
                         {s.demo && <span className="badge">demo</span>}
                       </td>
-                      <td>
-                        {EXERCISES[s.exercise].name} <span className="text-[12px] text-muted">· {s.side}</span>
+                      <td className="font-semibold">
+                        {EXERCISES[s.exercise].name} <span className="text-[12px] font-medium text-muted">· {s.side}</span>
                       </td>
                       <td className="num">{s.summary.totalReps}</td>
-                      <td className="num">{deg(s.summary.bestPeakDeg)}</td>
+                      <td className="num font-bold">{deg(s.summary.bestPeakDeg)}</td>
                       <td className="num">{deg(s.summary.meanPeakDeg)}</td>
                       <td className="num">{s.summary.fatigueIndex.toFixed(2)}</td>
                     </tr>

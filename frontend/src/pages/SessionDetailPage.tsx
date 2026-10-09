@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { Bar, BarChart, CartesianGrid, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { api } from '../api/client'
-import { IconArrowLeft } from '../components/icons'
+import { IconActivity, IconArrowLeft, IconFlame, IconTarget, IconTrend } from '../components/icons'
 import { AnimatedNumber, Item, Page, Stagger } from '../components/motion'
 import { axisTick, tooltipStyle } from '../components/ProgressCharts'
 import { Alert, Card, PageHeader, Skeleton, StatTile } from '../components/ui'
@@ -31,9 +31,9 @@ export function SessionDetailPage() {
   }, [id])
 
   const back = (
-    <nav className="mb-3 flex items-center gap-1.5 text-[13px] text-muted" aria-label="Breadcrumb">
+    <nav className="mb-4 flex items-center gap-1.5 text-[13px] font-semibold text-muted" aria-label="Breadcrumb">
       <Link to="/dashboard" className="inline-flex items-center gap-1">
-        <IconArrowLeft width={14} height={14} /> Dashboard
+        <IconArrowLeft size={14} /> Dashboard
       </Link>
       <span>/</span>
       <span>Session</span>
@@ -52,10 +52,10 @@ export function SessionDetailPage() {
     return (
       <Page>
         {back}
-        <Skeleton height={40} width={320} />
-        <div className="mt-5 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <Skeleton height={44} width={360} />
+        <div className="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
           {[0, 1, 2, 3].map((i) => (
-            <Skeleton key={i} height={104} />
+            <Skeleton key={i} height={128} />
           ))}
         </div>
       </Page>
@@ -76,7 +76,7 @@ export function SessionDetailPage() {
         eyebrow={formatDateTime(session.startedAt)}
         title={
           <>
-            {exercise.name} <span className="font-medium text-muted">· {session.side}</span>
+            {exercise.name} <span className="font-semibold text-muted">· {session.side}</span>
             {session.demo && <span className="badge">demo</span>}
           </>
         }
@@ -85,16 +85,16 @@ export function SessionDetailPage() {
 
       <Stagger className="mb-5 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <Item>
-          <StatTile label="Reps" value={<AnimatedNumber value={session.summary.totalReps} />} hint={`${session.sets.length} sets`} />
+          <StatTile label="Reps" icon={<IconActivity size={18} />} value={<AnimatedNumber value={session.summary.totalReps} />} hint={`${session.sets.length} sets`} tone="primary" />
         </Item>
         <Item>
-          <StatTile label="Best rep" value={<AnimatedNumber value={session.summary.bestPeakDeg} suffix="°" />} hint={goalReached ? `goal of ${deg(session.plan.targetDeg)} reached` : `goal ${deg(session.plan.targetDeg)}`} tone={goalReached ? 'good' : 'primary'} />
+          <StatTile label="Best rep" icon={<IconTarget size={18} />} value={<AnimatedNumber value={session.summary.bestPeakDeg} suffix="°" />} hint={goalReached ? `goal of ${deg(session.plan.targetDeg)} reached` : `goal ${deg(session.plan.targetDeg)}`} tone={goalReached ? 'good' : 'primary'} />
         </Item>
         <Item>
-          <StatTile label="Mean rep" value={<AnimatedNumber value={session.summary.meanPeakDeg} suffix="°" />} hint={exercise.metricLabel} />
+          <StatTile label="Mean rep" icon={<IconTrend size={18} />} value={<AnimatedNumber value={session.summary.meanPeakDeg} suffix="°" />} hint={exercise.metricLabel} />
         </Item>
         <Item>
-          <StatTile label="Fatigue proxy" value={<AnimatedNumber value={session.summary.fatigueIndex} decimals={2} />} hint={fatigue.text} tone={fatigue.tone} />
+          <StatTile label="Fatigue proxy" icon={<IconFlame size={18} />} value={<AnimatedNumber value={session.summary.fatigueIndex} decimals={2} />} hint={fatigue.text} tone={fatigue.tone} />
         </Item>
       </Stagger>
 
@@ -106,7 +106,7 @@ export function SessionDetailPage() {
               <XAxis dataKey="label" tick={{ ...axisTick, fontSize: 11 }} interval="preserveStartEnd" minTickGap={18} axisLine={false} tickLine={false} />
               <YAxis domain={[0, yMax]} unit="°" tick={axisTick} axisLine={false} tickLine={false} />
               <Tooltip contentStyle={tooltipStyle} formatter={(v) => `${Number(v).toFixed(0)}°`} cursor={{ fill: 'var(--surface-2)' }} />
-              <Bar dataKey="peakDeg" name="Peak" fill="var(--chart-reps)" radius={[6, 6, 0, 0]} isAnimationActive={false} />
+              <Bar dataKey="peakDeg" name="Peak" fill="var(--chart-reps)" radius={[8, 8, 0, 0]} isAnimationActive={false} />
               <ReferenceLine y={session.plan.targetDeg} stroke="var(--chart-goal)" strokeDasharray="6 3" />
             </BarChart>
           </ResponsiveContainer>
@@ -128,9 +128,9 @@ export function SessionDetailPage() {
               <tbody>
                 {session.sets.map((s) => (
                   <tr key={s.setNumber}>
-                    <td className="font-medium">Set {s.setNumber}</td>
+                    <td className="font-bold">Set {s.setNumber}</td>
                     <td className="num">{s.reps.length}</td>
-                    <td className="num">{deg(Math.max(...s.reps.map((r) => r.peakDeg)))}</td>
+                    <td className="num font-bold">{deg(Math.max(...s.reps.map((r) => r.peakDeg)))}</td>
                     <td className="num">{s.fatigue.sampleReps >= 4 ? deg(s.fatigue.romDropDeg) : '–'}</td>
                     <td className="num">{s.fatigue.sampleReps >= 4 ? pct(s.fatigue.tempoDrift) : '–'}</td>
                     <td>{s.endedEarly ? <span className="badge ml-0">early</span> : <span className="text-muted">as planned</span>}</td>
