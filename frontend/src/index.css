@@ -51,7 +51,7 @@
   --shadow-blue: 0 12px 28px -12px rgb(37 99 235 / 0.55);
 
   /* type scale */
-  --text-display: clamp(2.75rem, 5.5vw, 4.75rem);
+  --text-display: clamp(2.6rem, 5.2vw, 4.5rem);
   --text-h1: clamp(1.9rem, 3vw, 2.4rem);
   --text-h2: clamp(1.6rem, 2.4vw, 2rem);
   --text-h3: 1.0625rem;
@@ -156,8 +156,8 @@
 @layer components {
   .display {
     font-size: var(--text-display);
-    line-height: 1.02;
-    @apply font-extrabold tracking-[-0.035em] text-ink;
+    line-height: 1;
+    @apply font-extrabold tracking-[-0.04em] text-ink;
     text-wrap: balance;
   }
   .eyebrow {
@@ -165,6 +165,17 @@
   }
   .lead {
     @apply text-[17px] leading-[1.65] text-ink-2;
+  }
+  .nav-link {
+    @apply relative text-[14px] font-bold text-ink-2 no-underline transition-colors hover:text-ink hover:no-underline;
+  }
+  .nav-link::after {
+    content: '';
+    @apply absolute -bottom-1 left-0 h-[2px] w-full origin-left scale-x-0 rounded-full bg-primary transition-transform duration-200;
+  }
+  .nav-link:hover::after,
+  .nav-link:focus-visible::after {
+    @apply scale-x-100;
   }
 
   .btn {
@@ -261,6 +272,29 @@
   }
 }
 
+@keyframes accordion-down {
+  from {
+    height: 0;
+  }
+  to {
+    height: var(--radix-accordion-content-height);
+  }
+}
+@keyframes accordion-up {
+  from {
+    height: var(--radix-accordion-content-height);
+  }
+  to {
+    height: 0;
+  }
+}
+.faq-content[data-state='open'] {
+  animation: accordion-down 0.28s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.faq-content[data-state='closed'] {
+  animation: accordion-up 0.2s ease-in;
+}
+
 @keyframes shimmer {
   0% {
     background-position: 200% 0;
@@ -338,7 +372,8 @@
   }
   .marquee-track,
   .grid-lines,
-  .skeleton {
+  .skeleton,
+  .faq-content {
     animation: none;
   }
 }
