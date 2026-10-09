@@ -34,7 +34,7 @@ Owners: **FS** = full-stack (this repo), **CV** = computer-vision camera app.
 
 | # | Story | AC | Pts | Status |
 |---|---|---|---|---|
-| D1 | As a team we deploy to getarc.health | Render blueprint; GoDaddy records; HTTPS; `CORS_ORIGINS` set; smoke test | 5 | Ready |
+| D1 | As a team we deploy to getarc.health | Render blueprint; Porkbun records; HTTPS; `CORS_ORIGINS` set; smoke test | 5 | Ready |
 | D2 | As a family member I switch to my profile quickly | profile switcher remembered per device, optional PIN | 3 | Backlog |
 | D3 | As a user I export my sessions as CSV | `GET /api/profiles/:id/sessions.csv`; test for header + rows | 2 | Backlog |
 | D4 | As a user I get helpful errors when the API is down | toast + retry; status dot already exists | 2 | Backlog |

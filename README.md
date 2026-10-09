@@ -2,7 +2,7 @@
 
 **Range of motion is an arc.** Arc is a webcam goniometer for home use, for anyone at any age, live at [getarc.health](https://getarc.health). A separate **camera app** (built by the computer-vision teammates) watches you exercise, measures joint range of motion (ROM) in degrees, counts reps and sets, and stores each session in MongoDB. **This repository is the web app and API around that data**: accounts, one profile per person in the household, and dashboards that show progress over weeks. It is a personal tool, not a clinical one: no doctor or therapist sees the data.
 
-Stack: MongoDB Atlas · Express 5 · React 19 · Node 20 (MERN), TypeScript everywhere, Vite, Vitest. Hosted on Render, domain at GoDaddy.
+Stack: MongoDB Atlas · Express 5 · React 19 · Node 20 (MERN), TypeScript everywhere, Vite, Vitest. Hosted on Render, domain at Porkbun.
 
 ---
 
@@ -181,7 +181,7 @@ How the team works (sprints, stories, definition of done, PR checklist) is in [C
 
 ## 8. Deployment: getarc.health
 
-The domain **getarc.health** is registered at GoDaddy. Hosting is Render, defined by [`render.yaml`](render.yaml) at the repo root: a static site `getarc-web` for the web app and a Node web service `getarc-api` for the API. The static site rewrites `/api/*` to the API's Render hostname, so the browser keeps the same-origin calls it uses in development and the site works on Render's own URLs before DNS is switched. A push to `main` deploys both.
+The domain **getarc.health** is registered at Porkbun, which also serves its DNS. Hosting is Render, defined by [`render.yaml`](render.yaml) at the repo root: a static site `getarc-web` for the web app and a Node web service `getarc-api` for the API. The static site rewrites `/api/*` to the API's Render hostname, so the browser keeps the same-origin calls it uses in development and the site works on Render's own URLs before DNS is switched. A push to `main` deploys both.
 
 ### One-time setup (about 15 minutes)
 
@@ -189,15 +189,15 @@ The domain **getarc.health** is registered at GoDaddy. Hosting is Render, define
 2. **Set the secret** it asks for: `MONGODB_URI` (the Atlas string). `JWT_SECRET` and `CV_API_KEY` are generated; copy `CV_API_KEY` from `getarc-api` → *Environment* and give it to the camera-app team.
 3. **Allow Render in Atlas.** Atlas → Network Access → add the outbound IPs shown on `getarc-api` → *Networking* (or `0.0.0.0/0` for the hackathon).
 4. **Check it on Render's URLs first:** `https://getarc-api.onrender.com/api/health` returns `{ ok: true, db: "connected" }`, and `https://getarc-web.onrender.com` lands on the sign-up page. If Render gave a service a suffixed hostname (the name was taken), update the rewrite destination in `render.yaml` to match.
-5. **Point the domain at Render.** Each service's *Settings → Custom Domains* shows the exact values; at GoDaddy → DNS, replace what is there with:
+5. **Point the domain at Render.** Add `getarc.health` under `getarc-web` → *Settings → Custom Domains* and `api.getarc.health` under `getarc-api`. Then at Porkbun → *Domain Management* → `getarc.health` → **DNS Records**, delete the default records (the `A` records for the root and `*` pointing at `192.0.79.151` / `192.0.79.171`, and any `AAAA` records; the `_acme-challenge` TXT records are Porkbun's own SSL automation and can go too) and add these. Porkbun's *Host* field takes only the part before the domain: leave it blank for the root.
 
-   | Type | Name | Value | TTL |
+   | Type | Host | Answer | TTL |
    |---|---|---|---|
-   | A | `@` | the apex IP Render shows for `getarc-web` | 600 |
+   | ALIAS | *(blank)* | `getarc-web.onrender.com` | 600 |
    | CNAME | `www` | `getarc-web.onrender.com` | 600 |
    | CNAME | `api` | `getarc-api.onrender.com` | 600 |
 
-   Delete the pre-existing `A` records for `@`, `www`, `api` and `*` that point at `192.0.79.151` / `192.0.79.171` (another provider's servers) and the `_acme-challenge` TXT records (Render issues its own certificates). Render verifies the domain within minutes and turns on HTTPS; `www.getarc.health` redirects to the root automatically.
+   ALIAS is Porkbun's root-level CNAME, so you never have to copy an IP from Render. (If you prefer an `A` record for the root, use the IP Render shows on the Custom Domains screen.) Render verifies the domain within minutes and issues HTTPS; `www.getarc.health` redirects to the root automatically.
 6. **Final check:** `https://api.getarc.health/api/health` and `https://getarc.health`.
 
 Production env on `getarc-api`: `NODE_ENV=production`, `MONGODB_URI`, `JWT_SECRET`, `CV_API_KEY`, `CORS_ORIGINS`. The camera app talks to `https://api.getarc.health` (or `https://getarc-api.onrender.com`) with the API key.
