@@ -23,3 +23,7 @@ dist-ssr
 __pycache__/
 *.pyc
 .venv/
+
+# macOS Finder duplicate copies ("name 2.ext") must never be committed
+* 2
+* 2.*
