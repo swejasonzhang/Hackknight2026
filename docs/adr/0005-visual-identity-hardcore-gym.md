@@ -1,7 +1,7 @@
 # ADR-0005: Visual identity: hardcore gym, one dark theme
 
 - Date: 2026-10-09
-- Status: accepted
+- Status: superseded by ADR-0006
 
 ## Context
 

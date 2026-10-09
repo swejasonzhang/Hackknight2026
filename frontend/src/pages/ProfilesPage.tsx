@@ -1,15 +1,13 @@
-import { motion, useReducedMotion } from 'motion/react'
 import { useState, type FormEvent } from 'react'
 import { api } from '../api/client'
 import { IconPlus, IconSparkle, IconTrash, IconUsers } from '../components/icons'
-import { Item, Page, Stagger } from '../components/motion'
+import { Item, Lift, Page, Stagger } from '../components/motion'
 import { Alert, Avatar, Card, EmptyState, PageHeader, Skeleton } from '../components/ui'
 import { formatDate } from '../format'
 import { useProfiles } from '../hooks/useProfiles'
 
 export function ProfilesPage() {
   const { profiles, selectedId, setSelectedId, reload, loading, error } = useProfiles()
-  const reduce = useReducedMotion()
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
   const [busy, setBusy] = useState(false)
@@ -66,17 +64,17 @@ export function ProfilesPage() {
         </div>
       )}
 
-      <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,2fr)_minmax(300px,1fr)]">
+      <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,2fr)_minmax(320px,1fr)]">
         <div>
           {loading && (
             <div className="grid gap-4 sm:grid-cols-2">
               {[0, 1].map((i) => (
-                <Skeleton key={i} height={150} />
+                <Skeleton key={i} height={168} />
               ))}
             </div>
           )}
           {!loading && profiles.length === 0 && (
-            <EmptyState icon={<IconUsers />} title="No profiles yet" description="Add yourself or a family member using the form, or load the demo profile to explore." />
+            <EmptyState icon={<IconUsers size={44} strokeWidth={1.5} />} title="No profiles yet" description="Add yourself or a family member using the form, or load the demo profile to explore." />
           )}
           {profiles.length > 0 && (
             <Stagger className="grid gap-4 sm:grid-cols-2">
@@ -84,11 +82,11 @@ export function ProfilesPage() {
                 const isSelected = p.id === selectedId
                 return (
                   <Item key={p.id}>
-                    <motion.div whileHover={reduce ? undefined : { y: -3 }} transition={{ type: 'spring', stiffness: 400, damping: 30 }} className={`card flex h-full flex-col gap-4 transition-shadow ${isSelected ? 'ring-2 ring-primary/60' : 'hover:shadow-pop'}`}>
-                      <div className="flex items-center gap-3">
-                        <Avatar name={p.name} size={46} />
+                    <Lift className={`card flex h-full flex-col gap-5 ${isSelected ? 'ring-2 ring-primary/50' : ''}`}>
+                      <div className="flex items-center gap-3.5">
+                        <Avatar name={p.name} size={52} />
                         <div className="min-w-0">
-                          <div className="flex items-center gap-1 text-[16px] font-semibold text-ink">
+                          <div className="flex items-center gap-1 text-[17px] font-extrabold tracking-[-0.01em] text-ink">
                             <span className="truncate">{p.name}</span>
                             {isSelected && <span className="badge bg-primary-soft text-primary">viewing</span>}
                           </div>
@@ -101,10 +99,10 @@ export function ProfilesPage() {
                           {isSelected ? 'Selected' : 'View dashboard'}
                         </button>
                         <button className="btn btn-sm btn-danger" disabled={busy} onClick={() => remove(p.id, p.name)} aria-label={`Delete ${p.name}`}>
-                          <IconTrash width={15} height={15} /> Delete
+                          <IconTrash size={15} /> Delete
                         </button>
                       </div>
-                    </motion.div>
+                    </Lift>
                   </Item>
                 )
               })}
@@ -115,22 +113,22 @@ export function ProfilesPage() {
         <div className="flex flex-col gap-5">
           <Card title="Add a profile" subtitle="A name is all that's needed.">
             <form className="flex flex-col gap-4" onSubmit={create}>
-              <label className="field">
-                Name
-                <input className="input" type="text" required value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Grandma June" />
-              </label>
-              <label className="field">
-                Email (optional)
-                <input className="input" type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
-              </label>
+              <div className="field">
+                <label htmlFor="profile-name">Name</label>
+                <input id="profile-name" className="input" type="text" required value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Grandma June" />
+              </div>
+              <div className="field">
+                <label htmlFor="profile-email">Email (optional)</label>
+                <input id="profile-email" className="input" type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
+              </div>
               <button className="btn btn-primary" type="submit" disabled={busy || !name.trim()}>
-                <IconPlus width={16} height={16} /> Add profile
+                <IconPlus size={16} /> Add profile
               </button>
             </form>
           </Card>
           <Card title="Demo data" subtitle='Creates "Demo Profile" with six weeks of seeded sessions.'>
             <button className="btn" onClick={seed} disabled={busy}>
-              <IconSparkle width={16} height={16} /> Load demo data
+              <IconSparkle size={16} /> Load demo data
             </button>
           </Card>
         </div>

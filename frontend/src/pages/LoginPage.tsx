@@ -14,11 +14,11 @@ export function LoginPage() {
 
   return (
     <>
-      <div className="mb-1.5 font-display text-[12px] font-bold tracking-[0.16em] text-primary uppercase">Welcome back</div>
-      <h2 className="text-[2.2rem] leading-none text-ink">Log in</h2>
-      <p className="mt-1.5 text-[15px] text-muted">Pick up where you left off.</p>
+      <div className="eyebrow mb-2">Welcome back</div>
+      <h2>Log in</h2>
+      <p className="mt-2 text-[15px] text-muted">Pick up where you left off.</p>
       <AuthForm mode="login" onSubmit={onSubmit} />
-      <p className="mt-5 text-[13px] text-muted">
+      <p className="mt-6 text-[13.5px] font-semibold text-muted">
         New here? <Link to="/signup">Create an account</Link>
       </p>
     </>

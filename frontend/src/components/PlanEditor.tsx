@@ -39,9 +39,9 @@ export function PlanEditor({ profileId, plan, onSaved }: Props) {
   return (
     <Card title="Your plan" subtitle={plan ? 'The camera app reads this to know your sets, reps and goal.' : 'No plan yet. Save one so the camera app knows what to count.'}>
       <form className="flex flex-col gap-4" onSubmit={submit}>
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-2 gap-3.5">
           <label className="field">
-            Exercise
+            <span className="text-[13px] font-bold text-ink-2">Exercise</span>
             <select className="input" value={form.exercise} onChange={(e) => setForm({ ...form, exercise: e.target.value as ExerciseId })}>
               {EXERCISE_LIST.map((ex) => (
                 <option key={ex.id} value={ex.id}>
@@ -51,26 +51,26 @@ export function PlanEditor({ profileId, plan, onSaved }: Props) {
             </select>
           </label>
           <label className="field">
-            Side
+            <span className="text-[13px] font-bold text-ink-2">Side</span>
             <select className="input" value={form.side} onChange={(e) => setForm({ ...form, side: e.target.value as Side })}>
               <option value="right">Right</option>
               <option value="left">Left</option>
             </select>
           </label>
           <label className="field">
-            Sets
+            <span className="text-[13px] font-bold text-ink-2">Sets</span>
             <input className="input" type="number" min={1} max={10} value={form.sets} onChange={num('sets')} />
           </label>
           <label className="field">
-            Reps per set
+            <span className="text-[13px] font-bold text-ink-2">Reps per set</span>
             <input className="input" type="number" min={1} max={50} value={form.reps} onChange={num('reps')} />
           </label>
           <label className="field">
-            Rest (seconds)
+            <span className="text-[13px] font-bold text-ink-2">Rest (seconds)</span>
             <input className="input" type="number" min={10} max={600} value={form.restSeconds} onChange={num('restSeconds')} />
           </label>
           <label className="field">
-            Goal (degrees)
+            <span className="text-[13px] font-bold text-ink-2">Goal (degrees)</span>
             <input className="input" type="number" min={0} max={180} value={form.targetDeg} onChange={num('targetDeg')} />
           </label>
         </div>
@@ -79,7 +79,7 @@ export function PlanEditor({ profileId, plan, onSaved }: Props) {
           <button className="btn btn-primary" type="submit" disabled={saving}>
             {saving ? 'Saving…' : 'Save plan'}
           </button>
-          {savedAt && !saving && <span className="text-[13px] text-good">Saved.</span>}
+          {savedAt && !saving && <span className="text-[13px] font-bold text-good">Saved.</span>}
         </div>
       </form>
     </Card>

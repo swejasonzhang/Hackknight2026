@@ -1,24 +1,25 @@
 import { animate, motion, useReducedMotion, type Variants } from 'motion/react'
 import { useEffect, useState, type ReactNode } from 'react'
 
-/* Motion primitives. Every one of them degrades to a static render when the OS asks for reduced motion. */
+/* Motion conventions: one easing, short durations, small distances. Static under reduced motion. */
 
 export const ease: [number, number, number, number] = [0.22, 1, 0.36, 1]
+export const DURATION = 0.4
 
 /** Fade-and-rise on mount; wrap each page in it. */
 export function Page({ children, className = '' }: { children: ReactNode; className?: string }) {
   const reduce = useReducedMotion()
   return (
-    <motion.div className={className} initial={reduce ? false : { opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.35, ease }}>
+    <motion.div className={className} initial={reduce ? false : { opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: DURATION, ease }}>
       {children}
     </motion.div>
   )
 }
 
 const parent: Variants = { hidden: {}, show: { transition: { staggerChildren: 0.06, delayChildren: 0.04 } } }
-const child: Variants = { hidden: { opacity: 0, y: 12 }, show: { opacity: 1, y: 0, transition: { duration: 0.4, ease } } }
+const child: Variants = { hidden: { opacity: 0, y: 14 }, show: { opacity: 1, y: 0, transition: { duration: DURATION, ease } } }
 
-/** Children wrapped in <Item> reveal one after another. */
+/** Children wrapped in <Item> reveal one after another on mount. */
 export function Stagger({ children, className = '' }: { children: ReactNode; className?: string }) {
   const reduce = useReducedMotion()
   return (
@@ -28,9 +29,29 @@ export function Stagger({ children, className = '' }: { children: ReactNode; cla
   )
 }
 
+/** Like Stagger, but triggered when scrolled into view (once). */
+export function Reveal({ children, className = '' }: { children: ReactNode; className?: string }) {
+  const reduce = useReducedMotion()
+  return (
+    <motion.div className={className} variants={parent} initial={reduce ? 'show' : 'hidden'} whileInView="show" viewport={{ once: true, margin: '-60px' }}>
+      {children}
+    </motion.div>
+  )
+}
+
 export function Item({ children, className = '' }: { children: ReactNode; className?: string }) {
   return (
     <motion.div className={className} variants={child}>
+      {children}
+    </motion.div>
+  )
+}
+
+/** Hover lift for cards; no-op under reduced motion. */
+export function Lift({ children, className = '' }: { children: ReactNode; className?: string }) {
+  const reduce = useReducedMotion()
+  return (
+    <motion.div className={className} whileHover={reduce ? undefined : { y: -4 }} transition={{ type: 'spring', stiffness: 380, damping: 28 }}>
       {children}
     </motion.div>
   )

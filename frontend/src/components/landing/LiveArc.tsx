@@ -24,10 +24,11 @@ const g2 = pt(GOAL, r - 22)
 const TICKS = [0, 30, 60, 90, 120, 150, 180]
 
 /**
- * The hero: an arc that performs reps on a loop, the readout tracking the angle, and a
- * live-set card that counts reps, draws each peak and nudges when the range shrinks.
+ * An arc that performs reps on a loop, the readout tracking the angle, and a live-set card
+ * that counts reps, draws each peak and nudges when the range shrinks. Colours come from the
+ * surrounding tokens, so it works on white and inside `.on-navy` panels.
  */
-export function LiveArc() {
+export function LiveArc({ compact = false }: { compact?: boolean }) {
   const reduce = useReducedMotion()
   const angle = useMotionValue(reduce ? 132 : REST)
   const [peaks, setPeaks] = useState<number[]>(reduce ? PEAKS : [])
@@ -57,12 +58,12 @@ export function LiveArc() {
   const nudge = last == null ? null : last < 127 ? { text: 'Range shrinking late in the set', tone: 'warn' as const } : { text: 'Full range', tone: 'good' as const }
 
   return (
-    <div className="grid items-center gap-6 sm:grid-cols-[minmax(0,1fr)_200px]">
+    <div className={`grid items-center gap-5 ${compact ? 'sm:grid-cols-[minmax(0,1fr)_170px]' : 'sm:grid-cols-[minmax(0,1fr)_200px]'}`}>
       <svg className="h-auto w-full max-w-[400px]" viewBox="0 0 320 200" role="img" aria-label={`Arc performing reps toward a ${GOAL} degree goal`}>
         <defs>
           <linearGradient id="arcGrad" x1="0" y1="0" x2="1" y2="0">
             <stop offset="0" stopColor="var(--primary)" />
-            <stop offset="1" stopColor="var(--primary-2)" />
+            <stop offset="1" stopColor="var(--sky)" />
           </linearGradient>
         </defs>
         <path d={track} fill="none" stroke="var(--line-strong)" strokeWidth="10" strokeLinecap="round" />
@@ -70,26 +71,26 @@ export function LiveArc() {
         {TICKS.map((t) => {
           const a = pt(t, r + 20)
           return (
-            <text key={t} x={a.x} y={a.y + 4} textAnchor="middle" fontSize="11" fill="var(--muted)">
+            <text key={t} x={a.x} y={a.y + 4} textAnchor="middle" fontSize="11" fontWeight="600" fill="var(--muted)">
               {t}°
             </text>
           )
         })}
-        <line x1={g1.x} y1={g1.y} x2={g2.x} y2={g2.y} stroke="var(--accent)" strokeWidth="3" strokeLinecap="round" />
-        <motion.circle cx={mx} cy={my} r="9" fill="var(--surface)" stroke="var(--primary-2)" strokeWidth="4" />
-        <motion.text x={cx} y={cy - 26} textAnchor="middle" fontSize="42" fontWeight="800" fill="var(--ink)" letterSpacing="-1">
+        <line x1={g1.x} y1={g1.y} x2={g2.x} y2={g2.y} stroke="var(--chart-goal)" strokeWidth="3" strokeLinecap="round" />
+        <motion.circle cx={mx} cy={my} r="9" fill="var(--surface)" stroke="var(--sky)" strokeWidth="4" />
+        <motion.text x={cx} y={cy - 26} textAnchor="middle" fontSize="42" fontWeight="800" fill="var(--ink)" letterSpacing="-1.5">
           {label}
         </motion.text>
-        <text x={cx} y={cy - 4} textAnchor="middle" fontSize="12" fill="var(--muted)">
+        <text x={cx} y={cy - 4} textAnchor="middle" fontSize="12" fontWeight="600" fill="var(--muted)">
           elbow flexion · goal {GOAL}°
         </text>
       </svg>
 
-      <div className="rounded-sm border border-line bg-surface/90 p-4 shadow-pop backdrop-blur">
+      <div className="rounded-[16px] border border-line bg-surface/90 p-4 shadow-card backdrop-blur">
         <div className="flex items-baseline justify-between">
-          <span className="font-display text-[12px] font-bold tracking-[0.16em] text-muted uppercase">Live set</span>
-          <span className="font-display text-[15px] font-bold tracking-wide text-ink uppercase tabular-nums">
-            Rep {peaks.length} <span className="text-muted">/ {PEAKS.length}</span>
+          <span className="text-[11px] font-bold tracking-[0.12em] text-muted uppercase">Live set</span>
+          <span className="text-[13px] font-extrabold text-ink tabular-nums">
+            Rep {peaks.length} <span className="font-semibold text-muted">/ {PEAKS.length}</span>
           </span>
         </div>
         <div className="mt-3 flex h-16 items-end gap-1.5" aria-hidden="true">
@@ -97,10 +98,10 @@ export function LiveArc() {
             const p = peaks[i]
             const height = p == null ? 0 : Math.max(8, ((p - 100) / 40) * 100)
             return (
-              <div key={i} className="flex h-full flex-1 items-end rounded-sm bg-surface-2">
+              <div key={i} className="flex h-full flex-1 items-end rounded-[6px] bg-surface-2">
                 {p != null && (
                   <motion.div
-                    className={`w-full rounded-sm ${p < 127 ? 'bg-primary-2' : 'bg-accent'}`}
+                    className={`w-full rounded-[6px] ${p < 127 ? 'bg-warn' : 'bg-sky'}`}
                     initial={reduce ? false : { height: 0 }}
                     animate={{ height: `${height}%` }}
                     transition={{ type: 'spring', stiffness: 260, damping: 22 }}
@@ -110,9 +111,9 @@ export function LiveArc() {
             )
           })}
         </div>
-        <div className="mt-3 h-5 text-[12px] font-semibold">
+        <div className="mt-3 h-5 text-[12.5px] font-bold">
           {nudge && (
-            <motion.span key={peaks.length} initial={reduce ? false : { opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} className={`font-display tracking-[0.08em] uppercase ${nudge.tone === 'warn' ? 'text-primary-2' : 'text-accent'}`}>
+            <motion.span key={peaks.length} initial={reduce ? false : { opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} className={nudge.tone === 'warn' ? 'text-warn' : 'text-sky'}>
               {nudge.text}
             </motion.span>
           )}
