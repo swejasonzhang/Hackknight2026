@@ -181,25 +181,26 @@ How the team works (sprints, stories, definition of done, PR checklist) is in [C
 
 ## 8. Deployment: getarc.health
 
-The domain **getarc.health** is registered at GoDaddy. Hosting is Render, defined by [`render.yaml`](render.yaml) at the repo root: a static site for the web app on `getarc.health` (+ `www`) and a Node web service for the API on `api.getarc.health`. The static site rewrites `/api/*` to the API, so the browser keeps the same-origin calls it uses in development. A push to `main` deploys both.
+The domain **getarc.health** is registered at GoDaddy. Hosting is Render, defined by [`render.yaml`](render.yaml) at the repo root: a static site `getarc-web` for the web app and a Node web service `getarc-api` for the API. The static site rewrites `/api/*` to the API's Render hostname, so the browser keeps the same-origin calls it uses in development and the site works on Render's own URLs before DNS is switched. A push to `main` deploys both.
 
 ### One-time setup (about 15 minutes)
 
-1. **Connect GitHub to Render.** At dashboard.render.com choose *New → Blueprint*, pick the `swejasonzhang/Hackknight2026` repo and the `main` branch. Render reads `render.yaml` and creates `arc-web` and `arc-api`.
-2. **Set the secrets** it asks for: `MONGODB_URI` (the Atlas string). `JWT_SECRET` and `CV_API_KEY` are generated for you; copy `CV_API_KEY` from the `arc-api` environment page and give it to the camera-app team.
-3. **Allow Render in Atlas.** Atlas → Network Access → add the outbound IPs shown on the `arc-api` service page (or `0.0.0.0/0` for the hackathon).
-4. **Point the domain at Render.** Render shows the exact values under each service's *Custom Domains*; at GoDaddy → DNS, replace what is there with:
+1. **Connect GitHub to Render.** At dashboard.render.com choose *New → Blueprint*, pick the `swejasonzhang/Hackknight2026` repo and the `main` branch. Render reads `render.yaml` and creates `getarc-web` and `getarc-api`. (If you created services from an earlier version of the file, delete those first so the names don't collide.)
+2. **Set the secret** it asks for: `MONGODB_URI` (the Atlas string). `JWT_SECRET` and `CV_API_KEY` are generated; copy `CV_API_KEY` from `getarc-api` → *Environment* and give it to the camera-app team.
+3. **Allow Render in Atlas.** Atlas → Network Access → add the outbound IPs shown on `getarc-api` → *Networking* (or `0.0.0.0/0` for the hackathon).
+4. **Check it on Render's URLs first:** `https://getarc-api.onrender.com/api/health` returns `{ ok: true, db: "connected" }`, and `https://getarc-web.onrender.com` lands on the sign-up page. If Render gave a service a suffixed hostname (the name was taken), update the rewrite destination in `render.yaml` to match.
+5. **Point the domain at Render.** Each service's *Settings → Custom Domains* shows the exact values; at GoDaddy → DNS, replace what is there with:
 
    | Type | Name | Value | TTL |
    |---|---|---|---|
-   | A | `@` | the apex IP Render shows (currently `216.24.57.1`) | 600 |
-   | CNAME | `www` | `arc-web.onrender.com` | 600 |
-   | CNAME | `api` | `arc-api.onrender.com` | 600 |
+   | A | `@` | the apex IP Render shows for `getarc-web` | 600 |
+   | CNAME | `www` | `getarc-web.onrender.com` | 600 |
+   | CNAME | `api` | `getarc-api.onrender.com` | 600 |
 
-   Delete the pre-existing `A` records for `@` and `*` that point at `192.0.79.151` / `192.0.79.171` (they belong to another provider's servers) and the `_acme-challenge` TXT records (Render issues its own certificates). Within a few minutes Render verifies the domain and turns on HTTPS.
-5. **Check:** `https://api.getarc.health/api/health` returns `{ ok: true, db: "connected" }`, and `https://getarc.health` lands on the sign-up page.
+   Delete the pre-existing `A` records for `@`, `www`, `api` and `*` that point at `192.0.79.151` / `192.0.79.171` (another provider's servers) and the `_acme-challenge` TXT records (Render issues its own certificates). Render verifies the domain within minutes and turns on HTTPS; `www.getarc.health` redirects to the root automatically.
+6. **Final check:** `https://api.getarc.health/api/health` and `https://getarc.health`.
 
-Production env on `arc-api`: `NODE_ENV=production`, `MONGODB_URI`, `JWT_SECRET`, `CV_API_KEY`, `CORS_ORIGINS=https://getarc.health,https://www.getarc.health`. The camera app talks to `https://api.getarc.health` with the API key.
+Production env on `getarc-api`: `NODE_ENV=production`, `MONGODB_URI`, `JWT_SECRET`, `CV_API_KEY`, `CORS_ORIGINS`. The camera app talks to `https://api.getarc.health` (or `https://getarc-api.onrender.com`) with the API key.
 
 ## 9. Troubleshooting
 

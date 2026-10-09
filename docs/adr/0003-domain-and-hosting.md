@@ -9,7 +9,7 @@ The product lives at getarc.health (registered at GoDaddy). The camera app only 
 
 ## Decision
 
-Render, driven by the `render.yaml` blueprint in the repo root: a static site for `frontend/dist` on `getarc.health` and `www.getarc.health`, and a Node web service for the API on `api.getarc.health`. The static site rewrites `/api/*` to the API, so the browser keeps same-origin calls. Both get TLS from Render automatically once the GoDaddy records point at them. Data stays in the MongoDB Atlas cluster.
+Render, driven by the `render.yaml` blueprint in the repo root: a static site (`getarc-web`) for `frontend/dist` on `getarc.health`, and a Node web service (`getarc-api`) for the API on `api.getarc.health`. The static site rewrites `/api/*` to the API's Render hostname, so the browser keeps same-origin calls and the site works before DNS is switched. Both get TLS from Render automatically once the GoDaddy records point at them. Data stays in the MongoDB Atlas cluster.
 
 ## Consequences
 
