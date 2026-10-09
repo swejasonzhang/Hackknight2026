@@ -13,15 +13,14 @@ export function SignupPage() {
   }
 
   return (
-    <div className="auth-page">
-      <div className="card auth-card">
-        <h2>Create your account</h2>
-        <p className="muted">One account per household. Add a profile for each person who exercises.</p>
-        <AuthForm mode="signup" onSubmit={onSubmit} />
-        <p className="muted small">
-          Already have an account? <Link to="/login">Log in</Link>
-        </p>
-      </div>
-    </div>
+    <>
+      <div className="eyebrow">Get started</div>
+      <h2>Create your account</h2>
+      <p className="muted">One account per household. You'll add a profile for each person next.</p>
+      <AuthForm mode="signup" onSubmit={onSubmit} />
+      <p className="muted small auth-switch">
+        Already have an account? <Link to="/login">Log in</Link>
+      </p>
+    </>
   )
 }

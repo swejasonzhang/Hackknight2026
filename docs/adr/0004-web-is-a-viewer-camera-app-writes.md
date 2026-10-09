@@ -1,4 +1,4 @@
-# ADR-0005: The web app visualises; the camera app records sessions; accounts with JWT and an API key
+# ADR-0004: The web app visualises; the camera app records sessions; accounts with JWT and an API key
 
 - Date: 2026-10-09
 - Status: accepted
@@ -18,4 +18,4 @@ The computer-vision teammates' camera app tracks the joint, counts reps and sets
 
 - Three secrets in `.env`: `MONGODB_URI`, `JWT_SECRET`, `CV_API_KEY`; the API refuses to start without the first two.
 - The camera app needs the API URL and the key, and a profile id (from `GET /api/profiles`) for the person exercising.
-- Hosted auth providers (e.g. Clerk) were considered and not used: the app would then not own password hashing or token issuing, and the camera app would still need a separate credential.
+- A hosted auth provider was considered and not used: the app would then not own password hashing or token issuing, and the camera app would still need a separate credential.

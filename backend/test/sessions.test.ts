@@ -1,4 +1,4 @@
-import { estimateFatigue } from '@ptg/dependencies'
+import { estimateFatigue } from '@arc/dependencies'
 import { describe, expect, it } from 'vitest'
 import { createProfile, makeSession, signup } from './helpers.ts'
 

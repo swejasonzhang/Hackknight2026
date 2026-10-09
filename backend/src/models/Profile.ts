@@ -1,4 +1,4 @@
-import type { ProfileDto } from '@ptg/dependencies'
+import type { ProfileDto } from '@arc/dependencies'
 import { model, Schema, type Types } from 'mongoose'
 
 export interface ProfileShape {

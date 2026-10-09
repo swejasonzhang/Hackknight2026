@@ -13,14 +13,14 @@ export function LoginPage() {
   }
 
   return (
-    <div className="auth-page">
-      <div className="card auth-card">
-        <h2>Welcome back</h2>
-        <AuthForm mode="login" onSubmit={onSubmit} />
-        <p className="muted small">
-          New here? <Link to="/signup">Create an account</Link>
-        </p>
-      </div>
-    </div>
+    <>
+      <div className="eyebrow">Welcome back</div>
+      <h2>Log in</h2>
+      <p className="muted">Pick up where you left off.</p>
+      <AuthForm mode="login" onSubmit={onSubmit} />
+      <p className="muted small auth-switch">
+        New here? <Link to="/signup">Create an account</Link>
+      </p>
+    </>
   )
 }

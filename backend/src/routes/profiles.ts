@@ -1,4 +1,4 @@
-import { CreateProfileSchema } from '@ptg/dependencies'
+import { CreateProfileSchema } from '@arc/dependencies'
 import { Router } from 'express'
 import { principalOf, requireUser } from '../auth.ts'
 import { validate } from '../http.ts'

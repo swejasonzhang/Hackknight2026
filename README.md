@@ -1,8 +1,8 @@
-# ROM Tracker
+# Arc
 
-A webcam goniometer for home use, for anyone at any age. A separate **camera app** (built by the computer-vision teammates) watches you exercise, measures joint range of motion (ROM) in degrees, counts reps and sets, and stores each session in MongoDB. **This repository is the web app and API around that data**: accounts, one profile per person in the household, and dashboards that show progress over weeks. It is a personal tool, not a clinical one: no doctor or therapist sees the data.
+**Range of motion is an arc.** Arc is a webcam goniometer for home use, for anyone at any age, live at [getarc.health](https://getarc.health). A separate **camera app** (built by the computer-vision teammates) watches you exercise, measures joint range of motion (ROM) in degrees, counts reps and sets, and stores each session in MongoDB. **This repository is the web app and API around that data**: accounts, one profile per person in the household, and dashboards that show progress over weeks. It is a personal tool, not a clinical one: no doctor or therapist sees the data.
 
-Stack: MongoDB Atlas · Express 5 · React 19 · Node 20 (MERN), TypeScript everywhere, Vite, Vitest.
+Stack: MongoDB Atlas · Express 5 · React 19 · Node 20 (MERN), TypeScript everywhere, Vite, Vitest. Hosted on Render, domain at GoDaddy.
 
 ---
 
@@ -11,7 +11,7 @@ Stack: MongoDB Atlas · Express 5 · React 19 · Node 20 (MERN), TypeScript ever
 Prerequisites: **Node 20.19 or newer** (`.nvmrc` says 20; `nvm use` picks it), npm 10, and the team's MongoDB Atlas connection string.
 
 ```bash
-git clone <this repo> && cd Hackknight
+git clone https://github.com/swejasonzhang/Hackknight2026.git arc && cd arc
 npm install            # all three workspaces; first run also downloads a MongoDB test binary (~150 MB)
 cp .env.example .env   # fill in MONGODB_URI, JWT_SECRET and CV_API_KEY (see below)
 npm run dev            # API on :8787, web app on :5173
@@ -30,7 +30,7 @@ Copy `.env.example` to `.env` at the repo root. Only the backend reads it.
 
 | Variable | Meaning |
 |---|---|
-| `MONGODB_URI` | **Required.** `mongodb+srv://<user>:<password>@<cluster>.mongodb.net/ptg?retryWrites=true&w=majority`. A local server also works: `mongodb://127.0.0.1:27017/ptg`. If the cluster refuses the connection the API prints why and retries every 10 s. |
+| `MONGODB_URI` | **Required.** `mongodb+srv://<user>:<password>@<cluster>.mongodb.net/arc?retryWrites=true&w=majority`. A local server also works: `mongodb://127.0.0.1:27017/arc`. If the cluster refuses the connection the API prints why and retries every 10 s. |
 | `JWT_SECRET` | **Required.** Signs login tokens. Any long random string: `openssl rand -hex 32`. |
 | `CV_API_KEY` | Shared secret the camera app sends as `x-api-key` when it stores sessions or reads a plan. `openssl rand -hex 32`. Without it the camera app cannot write. |
 | `PORT` | API port, default `8787`. The Vite dev server proxies `/api/*` here. |
@@ -89,7 +89,7 @@ content-type: application/json
 
 ### What the engine defines for the camera app
 
-`@ptg/dependencies` is pure TypeScript shared by the server and (if the camera app is JavaScript) the camera app:
+`@arc/dependencies` is pure TypeScript shared by the server and (if the camera app is JavaScript) the camera app:
 
 - `EXERCISES` (`dependencies/src/engine/exercises.ts`): for each exercise, which three landmarks form the angle, how the inner angle becomes the metric (`metricFromInnerAngle`, always "more degrees = deeper into the rep"), the rep thresholds (`enterDeg`, `exitDeg`), the jitter floor (`minRepMs`), the default goal, and the cue that tells the user how to face the camera.
 - `RepCounter`: the hysteresis rep counter (leave rest, pass `enterDeg`, return to `exitDeg` = one rep; shorter than `minRepMs` = ignored). `OneEuroFilter` smooths the angle stream first.
@@ -144,17 +144,17 @@ Exercise ids: `elbow_flexion`, `shoulder_abduction`, `seated_knee_extension`. Si
 ## 6. Repository layout
 
 ```
-dependencies/  @ptg/dependencies  pure TypeScript shared by both sides: domain types, exercise configs,
+dependencies/  @arc/dependencies  pure TypeScript shared by both sides: domain types, exercise configs,
                rep counter, One Euro filter, fatigue proxy, session summary, zod API schemas
-backend/       @ptg/backend       Express 5 + Mongoose: models (User, Profile, Plan, Session), auth,
+backend/       @arc/backend       Express 5 + Mongoose: models (User, Profile, Plan, Session), auth,
                routes, services; src/app.ts builds the app, src/index.ts connects and listens, test/ = API tests
-frontend/      @ptg/frontend      Vite + React 19: auth (token, context, route guards), pages (Signup, Login,
+frontend/      @arc/frontend      Vite + React 19: auth (token, context, route guards), pages (Signup, Login,
                Dashboard, Profiles, SessionDetail), components, api/client.ts (typed fetch wrapper)
 docs/          backlog, sprint plan, definition of done, architecture decision records
 .github/       CI workflow and issue / PR templates
 ```
 
-The three packages are npm workspaces. `@ptg/dependencies` is consumed as TypeScript source, so a change there is picked up by both sides without a build step.
+The three packages are npm workspaces. `@arc/dependencies` is consumed as TypeScript source, so a change there is picked up by both sides without a build step.
 
 ## 7. Testing and the development process
 
@@ -166,19 +166,32 @@ The project is developed **test-first**: write the failing test, make it pass, t
 
 How the team works (sprints, stories, definition of done, PR checklist) is in [CONTRIBUTING.md](CONTRIBUTING.md) and [docs/](docs/).
 
-## 8. Deployment and the domain
+## 8. Deployment: getarc.health
 
-The domain is registered at **GoDaddy**. The app is two deployables plus the database:
+The domain **getarc.health** is registered at GoDaddy. Hosting is Render, defined by [`render.yaml`](render.yaml) at the repo root: a static site for the web app on `getarc.health` (+ `www`) and a Node web service for the API on `api.getarc.health`. The static site rewrites `/api/*` to the API, so the browser keeps the same-origin calls it uses in development. A push to `main` deploys both.
 
-1. **Database**: the MongoDB Atlas cluster. Put its connection string in `MONGODB_URI` and allow the API host's address under *Network Access*.
-2. **API** (`backend/`): any Node host (Render, Railway, Fly.io). Start command `npm run start -w backend`; set `NODE_ENV=production`, `MONGODB_URI`, `JWT_SECRET`, `CV_API_KEY`, `CORS_ORIGINS=https://app.<domain>`.
-3. **Web app** (`frontend/`): `npm run build` produces `frontend/dist`; host it on Vercel/Netlify/Cloudflare Pages and rewrite `/api/*` to the API host.
-4. **DNS at GoDaddy**: a CNAME `app` → the web host, a CNAME `api` → the API host, as each host's dashboard instructs. Both hosts provide HTTPS once the records resolve. Give the camera app `https://api.<domain>` and the `CV_API_KEY`.
+### One-time setup (about 15 minutes)
+
+1. **Connect GitHub to Render.** At dashboard.render.com choose *New → Blueprint*, pick the `swejasonzhang/Hackknight2026` repo and the `main` branch. Render reads `render.yaml` and creates `arc-web` and `arc-api`.
+2. **Set the secrets** it asks for: `MONGODB_URI` (the Atlas string). `JWT_SECRET` and `CV_API_KEY` are generated for you; copy `CV_API_KEY` from the `arc-api` environment page and give it to the camera-app team.
+3. **Allow Render in Atlas.** Atlas → Network Access → add the outbound IPs shown on the `arc-api` service page (or `0.0.0.0/0` for the hackathon).
+4. **Point the domain at Render.** Render shows the exact values under each service's *Custom Domains*; at GoDaddy → DNS, replace what is there with:
+
+   | Type | Name | Value | TTL |
+   |---|---|---|---|
+   | A | `@` | the apex IP Render shows (currently `216.24.57.1`) | 600 |
+   | CNAME | `www` | `arc-web.onrender.com` | 600 |
+   | CNAME | `api` | `arc-api.onrender.com` | 600 |
+
+   Delete the pre-existing `A` records for `@` and `*` that point at `192.0.79.151` / `192.0.79.171` (they belong to another provider's servers) and the `_acme-challenge` TXT records (Render issues its own certificates). Within a few minutes Render verifies the domain and turns on HTTPS.
+5. **Check:** `https://api.getarc.health/api/health` returns `{ ok: true, db: "connected" }`, and `https://getarc.health` lands on the sign-up page.
+
+Production env on `arc-api`: `NODE_ENV=production`, `MONGODB_URI`, `JWT_SECRET`, `CV_API_KEY`, `CORS_ORIGINS=https://getarc.health,https://www.getarc.health`. The camera app talks to `https://api.getarc.health` with the API key.
 
 ## 9. Troubleshooting
 
 - **"API unreachable" in the nav bar**: the server is not running or crashed on start. Run `npm run dev:backend` alone and read its output.
-- **API exits with "MONGODB_URI is not set" / "JWT_SECRET is not set"**: create `.env` at the repo root from `.env.example`.
+- **API exits with "MONGODB_URI is not set" / "JWT_SECRET is not set"**: create `.env` at the repo root from `.env.example` (locally) or set the variables on the Render service.
 - **API logs "Could not connect to MongoDB … IP that isn't whitelisted"**: in Atlas open *Network Access* → *Add IP Address* → *Allow access from anywhere* (`0.0.0.0/0`, fine for the hackathon). The API retries every 10 s and connects on its own once the rule is active.
 - **Camera app gets 401**: it must send `x-api-key` with the exact value of `CV_API_KEY` in the API's `.env`.
 - **`npm install` fails with "Cannot read properties of null (reading 'edgesOut')"**: an npm 10 workspace bug; the repo's `.npmrc` (`legacy-peer-deps=true`) avoids it.

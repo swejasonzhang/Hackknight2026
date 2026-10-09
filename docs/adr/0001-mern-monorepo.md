@@ -9,7 +9,7 @@ The team splits into a full-stack group and a computer-vision group. The full-st
 
 ## Decision
 
-MongoDB + Express 5 + React 19 + Node 20, TypeScript throughout, as npm workspaces: `dependencies` (domain types, engine, API schemas), `backend` (API), `frontend` (web app). `@ptg/dependencies` is consumed as TypeScript source (its `exports` points at `.ts`), so no build step sits between a change and its use. The CV module plugs into `frontend/src/motion/types.ts` (`MotionSource`).
+MongoDB + Express 5 + React 19 + Node 20, TypeScript throughout, as npm workspaces: `dependencies` (domain types, engine, API schemas), `backend` (API), `frontend` (web app). `@arc/dependencies` is consumed as TypeScript source (its `exports` points at `.ts`), so no build step sits between a change and its use. The CV module plugs into `frontend/src/motion/types.ts` (`MotionSource`).
 
 ## Consequences
 

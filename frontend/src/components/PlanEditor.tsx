@@ -1,6 +1,7 @@
-import { EXERCISE_LIST, type ExerciseId, type PlanDto, type PlanInput, type Side } from '@ptg/dependencies'
-import { useEffect, useState, type FormEvent } from 'react'
+import { EXERCISE_LIST, type ExerciseId, type PlanDto, type PlanInput, type Side } from '@arc/dependencies'
+import { useEffect, useState, type ChangeEvent, type FormEvent } from 'react'
 import { api } from '../api/client'
+import { Card } from './ui'
 
 interface Props {
   profileId: string
@@ -13,6 +14,7 @@ export function PlanEditor({ profileId, plan, onSaved }: Props) {
   const [form, setForm] = useState<PlanInput>(toForm(plan))
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [savedAt, setSavedAt] = useState<number | null>(null)
 
   useEffect(() => {
     setForm(toForm(plan))
@@ -24,6 +26,7 @@ export function PlanEditor({ profileId, plan, onSaved }: Props) {
     setError(null)
     try {
       onSaved(await api.plan.put(profileId, form))
+      setSavedAt(Date.now())
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not save plan')
     } finally {
@@ -31,52 +34,55 @@ export function PlanEditor({ profileId, plan, onSaved }: Props) {
     }
   }
 
-  const num = (key: keyof PlanInput) => (e: React.ChangeEvent<HTMLInputElement>) =>
-    setForm({ ...form, [key]: Number(e.target.value) })
+  const num = (key: keyof PlanInput) => (e: ChangeEvent<HTMLInputElement>) => setForm({ ...form, [key]: Number(e.target.value) })
 
   return (
-    <form className="card" onSubmit={submit}>
-      <h3>Your plan {plan ? <span className="muted small">(saving replaces the current plan)</span> : null}</h3>
-      <div className="grid-2">
-        <label>
-          Exercise
-          <select value={form.exercise} onChange={(e) => setForm({ ...form, exercise: e.target.value as ExerciseId })}>
-            {EXERCISE_LIST.map((ex) => (
-              <option key={ex.id} value={ex.id}>
-                {ex.name}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label>
-          Side
-          <select value={form.side} onChange={(e) => setForm({ ...form, side: e.target.value as Side })}>
-            <option value="right">Right</option>
-            <option value="left">Left</option>
-          </select>
-        </label>
-        <label>
-          Sets
-          <input type="number" min={1} max={10} value={form.sets} onChange={num('sets')} />
-        </label>
-        <label>
-          Reps per set
-          <input type="number" min={1} max={50} value={form.reps} onChange={num('reps')} />
-        </label>
-        <label>
-          Rest (seconds)
-          <input type="number" min={10} max={600} value={form.restSeconds} onChange={num('restSeconds')} />
-        </label>
-        <label>
-          Goal (degrees)
-          <input type="number" min={0} max={180} value={form.targetDeg} onChange={num('targetDeg')} />
-        </label>
-      </div>
-      {error && <p className="error">{error}</p>}
-      <button className="primary" type="submit" disabled={saving}>
-        {saving ? 'Saving…' : 'Save plan'}
-      </button>
-    </form>
+    <Card title="Your plan" subtitle={plan ? 'The camera app reads this to know your sets, reps and goal.' : 'No plan yet. Save one so the camera app knows what to count.'}>
+      <form className="form" onSubmit={submit} style={{ marginTop: 0 }}>
+        <div className="grid-2">
+          <label className="field">
+            Exercise
+            <select className="input" value={form.exercise} onChange={(e) => setForm({ ...form, exercise: e.target.value as ExerciseId })}>
+              {EXERCISE_LIST.map((ex) => (
+                <option key={ex.id} value={ex.id}>
+                  {ex.name}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="field">
+            Side
+            <select className="input" value={form.side} onChange={(e) => setForm({ ...form, side: e.target.value as Side })}>
+              <option value="right">Right</option>
+              <option value="left">Left</option>
+            </select>
+          </label>
+          <label className="field">
+            Sets
+            <input className="input" type="number" min={1} max={10} value={form.sets} onChange={num('sets')} />
+          </label>
+          <label className="field">
+            Reps per set
+            <input className="input" type="number" min={1} max={50} value={form.reps} onChange={num('reps')} />
+          </label>
+          <label className="field">
+            Rest (seconds)
+            <input className="input" type="number" min={10} max={600} value={form.restSeconds} onChange={num('restSeconds')} />
+          </label>
+          <label className="field">
+            Goal (degrees)
+            <input className="input" type="number" min={0} max={180} value={form.targetDeg} onChange={num('targetDeg')} />
+          </label>
+        </div>
+        {error && <p className="error">{error}</p>}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <button className="btn btn-primary" type="submit" disabled={saving}>
+            {saving ? 'Saving…' : 'Save plan'}
+          </button>
+          {savedAt && !saving && <span className="muted small">Saved.</span>}
+        </div>
+      </form>
+    </Card>
   )
 }
 

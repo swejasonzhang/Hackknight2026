@@ -1,4 +1,4 @@
-import type { UserDto } from '@ptg/dependencies'
+import type { UserDto } from '@arc/dependencies'
 import { model, Schema, type Types } from 'mongoose'
 
 export interface UserShape {

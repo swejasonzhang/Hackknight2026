@@ -11,7 +11,7 @@ import type {
   SignupInput,
   UpdatePlanInput,
   UserDto,
-} from '@ptg/dependencies'
+} from '@arc/dependencies'
 import { getToken, signOutLocally } from '../auth/token'
 
 export class ApiRequestError extends Error {

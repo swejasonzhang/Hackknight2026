@@ -28,20 +28,21 @@ export function AuthForm({ mode, onSubmit }: Props) {
   }
 
   return (
-    <form className="auth-form" onSubmit={submit}>
+    <form className="form" onSubmit={submit}>
       {mode === 'signup' && (
-        <label>
+        <label className="field">
           Name
-          <input type="text" autoComplete="name" required value={name} onChange={(e) => setName(e.target.value)} />
+          <input className="input" type="text" autoComplete="name" required value={name} onChange={(e) => setName(e.target.value)} />
         </label>
       )}
-      <label>
+      <label className="field">
         Email
-        <input type="email" autoComplete="email" required value={email} onChange={(e) => setEmail(e.target.value)} />
+        <input className="input" type="email" autoComplete="email" required value={email} onChange={(e) => setEmail(e.target.value)} />
       </label>
-      <label>
+      <label className="field">
         Password
         <input
+          className="input"
           type="password"
           autoComplete={mode === 'signup' ? 'new-password' : 'current-password'}
           required
@@ -49,9 +50,14 @@ export function AuthForm({ mode, onSubmit }: Props) {
           value={password}
           onChange={(e) => setPassword(e.target.value)}
         />
+        {mode === 'signup' && <span className="field-hint">At least 8 characters.</span>}
       </label>
-      {error && <p className="error">{error}</p>}
-      <button className="primary" type="submit" disabled={busy}>
+      {error && (
+        <p className="error" role="alert">
+          {error}
+        </p>
+      )}
+      <button className="btn btn-primary btn-block" type="submit" disabled={busy}>
         {busy ? 'Please wait…' : mode === 'signup' ? 'Create account' : 'Log in'}
       </button>
     </form>

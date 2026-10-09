@@ -1,4 +1,4 @@
-import type { ExerciseId, ProgressDto, SessionRecord } from '@ptg/dependencies'
+import type { ExerciseId, ProgressDto, SessionRecord } from '@arc/dependencies'
 
 /** ISO date (YYYY-MM-DD) of the Monday that starts the UTC week containing `ms`. */
 export function weekStartIso(ms: number): string {

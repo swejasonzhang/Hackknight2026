@@ -1,4 +1,4 @@
-import { PlanInputSchema, UpdatePlanSchema } from '@ptg/dependencies'
+import { PlanInputSchema, UpdatePlanSchema } from '@arc/dependencies'
 import { Router } from 'express'
 import { principalOf } from '../auth.ts'
 import { HttpError, validate } from '../http.ts'

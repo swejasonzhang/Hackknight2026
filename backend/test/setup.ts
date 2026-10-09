@@ -13,7 +13,7 @@ let mongod: MongoMemoryServer
 
 beforeAll(async () => {
   mongod = await MongoMemoryServer.create()
-  await mongoose.connect(mongod.getUri('ptg-test'))
+  await mongoose.connect(mongod.getUri('arc-test'))
 })
 
 afterEach(async () => {

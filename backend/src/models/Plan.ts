@@ -1,4 +1,4 @@
-import { EXERCISE_IDS, type ExerciseId, type PlanDto, type Side } from '@ptg/dependencies'
+import { EXERCISE_IDS, type ExerciseId, type PlanDto, type Side } from '@arc/dependencies'
 import { model, Schema, type Types } from 'mongoose'
 
 export interface PlanShape {

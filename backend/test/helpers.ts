@@ -1,4 +1,4 @@
-import type { CreateSessionInput, RepRecord, SetRecord } from '@ptg/dependencies'
+import type { CreateSessionInput, RepRecord, SetRecord } from '@arc/dependencies'
 import request, { type Test } from 'supertest'
 import { createApp } from '../src/app.ts'
 

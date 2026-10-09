@@ -1,6 +1,8 @@
 import { useState, type FormEvent } from 'react'
 import { api } from '../api/client'
-import { formatDateTime } from '../format'
+import { IconPlus, IconSparkle, IconTrash, IconUsers } from '../components/icons'
+import { Alert, Avatar, Card, EmptyState, PageHeader, Skeleton } from '../components/ui'
+import { formatDate } from '../format'
 import { useProfiles } from '../hooks/useProfiles'
 
 export function ProfilesPage() {
@@ -8,119 +10,120 @@ export function ProfilesPage() {
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
   const [busy, setBusy] = useState(false)
-  const [message, setMessage] = useState<string | null>(null)
+  const [message, setMessage] = useState<{ text: string; tone: 'good' | 'bad' } | null>(null)
 
-  const create = async (e: FormEvent) => {
-    e.preventDefault()
+  const run = async (work: () => Promise<string>) => {
     setBusy(true)
     setMessage(null)
     try {
+      setMessage({ text: await work(), tone: 'good' })
+    } catch (err) {
+      setMessage({ text: err instanceof Error ? err.message : 'Something went wrong', tone: 'bad' })
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const create = (e: FormEvent) => {
+    e.preventDefault()
+    void run(async () => {
       const p = await api.profiles.create({ name, email: email || undefined })
       setName('')
       setEmail('')
       await reload()
       setSelectedId(p.id)
-      setMessage(`Added ${p.name}.`)
-    } catch (err) {
-      setMessage(err instanceof Error ? err.message : 'Could not add profile')
-    } finally {
-      setBusy(false)
-    }
+      return `Added ${p.name}.`
+    })
   }
 
-  const remove = async (id: string, profileName: string) => {
+  const remove = (id: string, profileName: string) => {
     if (!window.confirm(`Delete ${profileName} and all of their sessions? This cannot be undone.`)) return
-    setBusy(true)
-    setMessage(null)
-    try {
+    void run(async () => {
       await api.profiles.delete(id)
       await reload()
-      setMessage(`Deleted ${profileName}.`)
-    } catch (err) {
-      setMessage(err instanceof Error ? err.message : 'Could not delete profile')
-    } finally {
-      setBusy(false)
-    }
+      return `Deleted ${profileName}.`
+    })
   }
 
-  const seed = async () => {
-    setBusy(true)
-    setMessage(null)
-    try {
+  const seed = () =>
+    void run(async () => {
       const r = await api.dev.seed()
       await reload()
       setSelectedId(r.profileId)
-      setMessage(r.created ? `Loaded ${r.sessions} demo sessions.` : `Demo data already loaded (${r.sessions} sessions).`)
-    } catch (err) {
-      setMessage(err instanceof Error ? err.message : 'Could not load demo data')
-    } finally {
-      setBusy(false)
-    }
-  }
+      return r.created ? `Loaded ${r.sessions} demo sessions.` : `Demo data already loaded (${r.sessions} sessions).`
+    })
 
   return (
     <div className="page">
-      <header className="page-header">
-        <h2>Profiles</h2>
-      </header>
-      <div className="layout">
+      <PageHeader eyebrow="Household" title="Profiles" subtitle="One profile per person who exercises. The selected profile is the one the dashboard shows." />
+      {error && <Alert tone="bad">{error}</Alert>}
+      {message && <Alert tone={message.tone}>{message.text}</Alert>}
+
+      <div className="layout" style={{ marginTop: message || error ? 14 : 0 }}>
         <section className="main">
-          <div className="card">
-            {loading && <p className="muted">Loading…</p>}
-            {error && <p className="error">{error}</p>}
-            {!loading && profiles.length === 0 && <p className="muted">No profiles yet.</p>}
-            {profiles.length > 0 && (
-              <table className="table">
-                <thead>
-                  <tr>
-                    <th>Name</th>
-                    <th>Email</th>
-                    <th>Added</th>
-                    <th></th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {profiles.map((p) => (
-                    <tr key={p.id} className={p.id === selectedId ? 'selected' : ''}>
-                      <td>{p.name}</td>
-                      <td>{p.email ?? '–'}</td>
-                      <td>{formatDateTime(p.createdAt)}</td>
-                      <td className="row-actions">
-                        {p.id === selectedId ? <span className="badge">selected</span> : <button onClick={() => setSelectedId(p.id)}>Select</button>}
-                        <button className="danger" disabled={busy} onClick={() => remove(p.id, p.name)}>
-                          Delete
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            )}
-          </div>
+          {loading && (
+            <div className="profile-grid">
+              {[0, 1, 2].map((i) => (
+                <Skeleton key={i} height={140} />
+              ))}
+            </div>
+          )}
+          {!loading && profiles.length === 0 && (
+            <EmptyState icon={<IconUsers />} title="No profiles yet" description="Add yourself or a family member using the form, or load the demo profile to explore." />
+          )}
+          {profiles.length > 0 && (
+            <div className="profile-grid">
+              {profiles.map((p) => {
+                const isSelected = p.id === selectedId
+                return (
+                  <Card key={p.id} className={`profile-card ${isSelected ? 'selected' : ''}`}>
+                    <div className="profile-top">
+                      <Avatar name={p.name} size={44} />
+                      <div style={{ minWidth: 0 }}>
+                        <div className="profile-name">
+                          {p.name}
+                          {isSelected && <span className="badge tone-primary">viewing</span>}
+                        </div>
+                        <div className="muted small">{p.email ?? `Added ${formatDate(p.createdAt)}`}</div>
+                      </div>
+                    </div>
+                    {p.notes && <div className="muted small">{p.notes}</div>}
+                    <div className="profile-actions">
+                      <button className="btn btn-sm" onClick={() => setSelectedId(p.id)} disabled={isSelected}>
+                        {isSelected ? 'Selected' : 'View dashboard'}
+                      </button>
+                      <button className="btn btn-sm btn-danger" disabled={busy} onClick={() => remove(p.id, p.name)} aria-label={`Delete ${p.name}`}>
+                        <IconTrash width={16} height={16} /> Delete
+                      </button>
+                    </div>
+                  </Card>
+                )
+              })}
+            </div>
+          )}
         </section>
+
         <aside className="side">
-          <form className="card" onSubmit={create}>
-            <h3>Add a profile</h3>
-            <label>
-              Name
-              <input type="text" required value={name} onChange={(e) => setName(e.target.value)} />
-            </label>
-            <label>
-              Email (optional)
-              <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
-            </label>
-            <button className="primary" type="submit" disabled={busy || !name.trim()}>
-              Add
+          <Card title="Add a profile" subtitle="Name is all that's needed.">
+            <form className="form" onSubmit={create} style={{ marginTop: 0 }}>
+              <label className="field">
+                Name
+                <input className="input" type="text" required value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Grandma June" />
+              </label>
+              <label className="field">
+                Email (optional)
+                <input className="input" type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
+              </label>
+              <button className="btn btn-primary" type="submit" disabled={busy || !name.trim()}>
+                <IconPlus width={16} height={16} /> Add profile
+              </button>
+            </form>
+          </Card>
+          <Card title="Demo data" subtitle='Creates "Demo Profile" with six weeks of seeded sessions.'>
+            <button className="btn" onClick={seed} disabled={busy}>
+              <IconSparkle width={16} height={16} /> Load demo data
             </button>
-          </form>
-          <div className="card">
-            <h3>Demo data</h3>
-            <p className="muted small">Creates "Demo Profile" with six weeks of seeded sessions so the dashboard has a trend to show.</p>
-            <button onClick={seed} disabled={busy}>
-              Load demo data
-            </button>
-          </div>
-          {message && <p className="muted">{message}</p>}
+          </Card>
         </aside>
       </div>
     </div>

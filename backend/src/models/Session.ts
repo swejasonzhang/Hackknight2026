@@ -6,7 +6,7 @@ import {
   type SessionSummary,
   type SetRecord,
   type Side,
-} from '@ptg/dependencies'
+} from '@arc/dependencies'
 import { model, Schema, type Types } from 'mongoose'
 
 export interface SessionShape {

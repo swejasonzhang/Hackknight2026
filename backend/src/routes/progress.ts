@@ -1,4 +1,4 @@
-import { ExerciseIdSchema } from '@ptg/dependencies'
+import { ExerciseIdSchema } from '@arc/dependencies'
 import { Router } from 'express'
 import { principalOf } from '../auth.ts'
 import { validate } from '../http.ts'

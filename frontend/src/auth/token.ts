@@ -1,7 +1,7 @@
-const KEY = 'ptg.token'
+const KEY = 'arc.token'
 
 /** Fired on `window` when the API rejects the stored token, so the app can show the sign-in pages. */
-export const SIGNED_OUT_EVENT = 'ptg:signed-out'
+export const SIGNED_OUT_EVENT = 'arc:signed-out'
 
 export function getToken(): string | null {
   try {

@@ -13,3 +13,17 @@ export function deg(x: number | null | undefined, digits = 0): string {
 export function pct(x: number): string {
   return `${Math.round(x * 100)}%`
 }
+
+/** ISO date of the Monday starting the UTC week that contains `ms`; matches the server's weekStartIso. */
+export function weekStartIso(ms: number): string {
+  const d = new Date(ms)
+  const daysSinceMonday = (d.getUTCDay() + 6) % 7
+  return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate() - daysSinceMonday)).toISOString().slice(0, 10)
+}
+
+/** Plain-language reading of the fatigue proxy. */
+export function fatigueLabel(index: number): { text: string; tone: 'good' | 'warn' | 'bad' } {
+  if (index >= 0.25) return { text: 'range collapsed late in a set', tone: 'bad' }
+  if (index >= 0.12) return { text: 'range shrank late in sets', tone: 'warn' }
+  return { text: 'steady across each set', tone: 'good' }
+}

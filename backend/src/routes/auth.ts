@@ -1,4 +1,4 @@
-import { LoginSchema, SignupSchema, type AuthResponse } from '@ptg/dependencies'
+import { LoginSchema, SignupSchema, type AuthResponse } from '@arc/dependencies'
 import bcrypt from 'bcryptjs'
 import { Router } from 'express'
 import { authenticate, requireUser, signToken } from '../auth.ts'

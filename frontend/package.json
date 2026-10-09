@@ -1,5 +1,5 @@
 {
-  "name": "@ptg/frontend",
+  "name": "@arc/frontend",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -12,7 +12,7 @@
     "test:watch": "vitest"
   },
   "dependencies": {
-    "@ptg/dependencies": "0.1.0",
+    "@arc/dependencies": "0.1.0",
     "react": "^19.3.0",
     "react-dom": "^19.3.0",
     "react-router-dom": "^7.18.4",

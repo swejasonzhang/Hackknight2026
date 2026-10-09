@@ -1,84 +1,78 @@
-import { FATIGUE_NUDGE, FATIGUE_STOP, type ProgressDto } from '@ptg/dependencies'
+import { FATIGUE_NUDGE, FATIGUE_STOP, type ProgressDto } from '@arc/dependencies'
 import { Bar, BarChart, CartesianGrid, Legend, Line, LineChart, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { formatDate } from '../format'
+import { Card } from './ui'
 
 interface Props {
   progress: ProgressDto
   metricLabel: string
 }
 
-const colors = { best: '#4f8df7', mean: '#9ab4e8', target: '#f2a541', fatigue: '#e8734a', reps: '#5cc8a0', weeks: '#8b7cf6' }
+const tooltipStyle = { background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 10, color: 'var(--ink)', fontSize: 13 }
+const axisTick = { fill: 'var(--chart-axis)', fontSize: 12 }
 
 export function ProgressCharts({ progress, metricLabel }: Props) {
   const sessions = progress.sessions.map((s) => ({ ...s, label: formatDate(s.date) }))
-  const yMax = Math.max(progress.targetDeg ?? 0, ...sessions.map((s) => s.bestPeakDeg), ...progress.latestSessionReps.map((r) => r.peakDeg), 10)
-
-  if (sessions.length === 0) {
-    return <p className="muted">No sessions for this exercise yet. Run one on the Session page or load demo data.</p>
-  }
+  const yMax = Math.ceil(Math.max(progress.targetDeg ?? 0, ...sessions.map((s) => s.bestPeakDeg), ...progress.latestSessionReps.map((r) => r.peakDeg), 10) / 10) * 10
+  const goal = progress.targetDeg
+  // Show at most ~12 rep labels so a 24-rep session stays readable.
+  const repInterval = Math.max(0, Math.ceil(progress.latestSessionReps.length / 12) - 1)
 
   return (
     <div className="charts">
-      <div className="card">
-        <h3>Peak {metricLabel.toLowerCase()} per session</h3>
+      <Card title={`Peak ${metricLabel.toLowerCase()} per session`} subtitle={goal != null ? `Goal ${goal}°` : 'No goal set yet'}>
         <ResponsiveContainer width="100%" height={240}>
-          <LineChart data={sessions} margin={{ top: 8, right: 16, left: 0, bottom: 0 }}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#2a3140" />
-            <XAxis dataKey="label" stroke="#9aa4b5" />
-            <YAxis domain={[0, Math.ceil(yMax / 10) * 10]} unit="°" stroke="#9aa4b5" />
-            <Tooltip formatter={(v) => `${Number(v).toFixed(0)}°`} />
-            <Legend />
-            <Line type="monotone" dataKey="bestPeakDeg" name="Best rep" stroke={colors.best} strokeWidth={2} dot={{ r: 3 }} />
-            <Line type="monotone" dataKey="meanPeakDeg" name="Mean rep" stroke={colors.mean} strokeDasharray="4 3" dot={false} />
-            {progress.targetDeg != null && (
-              <ReferenceLine y={progress.targetDeg} stroke={colors.target} strokeDasharray="6 3" label={{ value: `goal ${progress.targetDeg}°`, fill: colors.target, position: 'insideTopRight' }} />
-            )}
+          <LineChart data={sessions} margin={{ top: 8, right: 12, left: -12, bottom: 0 }}>
+            <CartesianGrid strokeDasharray="3 3" stroke="var(--chart-grid)" vertical={false} />
+            <XAxis dataKey="label" tick={axisTick} axisLine={false} tickLine={false} />
+            <YAxis domain={[0, yMax]} unit="°" tick={axisTick} axisLine={false} tickLine={false} />
+            <Tooltip contentStyle={tooltipStyle} formatter={(v) => `${Number(v).toFixed(0)}°`} />
+            <Legend wrapperStyle={{ fontSize: 12 }} />
+            <Line type="monotone" dataKey="bestPeakDeg" name="Best rep" stroke="var(--chart-1)" strokeWidth={2.5} dot={{ r: 3, strokeWidth: 0, fill: 'var(--chart-1)' }} activeDot={{ r: 5 }} />
+            <Line type="monotone" dataKey="meanPeakDeg" name="Mean rep" stroke="var(--chart-1-soft)" strokeWidth={2} strokeDasharray="4 3" dot={false} />
+            {goal != null && <ReferenceLine y={goal} stroke="var(--chart-goal)" strokeDasharray="6 3" label={{ value: `goal ${goal}°`, fill: 'var(--chart-goal)', fontSize: 12, position: 'insideTopRight' }} />}
           </LineChart>
         </ResponsiveContainer>
-      </div>
+      </Card>
 
-      <div className="card">
-        <h3>Latest session, rep by rep</h3>
+      <Card title="Latest session, rep by rep" subtitle="Each bar is one rep's peak; the dashed line is the goal">
         <ResponsiveContainer width="100%" height={240}>
-          <BarChart data={progress.latestSessionReps} margin={{ top: 8, right: 16, left: 0, bottom: 0 }}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#2a3140" />
-            <XAxis dataKey="label" stroke="#9aa4b5" interval={0} tick={{ fontSize: 11 }} />
-            <YAxis domain={[0, Math.ceil(yMax / 10) * 10]} unit="°" stroke="#9aa4b5" />
-            <Tooltip formatter={(v) => `${Number(v).toFixed(0)}°`} />
-            <Bar dataKey="peakDeg" name="Peak" fill={colors.reps} />
-            {progress.targetDeg != null && <ReferenceLine y={progress.targetDeg} stroke={colors.target} strokeDasharray="6 3" />}
+          <BarChart data={progress.latestSessionReps} margin={{ top: 8, right: 12, left: -12, bottom: 0 }}>
+            <CartesianGrid strokeDasharray="3 3" stroke="var(--chart-grid)" vertical={false} />
+            <XAxis dataKey="label" tick={{ ...axisTick, fontSize: 11 }} interval={repInterval} axisLine={false} tickLine={false} />
+            <YAxis domain={[0, yMax]} unit="°" tick={axisTick} axisLine={false} tickLine={false} />
+            <Tooltip contentStyle={tooltipStyle} formatter={(v) => `${Number(v).toFixed(0)}°`} cursor={{ fill: 'var(--surface-2)' }} />
+            <Bar dataKey="peakDeg" name="Peak" fill="var(--chart-reps)" radius={[6, 6, 0, 0]} />
+            {goal != null && <ReferenceLine y={goal} stroke="var(--chart-goal)" strokeDasharray="6 3" />}
           </BarChart>
         </ResponsiveContainer>
-      </div>
+      </Card>
 
-      <div className="card">
-        <h3>Fatigue proxy per session</h3>
+      <Card title="Fatigue proxy per session" subtitle="ROM decay + tempo drift within sets. Dashed lines: 0.12 nudge, 0.25 early rest. Not a clinical measure.">
         <ResponsiveContainer width="100%" height={240}>
-          <LineChart data={sessions} margin={{ top: 8, right: 16, left: 0, bottom: 0 }}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#2a3140" />
-            <XAxis dataKey="label" stroke="#9aa4b5" />
-            <YAxis domain={[0, 0.5]} stroke="#9aa4b5" />
-            <Tooltip formatter={(v) => Number(v).toFixed(2)} />
-            <ReferenceLine y={FATIGUE_NUDGE} stroke="#f2a541" strokeDasharray="4 3" label={{ value: 'nudge', fill: '#f2a541', position: 'insideTopLeft' }} />
-            <ReferenceLine y={FATIGUE_STOP} stroke="#e8734a" strokeDasharray="4 3" label={{ value: 'early rest', fill: '#e8734a', position: 'insideTopLeft' }} />
-            <Line type="monotone" dataKey="fatigueIndex" name="ROM decay + tempo drift" stroke={colors.fatigue} strokeWidth={2} dot={{ r: 3 }} />
+          <LineChart data={sessions} margin={{ top: 8, right: 12, left: -12, bottom: 0 }}>
+            <CartesianGrid strokeDasharray="3 3" stroke="var(--chart-grid)" vertical={false} />
+            <XAxis dataKey="label" tick={axisTick} axisLine={false} tickLine={false} />
+            <YAxis domain={[0, 0.5]} tick={axisTick} axisLine={false} tickLine={false} />
+            <Tooltip contentStyle={tooltipStyle} formatter={(v) => Number(v).toFixed(2)} />
+            <ReferenceLine y={FATIGUE_NUDGE} stroke="var(--warn)" strokeDasharray="4 3" />
+            <ReferenceLine y={FATIGUE_STOP} stroke="var(--bad)" strokeDasharray="4 3" />
+            <Line type="monotone" dataKey="fatigueIndex" name="Fatigue proxy" stroke="var(--chart-fatigue)" strokeWidth={2.5} dot={{ r: 3, strokeWidth: 0, fill: 'var(--chart-fatigue)' }} />
           </LineChart>
         </ResponsiveContainer>
-        <p className="muted small">A proxy: how much range and tempo fell between the first and last reps of each set. Not a clinical measure.</p>
-      </div>
+      </Card>
 
-      <div className="card">
-        <h3>Sessions per week</h3>
+      <Card title="Sessions per week" subtitle="Consistency beats intensity">
         <ResponsiveContainer width="100%" height={240}>
-          <BarChart data={progress.sessionsPerWeek} margin={{ top: 8, right: 16, left: 0, bottom: 0 }}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#2a3140" />
-            <XAxis dataKey="weekStart" stroke="#9aa4b5" tickFormatter={(w: string) => formatDate(Date.parse(`${w}T12:00:00Z`))} />
-            <YAxis allowDecimals={false} stroke="#9aa4b5" />
-            <Tooltip />
-            <Bar dataKey="count" name="Sessions" fill={colors.weeks} />
+          <BarChart data={progress.sessionsPerWeek} margin={{ top: 8, right: 12, left: -12, bottom: 0 }}>
+            <CartesianGrid strokeDasharray="3 3" stroke="var(--chart-grid)" vertical={false} />
+            <XAxis dataKey="weekStart" tick={axisTick} axisLine={false} tickLine={false} tickFormatter={(w: string) => formatDate(Date.parse(`${w}T12:00:00Z`))} />
+            <YAxis allowDecimals={false} tick={axisTick} axisLine={false} tickLine={false} />
+            <Tooltip contentStyle={tooltipStyle} cursor={{ fill: 'var(--surface-2)' }} labelFormatter={(w) => `Week of ${formatDate(Date.parse(`${w}T12:00:00Z`))}`} />
+            <Bar dataKey="count" name="Sessions" fill="var(--chart-weeks)" radius={[6, 6, 0, 0]} />
           </BarChart>
         </ResponsiveContainer>
-      </div>
+      </Card>
     </div>
   )
 }

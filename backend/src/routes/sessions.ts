@@ -1,4 +1,4 @@
-import { CreateSessionSchema, ExerciseIdSchema, estimateFatigue, summarizeSets } from '@ptg/dependencies'
+import { CreateSessionSchema, ExerciseIdSchema, estimateFatigue, summarizeSets } from '@arc/dependencies'
 import { Router } from 'express'
 import { principalOf } from '../auth.ts'
 import { HttpError, toObjectId, validate } from '../http.ts'

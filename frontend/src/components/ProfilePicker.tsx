@@ -1,26 +1,23 @@
-import type { ProfileDto } from '@ptg/dependencies'
 import { Link } from 'react-router-dom'
+import { useProfiles } from '../hooks/useProfiles'
+import { Avatar } from './ui'
 
-interface Props {
-  profiles: ProfileDto[]
-  selectedId: string
-  onSelect: (id: string) => void
-  loading: boolean
-}
-
-export function ProfilePicker({ profiles, selectedId, onSelect, loading }: Props) {
-  if (loading) return <span className="muted">Loading profiles…</span>
+/** Top-bar switcher for who the whole app is looking at. */
+export function ProfilePicker() {
+  const { profiles, selected, selectedId, setSelectedId, loading } = useProfiles()
+  if (loading) return <span className="muted small">Loading profiles…</span>
   if (profiles.length === 0) {
     return (
-      <span className="muted">
-        No profiles yet. <Link to="/profiles">Add yourself or load demo data</Link>.
+      <span className="muted small">
+        No profiles yet. <Link to="/profiles">Add the first one</Link>.
       </span>
     )
   }
   return (
-    <label className="inline">
-      Who's exercising?
-      <select value={selectedId} onChange={(e) => onSelect(e.target.value)}>
+    <label className="switcher">
+      {selected && <Avatar name={selected.name} size={28} />}
+      <span className="switcher-label">Viewing</span>
+      <select className="input input-sm" value={selectedId} onChange={(e) => setSelectedId(e.target.value)} aria-label="Who's exercising">
         {profiles.map((p) => (
           <option key={p.id} value={p.id}>
             {p.name}

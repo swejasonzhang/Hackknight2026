@@ -1,6 +1,6 @@
 # Contributing
 
-How this team builds the ROM Tracker during Hackknight. Short on ceremony, strict on two things: every change is driven by a test, and every change is small enough to merge the same day.
+How this team builds Arc. Short on ceremony, strict on two things: every change is driven by a test, and every change is small enough to merge the same day.
 
 ## The loop (TDD)
 
@@ -37,7 +37,7 @@ Details and templates are in [docs/SPRINTS.md](docs/SPRINTS.md).
 ## Conventions
 
 - Commits: `<area>: <imperative summary>` e.g. `server: recompute fatigue when a session is saved`.
-- Keep `@ptg/dependencies` free of DOM, Node and MediaPipe imports; it is the contract between the server, the client and the CV module.
+- Keep `@arc/dependencies` free of DOM, Node and MediaPipe imports; it is the contract between the server, the client and the CV module.
 - API changes start in `dependencies/src/api.ts` (zod schema + DTO type), then the server test, then the route, then the client wrapper.
 - Numbers derived from raw reps (fatigue, summaries) are computed on the server from the reps; the client's copies are display-only.
 - Record a non-obvious decision as an ADR in `docs/adr/` (copy `0000-template.md`).

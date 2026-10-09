@@ -1,4 +1,4 @@
-import { estimateFatigue, EXERCISES, EXERCISE_IDS, summarizeSets, type SetRecord, type SessionRecord } from '@ptg/dependencies'
+import { estimateFatigue, EXERCISES, EXERCISE_IDS, summarizeSets, type SetRecord, type SessionRecord } from '@arc/dependencies'
 
 /** Small deterministic PRNG so the demo dashboard looks the same on every machine. */
 function mulberry32(seed: number): () => number {

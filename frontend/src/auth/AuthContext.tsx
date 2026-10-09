@@ -1,4 +1,4 @@
-import type { LoginInput, SignupInput, UserDto } from '@ptg/dependencies'
+import type { LoginInput, SignupInput, UserDto } from '@arc/dependencies'
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { api } from '../api/client'
 import { clearToken, getToken, setToken, SIGNED_OUT_EVENT } from './token'
