@@ -17,19 +17,20 @@ function app(initialPath: string) {
           <Route
             path="/"
             element={
+              <PublicOnly>
+                <p>landing page</p>
+              </PublicOnly>
+            }
+          />
+          <Route
+            path="/dashboard"
+            element={
               <RequireAuth>
                 <p>dashboard</p>
               </RequireAuth>
             }
           />
-          <Route
-            path="/signup"
-            element={
-              <PublicOnly>
-                <p>signup page</p>
-              </PublicOnly>
-            }
-          />
+          <Route path="/login" element={<p>login page</p>} />
         </Routes>
       </MemoryRouter>
     </AuthProvider>,
@@ -40,32 +41,38 @@ describe('route guards', () => {
   beforeEach(() => clearToken())
   afterEach(() => vi.unstubAllGlobals())
 
-  it('sends a visitor without a token to /signup', async () => {
+  it('sends a visitor without a token from an app page to /login', async () => {
     vi.stubGlobal('fetch', vi.fn())
-    app('/')
-    expect(await screen.findByText('signup page')).toBeInTheDocument()
+    app('/dashboard')
+    expect(await screen.findByText('login page')).toBeInTheDocument()
     expect(fetch).not.toHaveBeenCalled()
   })
 
   it('lets a valid token through once /api/auth/me confirms it', async () => {
     setToken('valid')
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse({ id: 'u1', name: 'Ada', email: 'ada@example.com', createdAt: 1 })))
-    app('/')
+    app('/dashboard')
     expect(await screen.findByText('dashboard')).toBeInTheDocument()
     expect((fetch as unknown as ReturnType<typeof vi.fn>).mock.calls[0]![0]).toBe('/api/auth/me')
   })
 
-  it('sends a visitor with a stale token to /signup', async () => {
+  it('sends a visitor with a stale token to /login', async () => {
     setToken('stale')
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse({ error: 'Not signed in' }, 401)))
-    app('/')
-    expect(await screen.findByText('signup page')).toBeInTheDocument()
+    app('/dashboard')
+    expect(await screen.findByText('login page')).toBeInTheDocument()
   })
 
-  it('keeps a signed-in user away from /signup', async () => {
+  it('shows the landing page to a visitor', async () => {
+    vi.stubGlobal('fetch', vi.fn())
+    app('/')
+    expect(await screen.findByText('landing page')).toBeInTheDocument()
+  })
+
+  it('takes a signed-in user from the landing page to /dashboard', async () => {
     setToken('valid')
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse({ id: 'u1', name: 'Ada', email: 'ada@example.com', createdAt: 1 })))
-    app('/signup')
+    app('/')
     expect(await screen.findByText('dashboard')).toBeInTheDocument()
   })
 })

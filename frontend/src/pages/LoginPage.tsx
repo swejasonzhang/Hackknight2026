@@ -5,7 +5,7 @@ import { AuthForm, type AuthFormValues } from '../components/AuthForm'
 export function LoginPage() {
   const { login } = useAuth()
   const navigate = useNavigate()
-  const from = (useLocation().state as { from?: string } | null)?.from ?? '/'
+  const from = (useLocation().state as { from?: string } | null)?.from ?? '/dashboard'
 
   const onSubmit = async (v: AuthFormValues) => {
     await login({ email: v.email, password: v.password })

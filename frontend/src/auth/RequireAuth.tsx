@@ -10,19 +10,19 @@ function Checking() {
   )
 }
 
-/** Wraps pages that need an account: visitors land on /signup. */
+/** Wraps app pages: a visitor is sent to /login and returned here afterwards. */
 export function RequireAuth({ children }: { children: ReactNode }) {
   const { status } = useAuth()
   const location = useLocation()
   if (status === 'loading') return <Checking />
-  if (status === 'signedOut') return <Navigate to="/signup" replace state={{ from: location.pathname }} />
+  if (status === 'signedOut') return <Navigate to="/login" replace state={{ from: location.pathname }} />
   return children
 }
 
-/** Wraps /signup and /login: a signed-in user goes straight to the app. */
+/** Wraps the landing, signup and login pages: a signed-in user goes straight to the app. */
 export function PublicOnly({ children }: { children: ReactNode }) {
   const { status } = useAuth()
   if (status === 'loading') return <Checking />
-  if (status === 'signedIn') return <Navigate to="/" replace />
+  if (status === 'signedIn') return <Navigate to="/dashboard" replace />
   return children
 }

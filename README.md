@@ -17,7 +17,7 @@ cp .env.example .env   # fill in MONGODB_URI, JWT_SECRET and CV_API_KEY (see bel
 npm run dev            # API on :8787, web app on :5173
 ```
 
-Open <http://localhost:5173>. You land on **/signup**; create an account (one per household). Then:
+Open <http://localhost:5173>. `/` is the landing page; **Get started** takes you to `/signup` (one account per household) and the app lives at `/dashboard`. Then:
 
 1. **Profiles** → **Add a profile** for each person who exercises, or **Load demo data** for a profile with six weeks of seeded sessions.
 2. **Dashboard** → pick who you're looking at and the exercise. You get peak ROM per session with your goal line, the latest session rep by rep, the fatigue proxy per session, sessions per week, and a table of recent sessions (click one for the set-by-set view). Set or change your plan (sets, reps, rest, goal angle) in the panel on the right.
@@ -160,8 +160,8 @@ dependencies/  @arc/dependencies  pure TypeScript shared by both sides: domain t
                rep counter, One Euro filter, fatigue proxy, session summary, zod API schemas
 backend/       @arc/backend       Express 5 + Mongoose: models (User, Profile, Plan, Session), auth,
                routes, services; src/app.ts builds the app, src/index.ts connects and listens, test/ = API tests
-frontend/      @arc/frontend      Vite + React 19: auth (token, context, route guards), pages (Signup, Login,
-               Dashboard, Profiles, SessionDetail), components, api/client.ts (typed fetch wrapper)
+frontend/      @arc/frontend      Vite + React 19 + Tailwind + Motion: pages (Landing, Signup, Login, Dashboard,
+               Profiles, SessionDetail), auth (token, context, route guards), api/client.ts (typed fetch wrapper)
 computer-vision/  Python camera app (OpenCV + MediaPipe, uv): tracks the joint, counts reps, times rest
 docs/          backlog, sprint plan, definition of done, architecture decision records
 .github/       CI workflow and issue / PR templates
@@ -175,7 +175,7 @@ The project is developed **test-first**: write the failing test, make it pass, t
 
 - `dependencies/src/**/*.test.ts`: engine behaviour (rep counting, hysteresis, jitter rejection, fatigue arithmetic, summaries, schema validation).
 - `backend/test/*.test.ts`: every API route through supertest against a throwaway in-memory MongoDB, including sign-up, login, token checks, API-key access and profile isolation between accounts. Tests never touch the cluster in `.env`.
-- `frontend/src/**/*.test.ts(x)`: the API wrapper (token header, 401 handling), the route guards (visitors land on `/signup`), and the sign-up / login form.
+- `frontend/src/**/*.test.ts(x)`: the API wrapper (token header, 401 handling), the route guards (app pages send visitors to `/login`, the landing page sends signed-in users to `/dashboard`), the sign-up / login form, UI primitives and the hero's rep detector.
 
 How the team works (sprints, stories, definition of done, PR checklist) is in [CONTRIBUTING.md](CONTRIBUTING.md) and [docs/](docs/).
 

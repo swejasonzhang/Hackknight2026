@@ -32,7 +32,7 @@ export function SessionDetailPage() {
 
   const back = (
     <nav className="mb-3 flex items-center gap-1.5 text-[13px] text-muted" aria-label="Breadcrumb">
-      <Link to="/" className="inline-flex items-center gap-1">
+      <Link to="/dashboard" className="inline-flex items-center gap-1">
         <IconArrowLeft width={14} height={14} /> Dashboard
       </Link>
       <span>/</span>

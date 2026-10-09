@@ -8,7 +8,7 @@ Owners: **FS** = full-stack (this repo), **CV** = computer-vision camera app.
 
 | # | Story | AC | Pts | Status |
 |---|---|---|---|---|
-| A1 | As a user I sign up and log in so my household's data is private | email + password, bcrypt, 7-day JWT; visitors land on `/signup`; 401/404 tests | 8 | Done |
+| A1 | As a user I sign up and log in so my household's data is private | email + password, bcrypt, 7-day JWT; `/` landing, `/signup`, `/login`, app under `/dashboard`; 401/404 tests | 8 | Done |
 | A2 | As a user I keep one profile per person in the household | create, list, select, delete (cascades plans and sessions); profiles scoped to the account | 3 | Done |
 | A3 | As a user I set a plan and a goal angle per profile | `PUT`/`PATCH /plan`; previous plan kept inactive; camera app can read it | 3 | Done |
 

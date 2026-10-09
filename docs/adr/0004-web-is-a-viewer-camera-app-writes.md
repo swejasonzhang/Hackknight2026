@@ -11,7 +11,7 @@ The computer-vision teammates' camera app tracks the joint, counts reps and sets
 
 - The web app has no session page and no simulated motion source. It shows accounts, profiles, plans and dashboards built from the sessions stored in MongoDB.
 - Sessions enter through `POST /api/sessions`. The camera app authenticates with a shared `x-api-key` (`CV_API_KEY`) and may read any profile and plan; the server validates the body and recomputes fatigue and the summary.
-- Accounts are email + password with bcrypt (bcryptjs) hashes and 7-day JWTs signed with `JWT_SECRET`. Profiles carry `ownerId`; a user only sees their own, and a foreign profile is a 404. Visitors are redirected to `/signup`.
+- Accounts are email + password with bcrypt (bcryptjs) hashes and 7-day JWTs signed with `JWT_SECRET`. Profiles carry `ownerId`; a user only sees their own, and a foreign profile is a 404. `/` is a public landing page; app pages send visitors to `/login`.
 - The shared engine keeps the rep counter and smoothing filter as the reference implementation of the rep contract for a JavaScript camera app; the session state machine was removed.
 
 ## Consequences

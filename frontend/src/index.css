@@ -201,3 +201,86 @@
     animation: none;
   }
 }
+
+/* ---------- Landing page motion ---------- */
+@keyframes marquee {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-50%);
+  }
+}
+
+@keyframes gradient-shift {
+  0%,
+  100% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+}
+
+@keyframes dots-pan {
+  from {
+    background-position: 0 0;
+  }
+  to {
+    background-position: 22px 22px;
+  }
+}
+
+.marquee {
+  overflow: hidden;
+  mask-image: linear-gradient(90deg, transparent, black 8%, black 92%, transparent);
+  -webkit-mask-image: linear-gradient(90deg, transparent, black 8%, black 92%, transparent);
+}
+
+.marquee-track {
+  display: flex;
+  width: max-content;
+  animation: marquee 34s linear infinite;
+}
+
+.marquee-item {
+  display: inline-flex;
+  align-items: center;
+  padding: 0 0.25rem;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--ink-2);
+  white-space: nowrap;
+}
+
+.marquee-dot {
+  margin: 0 1.25rem;
+  color: var(--primary);
+}
+
+.text-gradient-animated {
+  background-image: linear-gradient(90deg, var(--primary), var(--primary-2), var(--accent), var(--primary-2), var(--primary));
+  background-size: 300% 100%;
+  animation: gradient-shift 9s ease-in-out infinite;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.dots {
+  background-image: radial-gradient(var(--line-strong) 1px, transparent 1.5px);
+  background-size: 22px 22px;
+  mask-image: radial-gradient(ellipse at 35% 25%, black 10%, transparent 70%);
+  -webkit-mask-image: radial-gradient(ellipse at 35% 25%, black 10%, transparent 70%);
+  animation: dots-pan 24s linear infinite;
+  opacity: 0.9;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .marquee-track,
+  .text-gradient-animated,
+  .dots {
+    animation: none;
+  }
+}
