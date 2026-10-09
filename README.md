@@ -113,6 +113,17 @@ index      = clamp(0.6 · romDecay + 0.4 · tempoDrift, 0, 1)       (only losses
 
 The dashboard draws `0.12` (nudge) and `0.25` (early rest) as reference lines and labels the quantity "ROM decay + tempo drift", never "fatigue" as a diagnosis.
 
+## 4b. The camera app (Python)
+
+The computer-vision side lives at the repo root as a Python 3.12 project managed with [uv](https://docs.astral.sh/uv/): `main.py` starts `ExerciseTracker` from `movements.py`, which uses OpenCV and MediaPipe to track the joint, count reps against flex/extend thresholds and time rest.
+
+```bash
+uv sync          # installs mediapipe and opencv into .venv
+uv run main.py   # opens the webcam window
+```
+
+It does not yet send finished sessions to the API; that is backlog story C4 (`POST /api/sessions` with the `x-api-key` header, section 4 above).
+
 ## 5. API reference
 
 Base URL in development: `http://localhost:8787`. All bodies are JSON. Validation errors return `400 { error: "Invalid request", issues: [...] }`; unknown or foreign ids return `404`; missing credentials return `401`.
