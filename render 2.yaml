@@ -1,0 +1,46 @@
+# Render Blueprint for Arc (getarc.health). Dashboard → New → Blueprint → this repo.
+# Docs: https://render.com/docs/blueprint-spec
+services:
+  - type: web
+    name: arc-api
+    runtime: node
+    plan: free
+    buildCommand: npm ci --omit=dev
+    startCommand: npm run start -w backend
+    healthCheckPath: /api/health
+    autoDeploy: true
+    domains:
+      - api.getarc.health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: NODE_VERSION
+        value: 20.19.4
+      - key: MONGODB_URI
+        sync: false
+      - key: JWT_SECRET
+        generateValue: true
+      - key: CV_API_KEY
+        generateValue: true
+      - key: CORS_ORIGINS
+        value: https://getarc.health,https://www.getarc.health
+
+  - type: web
+    name: arc-web
+    runtime: static
+    buildCommand: npm ci --include=dev && npm run build -w frontend
+    staticPublishPath: frontend/dist
+    autoDeploy: true
+    domains:
+      - getarc.health
+      - www.getarc.health
+    envVars:
+      - key: NODE_VERSION
+        value: 20.19.4
+    routes:
+      - type: rewrite
+        source: /api/*
+        destination: https://api.getarc.health/api/*
+      - type: rewrite
+        source: /*
+        destination: /index.html

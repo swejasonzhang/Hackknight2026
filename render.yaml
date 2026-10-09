@@ -10,8 +10,7 @@ services:
     startCommand: npm run start -w backend
     healthCheckPath: /api/health
     autoDeployTrigger: commit
-    domains:
-      - api.getarc.health
+    # Custom domain api.getarc.health is attached in the dashboard (Settings → Custom Domains).
     envVars:
       - key: NODE_ENV
         value: production
@@ -34,8 +33,7 @@ services:
     buildCommand: npm ci --include=dev && npm run build -w frontend
     staticPublishPath: frontend/dist
     autoDeployTrigger: commit
-    domains:
-      - getarc.health
+    # Custom domain getarc.health is attached in the dashboard (Settings → Custom Domains).
     envVars:
       - key: NODE_VERSION
         value: 20.19.4

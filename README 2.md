@@ -2,7 +2,7 @@
 
 **Range of motion is an arc.** Arc is a webcam goniometer for home use, for anyone at any age, live at [getarc.health](https://getarc.health). A separate **camera app** (built by the computer-vision teammates) watches you exercise, measures joint range of motion (ROM) in degrees, counts reps and sets, and stores each session in MongoDB. **This repository is the web app and API around that data**: accounts, one profile per person in the household, and dashboards that show progress over weeks. It is a personal tool, not a clinical one: no doctor or therapist sees the data.
 
-Stack: MongoDB Atlas · Express 5 · React 19 · Node 20 (MERN), TypeScript everywhere, Vite, Vitest. Hosted on Render, domain at Porkbun.
+Stack: MongoDB Atlas · Express 5 · React 19 · Node 20 (MERN), TypeScript everywhere, Vite, Vitest. Hosted on Render, domain at GoDaddy.
 
 ---
 
@@ -115,10 +115,9 @@ The dashboard draws `0.12` (nudge) and `0.25` (early rest) as reference lines an
 
 ## 4b. The camera app (Python)
 
-The computer-vision side lives in [`computer-vision/`](computer-vision/) as a Python 3.12 project managed with [uv](https://docs.astral.sh/uv/): `main.py` starts `ExerciseTracker` from `movements.py`, which uses OpenCV and MediaPipe to track the joint, count reps against flex/extend thresholds and time rest.
+The computer-vision side lives at the repo root as a Python 3.12 project managed with [uv](https://docs.astral.sh/uv/): `main.py` starts `ExerciseTracker` from `movements.py`, which uses OpenCV and MediaPipe to track the joint, count reps against flex/extend thresholds and time rest.
 
 ```bash
-cd computer-vision
 uv sync          # installs mediapipe and opencv into .venv
 uv run main.py   # opens the webcam window
 ```
@@ -162,12 +161,11 @@ backend/       @arc/backend       Express 5 + Mongoose: models (User, Profile, P
                routes, services; src/app.ts builds the app, src/index.ts connects and listens, test/ = API tests
 frontend/      @arc/frontend      Vite + React 19: auth (token, context, route guards), pages (Signup, Login,
                Dashboard, Profiles, SessionDetail), components, api/client.ts (typed fetch wrapper)
-computer-vision/  Python camera app (OpenCV + MediaPipe, uv): tracks the joint, counts reps, times rest
 docs/          backlog, sprint plan, definition of done, architecture decision records
 .github/       CI workflow and issue / PR templates
 ```
 
-The three JavaScript packages are npm workspaces; the camera app is a separate Python project. `@arc/dependencies` is consumed as TypeScript source, so a change there is picked up by both sides without a build step.
+The three packages are npm workspaces. `@arc/dependencies` is consumed as TypeScript source, so a change there is picked up by both sides without a build step.
 
 ## 7. Testing and the development process
 
@@ -181,26 +179,25 @@ How the team works (sprints, stories, definition of done, PR checklist) is in [C
 
 ## 8. Deployment: getarc.health
 
-The domain **getarc.health** is registered at Porkbun, which also serves its DNS. Hosting is Render, defined by [`render.yaml`](render.yaml) at the repo root: a static site `getarc-web` for the web app and a Node web service `getarc-api` for the API. The static site rewrites `/api/*` to the API's Render hostname, so the browser keeps the same-origin calls it uses in development and the site works on Render's own URLs before DNS is switched. A push to `main` deploys both.
+The domain **getarc.health** is registered at GoDaddy. Hosting is Render, defined by [`render.yaml`](render.yaml) at the repo root: a static site for the web app on `getarc.health` (+ `www`) and a Node web service for the API on `api.getarc.health`. The static site rewrites `/api/*` to the API, so the browser keeps the same-origin calls it uses in development. A push to `main` deploys both.
 
 ### One-time setup (about 15 minutes)
 
-1. **Connect GitHub to Render.** At dashboard.render.com choose *New → Blueprint*, pick the `swejasonzhang/Hackknight2026` repo and the `main` branch. Render reads `render.yaml` and creates `getarc-web` and `getarc-api`. (If you created services from an earlier version of the file, delete those first so the names don't collide.)
-2. **Set the secret** it asks for: `MONGODB_URI` (the Atlas string). `JWT_SECRET` and `CV_API_KEY` are generated; copy `CV_API_KEY` from `getarc-api` → *Environment* and give it to the camera-app team.
-3. **Allow Render in Atlas.** Atlas → Network Access → add the outbound IPs shown on `getarc-api` → *Networking* (or `0.0.0.0/0` for the hackathon).
-4. **Check it on Render's URLs first:** `https://getarc-api.onrender.com/api/health` returns `{ ok: true, db: "connected" }`, and `https://getarc-web.onrender.com` lands on the sign-up page. If Render gave a service a suffixed hostname (the name was taken), update the rewrite destination in `render.yaml` to match.
-5. **Point the domain at Render.** The blueprint deliberately leaves domains out (Render refuses a blueprint whose domain is attached anywhere else). Add `getarc.health` under `getarc-web` → *Settings → Custom Domains* and `api.getarc.health` under `getarc-api`; if Render says a domain is taken, it names the service or workspace that holds it. Then at Porkbun → *Domain Management* → `getarc.health` → **DNS Records**, delete the default records (the `A` records for the root and `*` pointing at `192.0.79.151` / `192.0.79.171`, and any `AAAA` records; the `_acme-challenge` TXT records are Porkbun's own SSL automation and can go too) and add these. Porkbun's *Host* field takes only the part before the domain: leave it blank for the root.
+1. **Connect GitHub to Render.** At dashboard.render.com choose *New → Blueprint*, pick the `swejasonzhang/Hackknight2026` repo and the `main` branch. Render reads `render.yaml` and creates `arc-web` and `arc-api`.
+2. **Set the secrets** it asks for: `MONGODB_URI` (the Atlas string). `JWT_SECRET` and `CV_API_KEY` are generated for you; copy `CV_API_KEY` from the `arc-api` environment page and give it to the camera-app team.
+3. **Allow Render in Atlas.** Atlas → Network Access → add the outbound IPs shown on the `arc-api` service page (or `0.0.0.0/0` for the hackathon).
+4. **Point the domain at Render.** Render shows the exact values under each service's *Custom Domains*; at GoDaddy → DNS, replace what is there with:
 
-   | Type | Host | Answer | TTL |
+   | Type | Name | Value | TTL |
    |---|---|---|---|
-   | ALIAS | *(blank)* | `getarc-web.onrender.com` | 600 |
-   | CNAME | `www` | `getarc-web.onrender.com` | 600 |
-   | CNAME | `api` | `getarc-api.onrender.com` | 600 |
+   | A | `@` | the apex IP Render shows (currently `216.24.57.1`) | 600 |
+   | CNAME | `www` | `arc-web.onrender.com` | 600 |
+   | CNAME | `api` | `arc-api.onrender.com` | 600 |
 
-   ALIAS is Porkbun's root-level CNAME, so you never have to copy an IP from Render. (If you prefer an `A` record for the root, use the IP Render shows on the Custom Domains screen.) Render verifies the domain within minutes and issues HTTPS; `www.getarc.health` redirects to the root automatically.
-6. **Final check:** `https://api.getarc.health/api/health` and `https://getarc.health`.
+   Delete the pre-existing `A` records for `@` and `*` that point at `192.0.79.151` / `192.0.79.171` (they belong to another provider's servers) and the `_acme-challenge` TXT records (Render issues its own certificates). Within a few minutes Render verifies the domain and turns on HTTPS.
+5. **Check:** `https://api.getarc.health/api/health` returns `{ ok: true, db: "connected" }`, and `https://getarc.health` lands on the sign-up page.
 
-Production env on `getarc-api`: `NODE_ENV=production`, `MONGODB_URI`, `JWT_SECRET`, `CV_API_KEY`, `CORS_ORIGINS`. The camera app talks to `https://api.getarc.health` (or `https://getarc-api.onrender.com`) with the API key.
+Production env on `arc-api`: `NODE_ENV=production`, `MONGODB_URI`, `JWT_SECRET`, `CV_API_KEY`, `CORS_ORIGINS=https://getarc.health,https://www.getarc.health`. The camera app talks to `https://api.getarc.health` with the API key.
 
 ## 9. Troubleshooting
 
