@@ -18,3 +18,8 @@ dist-ssr
 
 # private working notes
 .notes/
+
+# python
+__pycache__/
+*.pyc
+.venv/
