@@ -3,15 +3,33 @@ import { PublicOnly, RequireAuth } from './auth/RequireAuth'
 import { AppShell } from './layouts/AppShell'
 import { AuthLayout } from './layouts/AuthLayout'
 import { DashboardPage } from './pages/DashboardPage'
+import { LandingPage } from './pages/LandingPage'
 import { LoginPage } from './pages/LoginPage'
 import { ProfilesPage } from './pages/ProfilesPage'
 import { SessionDetailPage } from './pages/SessionDetailPage'
 import { SignupPage } from './pages/SignupPage'
 import { ProfilesProvider } from './profiles/ProfilesContext'
 
+/**
+ * URL map
+ *   /               landing page (visitors; signed-in users go to /dashboard)
+ *   /signup, /login account pages
+ *   /dashboard      progress for the selected profile
+ *   /profiles       household profiles
+ *   /sessions/:id   one session, set by set
+ */
 export default function App() {
   return (
     <Routes>
+      <Route
+        path="/"
+        element={
+          <PublicOnly>
+            <LandingPage />
+          </PublicOnly>
+        }
+      />
+
       <Route
         element={
           <PublicOnly>
@@ -32,7 +50,7 @@ export default function App() {
           </RequireAuth>
         }
       >
-        <Route path="/" element={<DashboardPage />} />
+        <Route path="/dashboard" element={<DashboardPage />} />
         <Route path="/profiles" element={<ProfilesPage />} />
         <Route path="/sessions/:id" element={<SessionDetailPage />} />
       </Route>

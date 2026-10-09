@@ -34,7 +34,7 @@ function ApiStatus() {
 }
 
 const links = [
-  { to: '/', label: 'Dashboard', icon: IconChart, end: true },
+  { to: '/dashboard', label: 'Dashboard', icon: IconChart, end: true },
   { to: '/profiles', label: 'Profiles', icon: IconUsers, end: false },
 ]
 
@@ -44,7 +44,7 @@ export function AppShell() {
   return (
     <div className="min-h-screen md:grid md:grid-cols-[248px_minmax(0,1fr)]">
       <aside className="sticky top-0 z-20 flex items-center gap-3 border-b border-line bg-surface/85 px-4 py-3 backdrop-blur-md md:h-screen md:flex-col md:items-stretch md:gap-7 md:border-r md:border-b-0 md:px-4 md:py-6">
-        <Link to="/" className="flex items-center gap-2.5 text-[17px] font-extrabold tracking-tight text-ink no-underline hover:no-underline">
+        <Link to="/dashboard" className="flex items-center gap-2.5 text-[17px] font-extrabold tracking-tight text-ink no-underline hover:no-underline">
           <Logo size={30} />
           <span>{APP_NAME}</span>
         </Link>
