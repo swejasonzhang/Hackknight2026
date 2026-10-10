@@ -311,17 +311,19 @@ function Body({ exercise, angle, goalDeg, rangeDeg, idle, reduce, muscles, mirro
     if (sway.current) sway.current.rotation.y = (mirrored ? -1 : 1) * (facing + (idle ? Math.sin(state.clock.elapsedTime * 0.45) * 0.34 : 0))
   })
 
-  // A hand: palm and fingers along +Y from the wrist, the palm facing +Z, the thumb on the outer side.
+  // A hand closed in a grip, as it holds a weight: about 10 cm from the wrist, the back of the hand
+  // along +Y, the fingers curled toward the palm (+Z), the thumb wrapped across them from the outer side.
   const hand = (name: 'rHand' | 'lHand') => (
     <group key={name} ref={bind(name)}>
-      <RoundedBox args={[0.27, 0.34, 0.1]} radius={0.045} smoothness={4} position={[0, 0.17, 0]} material={p.skin} />
-      {[-0.095, -0.032, 0.032, 0.095].map((x, i) => (
-        <mesh key={x} position={[x, 0.45 - Math.abs(i - 1.5) * 0.025, 0.012]} rotation={[0.22, 0, 0]} material={p.skin}>
-          <capsuleGeometry args={[0.036, 0.19 - Math.abs(i - 1.5) * 0.03, 6, 12]} />
+      <RoundedBox args={[0.27, 0.24, 0.13]} radius={0.05} smoothness={4} position={[0, 0.12, 0]} material={p.skin} />
+      <RoundedBox args={[0.26, 0.12, 0.17]} radius={0.055} smoothness={4} position={[0, 0.27, 0.03]} material={p.skin} />
+      {[-0.096, -0.032, 0.032, 0.096].map((x) => (
+        <mesh key={x} position={[x, 0.28, 0.07]} rotation={[Math.PI / 2, 0, 0]} material={p.skin}>
+          <capsuleGeometry args={[0.036, 0.07, 6, 12]} />
         </mesh>
       ))}
-      <mesh position={[0.155, 0.17, 0.035]} rotation={[0.35, 0, -0.6]} material={p.skin}>
-        <capsuleGeometry args={[0.042, 0.15, 6, 12]} />
+      <mesh position={[0.07, 0.21, 0.1]} rotation={[0, 0, 1.25]} material={p.skin}>
+        <capsuleGeometry args={[0.04, 0.12, 6, 12]} />
       </mesh>
     </group>
   )

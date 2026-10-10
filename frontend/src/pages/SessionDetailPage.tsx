@@ -84,8 +84,9 @@ export function SessionDetailPage() {
   const [stageRef, stageTop] = useStickyTop<HTMLElement>(24)
   const [session, setSession] = useState<SessionDto | null>(null)
   const [error, setError] = useState<string | null>(null)
-  // The figure works through the whole range, rep after rep: from rest to this session's best and back.
-  const loop = useRepLoop(session?.exercise ?? 'elbow_flexion', session ? session.summary.bestPeakDeg : null)
+  // The figure works through the range, rep after rep: from rest to this session's best and back,
+  // never past the goal's tick on its arc.
+  const loop = useRepLoop(session?.exercise ?? 'elbow_flexion', session ? Math.min(session.summary.bestPeakDeg, session.plan.targetDeg) : null)
 
   useEffect(() => {
     let cancelled = false
@@ -221,8 +222,8 @@ export function SessionDetailPage() {
             <div className="absolute inset-x-0 top-11 bottom-0">
               <LazyJointScene
                 exercise={session.exercise}
-                angle={loop ?? best}
-                rangeDeg={best}
+                angle={loop ?? Math.min(best, goal)}
+                rangeDeg={Math.min(best, goal)}
                 goalDeg={goal}
                 mirrored={exercise.sided && session.side === 'left'}
                 className="h-full w-full"

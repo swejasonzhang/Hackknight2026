@@ -145,9 +145,6 @@ export interface ProfileDto {
 
 // ---- Arc, the coach (Gemini for words, ElevenLabs for voice) ----
 
-/** The coach is always called Arc. */
-export const COACH_NAME = 'Arc'
-
 /** What Arc asks about, in order. The page shows a lamp per topic and quick replies for the current one. */
 export const ONBOARDING_TOPICS = ['goals', 'trainingGoal', 'focus', 'side', 'limitations', 'experience', 'days', 'height', 'weight'] as const
 export type OnboardingTopic = (typeof ONBOARDING_TOPICS)[number]

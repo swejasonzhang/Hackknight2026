@@ -41,7 +41,7 @@ TARGET_DEG = {
     "tricep_extension": 170.0,
     "shoulder_press": 170.0,
     "shoulder_abduction": 90.0,
-    "front_raise": 135.0,
+    "front_raise": 95.0,
     "chest_press": 170.0,
     "pec_fly": 160.0,
     "lat_pulldown": 120.0,

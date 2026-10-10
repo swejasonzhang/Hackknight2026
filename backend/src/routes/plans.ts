@@ -37,7 +37,7 @@ plansRouter.patch('/:id/plan', async (req, res) => {
   const plan = await Plan.findOneAndUpdate(
     { profileId: profile._id, active: true },
     { $set: input },
-    { new: true, runValidators: true },
+    { returnDocument: 'after', runValidators: true },
   ).lean<PlanShape>()
   if (!plan) throw new HttpError(404, 'No active plan')
   res.json(toPlanDto(plan))

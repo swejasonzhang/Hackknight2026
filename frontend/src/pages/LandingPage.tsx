@@ -352,10 +352,11 @@ export function LandingPage() {
 
           {/* ---- Footer index line ---- */}
           <footer className="t-meta mt-8 flex flex-wrap items-center gap-x-6 gap-y-3 border-t border-rule-strong pt-5">
-            <span className="flex items-center gap-2 text-navy">
+            {/* The logo always leads back to the landing page: here, its top. */}
+            <Link to="/" aria-label={`${APP_NAME} home page`} onClick={() => window.scrollTo({ top: 0 })} className="flex items-center gap-2 text-navy no-underline hover:no-underline">
               <Logo size={18} />
               {APP_NAME}
-            </span>
+            </Link>
             <span>© 2026 {APP_NAME} · Built at Hackknight · a personal tool, not a clinical one</span>
             <nav aria-label="Footer" className="flex gap-5 sm:ml-auto">
               {[...account].reverse().map((l) => (

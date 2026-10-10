@@ -151,8 +151,13 @@ export function WelcomePage() {
       {/* ---- top bar: the mark, progress through the questions, Arc's voice, the way out ---- */}
       <header className="sticky top-0 z-20 bg-navy text-white">
         <div className="mx-auto flex h-14 w-full max-w-[1180px] items-center gap-3 px-4 sm:px-6">
-          <Logo size={24} tone="paper" />
-          <span className="font-display text-[15px] font-bold tracking-[-0.01em]">Arc</span>
+          {/* The logo always leads back to the landing page. */}
+          <Link to="/" aria-label="Arc home page" className="flex items-center gap-3 text-white no-underline hover:no-underline">
+            <Logo size={24} tone="paper" />
+            <span aria-hidden="true" className="font-display text-[15px] font-bold tracking-[-0.01em]">
+              Arc
+            </span>
+          </Link>
           <span className="t-meta hidden text-rail-muted sm:inline">Getting to know you</span>
           <span className="flex-1" />
           <span className="t-meta text-rail-muted" aria-live="polite">

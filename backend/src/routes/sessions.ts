@@ -48,7 +48,7 @@ sessionsRouter.put('/:id', async (req, res) => {
   await requireProfile(existing.profileId.toString(), principalOf(req)) // 404 unless the caller may see it
   if (input.profileId !== existing.profileId.toString()) throw new HttpError(400, 'A session stays with its profile')
   if (existing.complete !== false) throw new HttpError(409, 'This session is finished')
-  const session = await Session.findByIdAndUpdate(existing._id, { $set: recordOf(input) }, { new: true, runValidators: true }).lean<SessionShape>()
+  const session = await Session.findByIdAndUpdate(existing._id, { $set: recordOf(input) }, { returnDocument: 'after', runValidators: true }).lean<SessionShape>()
   res.json(toSessionDto(session!))
 })
 

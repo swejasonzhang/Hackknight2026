@@ -31,6 +31,8 @@ describe('WelcomePage', () => {
     renderPage()
     expect(await screen.findByText(/I'm Arc, your coach/)).toBeInTheDocument()
     expect(onboarding).toHaveBeenCalledWith({ messages: [] })
+    // The logo always leads back to the landing page.
+    expect(screen.getByRole('link', { name: 'Arc home page' })).toHaveAttribute('href', '/')
   })
 
   it('sends each answer with the whole conversation, and shows Arc the next question', async () => {
