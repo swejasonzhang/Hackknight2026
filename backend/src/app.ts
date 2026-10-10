@@ -11,7 +11,7 @@ import { progressRouter } from './routes/progress.ts'
 import { profileSessionsRouter, sessionsRouter } from './routes/sessions.ts'
 
 export interface AppOptions {
-  /** Mount /api/dev (seeding). Defaults to true outside production. */
+  /** Mount /api/dev (the per-account demo seed). Defaults to true; pass false to leave it out. */
   allowDevRoutes?: boolean
   /** Allowed browser origins. Defaults to reflecting any origin (fine behind the Vite proxy). */
   corsOrigins?: string[]
@@ -57,7 +57,7 @@ export function createApp(opts: AppOptions = {}): Express {
   app.use('/api/profiles', progressRouter)
   app.use('/api/profiles', profileSessionsRouter)
   app.use('/api/sessions', authenticate, sessionsRouter)
-  if (opts.allowDevRoutes ?? process.env.NODE_ENV !== 'production') app.use('/api/dev', authenticate, devRouter)
+  if (opts.allowDevRoutes ?? true) app.use('/api/dev', authenticate, devRouter)
 
   app.use('/api', notFound)
   app.use(errorHandler)

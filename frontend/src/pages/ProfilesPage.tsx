@@ -213,7 +213,7 @@ export function ProfilesPage() {
         <h2 id={`${formId}-demo`} className="t-label text-navy">
           Demo data
         </h2>
-        <p className="t-desc">Creates "Demo Profile" with six weeks of seeded sessions.</p>
+        <p className="t-desc">Creates "Demo Profile" with six weeks of random sessions, different for every account.</p>
         <button className="btn" type="button" onClick={seed} disabled={busy}>
           Load demo data
         </button>

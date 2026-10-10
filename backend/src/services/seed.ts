@@ -1,3 +1,4 @@
+import { randomInt } from 'node:crypto'
 import type { Types } from 'mongoose'
 import { Plan } from '../models/Plan.ts'
 import { Profile } from '../models/Profile.ts'
@@ -12,8 +13,11 @@ export interface SeedResult {
   created: boolean
 }
 
-/** Creates the account's demo profile, its plan and weeks of demo sessions. Idempotent per account. */
-export async function seedDemoData(ownerId: Types.ObjectId, now = Date.now()): Promise<SeedResult> {
+/**
+ * Creates the account's demo profile, its plan and six weeks of random demo sessions (a fresh
+ * seed per account, so no two demo dashboards look alike). Idempotent per account.
+ */
+export async function seedDemoData(ownerId: Types.ObjectId, now = Date.now(), seed = randomInt(0, 2 ** 31 - 1)): Promise<SeedResult> {
   const existing = await Profile.findOne({ ownerId, name: DEMO_PROFILE_NAME }).lean()
   if (existing) {
     const sessions = await Session.countDocuments({ profileId: existing._id })
@@ -31,7 +35,7 @@ export async function seedDemoData(ownerId: Types.ObjectId, now = Date.now()): P
     active: true,
     createdAt: now,
   })
-  const docs = generateDemoSessions(profile._id.toString(), now).map((s) => ({ ...s, profileId: profile._id }))
+  const docs = generateDemoSessions(profile._id.toString(), now, seed).map((s) => ({ ...s, profileId: profile._id }))
   await Session.insertMany(docs)
   return { profileId: profile._id.toString(), sessions: docs.length, created: true }
 }

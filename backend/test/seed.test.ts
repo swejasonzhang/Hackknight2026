@@ -29,7 +29,29 @@ describe('POST /api/dev/seed', () => {
     expect((await c.get('/api/profiles')).body).toHaveLength(1)
   })
 
-  it('is not mounted when dev routes are disabled', async () => {
+  it('gives each account its own random demo data', async () => {
+    const a = await signup('A')
+    const b = await signup('B')
+    const ra = await a.post('/api/dev/seed')
+    const rb = await b.post('/api/dev/seed')
+    const peaks = async (c: typeof a, id: string) => ((await c.get(`/api/profiles/${id}/sessions`)).body as { summary: { bestPeakDeg: number } }[]).map((s) => s.summary.bestPeakDeg)
+    expect(await peaks(a, ra.body.profileId)).not.toEqual(await peaks(b, rb.body.profileId))
+  })
+
+  it('is available in production to signed-in accounts, never to the camera app key', async () => {
+    const c = await signup()
+    const previous = process.env.NODE_ENV
+    process.env.NODE_ENV = 'production'
+    try {
+      const prod = createApp()
+      expect((await request(prod).post('/api/dev/seed').set('x-api-key', process.env.CV_API_KEY ?? '')).status).toBe(403)
+      expect((await request(prod).post('/api/dev/seed').set('Authorization', `Bearer ${c.token}`)).status).toBe(201)
+    } finally {
+      process.env.NODE_ENV = previous
+    }
+  })
+
+  it('is not mounted when explicitly disabled', async () => {
     const c = await signup()
     const prod = createApp({ allowDevRoutes: false })
     const res = await request(prod).post('/api/dev/seed').set('Authorization', `Bearer ${c.token}`)

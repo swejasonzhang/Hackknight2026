@@ -16,7 +16,7 @@ export function AuthLayout() {
   const title = signup ? 'Create account' : 'Log in'
   const notes = signup
     ? ['One account for the household. A profile each.', 'After this: add a profile, then run the camera app.']
-    : ['Pick up where you left off.', 'Demo data: 6 weeks · 54 sessions, one click away.']
+    : ['Pick up where you left off.', 'Demo data: six weeks of random sessions, one click away.']
 
   return (
     <div className="min-h-screen bg-vellum">
