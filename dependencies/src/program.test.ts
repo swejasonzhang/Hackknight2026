@@ -1,12 +1,15 @@
 import { describe, expect, it } from 'vitest'
 import { CoachIntakeSchema, PlanInputSchema } from './api.ts'
 import { EXERCISES } from './engine/exercises.ts'
+import { EXERCISE_IDS } from './engine/types.ts'
 import {
   clampToRanges,
   parseHeightCm,
   parseTrainingGoal,
   parseWeekdays,
   parseWeightKg,
+  areaOfDay,
+  isDiverseWeek,
   prescriptionFor,
   programDayOn,
   programFromIntake,
@@ -88,14 +91,38 @@ describe('reading answers', () => {
 })
 
 describe('programFromIntake', () => {
-  it('trains on the chosen days, starting each with the focus movement on the chosen side', () => {
+  it('trains on the chosen days and opens the week with the focus movement on the chosen side', () => {
     const program = ProgramInputSchema.parse(programFromIntake(intake))
     expect(program.days.map((d) => d.weekday)).toEqual([1, 3, 5])
-    for (const day of program.days) {
-      expect(day.items[0]).toMatchObject({ exercise: 'elbow_flexion', side: 'right', targetDeg: EXERCISES.elbow_flexion.targetDeg })
-      for (const item of day.items) PlanInputSchema.parse(item)
-    }
+    expect(program.days[0]!.items[0]).toMatchObject({ exercise: 'elbow_flexion', side: 'right', targetDeg: EXERCISES.elbow_flexion.targetDeg })
+    for (const item of program.days.flatMap((d) => d.items)) PlanInputSchema.parse(item)
     expect(program.summary).toMatch(/Monday, Wednesday and Friday/)
+    expect(program.summary).toMatch(/upper body, legs and back/)
+  })
+
+  it('works a different body area each day: never the same area two training days running', () => {
+    for (const focus of EXERCISE_IDS) {
+      for (let count = 1; count <= 7; count++) {
+        for (const experience of ['new', 'some', 'regular'] as const) {
+          const program = programFromIntake({ ...intake, focus, experience, trainingDays: spreadDays(count), daysPerWeek: count })
+          const areas = program.days.map((d) => areaOfDay(d))
+          // Each day keeps to one area...
+          for (const day of program.days) expect(new Set(day.items.map((i) => EXERCISES[i.exercise].area)).size, `${focus} ${count}`).toBe(1)
+          // ...the next training day moves on...
+          areas.forEach((a, i) => i > 0 && expect(a, `${focus} ${count} day ${i}`).not.toBe(areas[i - 1]))
+          // ...and the week covers as many areas as it has days, up to all four.
+          expect(new Set(areas).size, `${focus} ${count}`).toBe(Math.min(count, 4))
+          expect(isDiverseWeek(program.days), `${focus} ${count}`).toBe(true)
+        }
+      }
+    }
+  })
+
+  it('starts with the focus area and uses its other movements when an area comes round again', () => {
+    const week = programFromIntake({ ...intake, focus: 'squat', experience: 'regular', trainingDays: [0, 1, 2, 3, 4, 5, 6], daysPerWeek: 7 })
+    expect(week.days.map((d) => areaOfDay(d))).toEqual(['legs', 'back', 'core', 'upper', 'legs', 'back', 'core'])
+    expect(week.days[0]!.items.map((i) => i.exercise)).toEqual(['squat', 'lunge'])
+    expect(week.days[4]!.items.map((i) => i.exercise)).toEqual(['seated_knee_extension', 'squat'])
   })
 
   it('keeps every prescription inside the goal range, and lighter for someone new', () => {
@@ -165,14 +192,19 @@ describe('prescriptionFor: what Record runs for the movement picked', () => {
   })
 
   it("falls back to the goal's ranges on the member's side, with the movement's own goal angle", () => {
-    const p = prescriptionFor('crunch', { plan, program, intake: { ...intake, side: 'left', trainingGoal: 'endurance' }, date: monday })
-    expect(p).toMatchObject({ exercise: 'crunch', side: 'left', targetDeg: 55, source: 'default' })
+    // A legs-first three-day week works legs, back and core: no upper-body day.
+    expect(program.days.map(areaOfDay)).toEqual(['legs', 'back', 'core'])
+    const p = prescriptionFor('pec_fly', { plan, program, intake: { ...intake, side: 'left', trainingGoal: 'endurance' }, date: monday })
+    expect(p).toMatchObject({ exercise: 'pec_fly', side: 'left', targetDeg: 160, source: 'default' })
     expect(p.reps).toBeGreaterThanOrEqual(13)
     expect(prescriptionFor('crunch', { date: monday })).toEqual({ exercise: 'crunch', side: 'right', sets: 3, reps: 8, restSeconds: 45, targetDeg: 55, source: 'default' })
   })
 
-  it('fills the week with movements from the focus area first', () => {
-    const legs = programFromIntake({ ...intake, focus: 'squat', experience: 'regular' })
-    expect(legs.days.map((d) => d.items[1]!.exercise)).toEqual(['lunge', 'seated_knee_extension', 'lunge'])
+  it('tells a varied week from one that keeps to one area', () => {
+    const day = (weekday: number, exercise: (typeof EXERCISE_IDS)[number]) => ({ weekday, title: 'x', items: [{ exercise, side: 'right' as const, sets: 3, reps: 8, restSeconds: 60, targetDeg: 90 }] })
+    expect(isDiverseWeek([day(1, 'squat'), day(3, 'lunge'), day(5, 'deadlift')])).toBe(false) // legs two days running
+    expect(isDiverseWeek([day(1, 'squat'), day(3, 'elbow_flexion'), day(5, 'squat')])).toBe(false) // only two areas in three days
+    expect(isDiverseWeek([day(1, 'squat'), day(3, 'elbow_flexion'), day(5, 'deadlift')])).toBe(true)
+    expect(isDiverseWeek([day(1, 'squat')])).toBe(true)
   })
 })

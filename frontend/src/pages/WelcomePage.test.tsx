@@ -61,7 +61,7 @@ describe('WelcomePage', () => {
     const quick = screen.getByRole('group', { name: /quick answers/i })
     fireEvent.click(within(quick).getByRole('button', { name: 'Left' }))
     expect(await screen.findByText('Any injuries?')).toBeInTheDocument()
-    expect(onboarding).toHaveBeenLastCalledWith({ messages: [{ role: 'arc', text: 'Left side or right side?' }, { role: 'user', text: 'Left' }] })
+    expect(onboarding).toHaveBeenLastCalledWith({ messages: [{ role: 'arc', text: 'Left side or right side?', topic: 'side' }, { role: 'user', text: 'Left' }] })
     expect(within(screen.getByRole('group', { name: /quick answers/i })).getByRole('button', { name: 'None' })).toBeInTheDocument()
   })
 
@@ -76,8 +76,31 @@ describe('WelcomePage', () => {
     expect(within(start).getAllByRole('button')).toHaveLength(EXERCISE_IDS.length)
     fireEvent.click(within(start).getByRole('button', { name: 'Lat pulldown' }))
     expect(await screen.findByText('Left side or right side?')).toBeInTheDocument()
-    expect(onboarding).toHaveBeenLastCalledWith({ messages: [{ role: 'arc', text: 'Where should we start?' }, { role: 'user', text: 'Lat pulldown' }] })
+    expect(onboarding).toHaveBeenLastCalledWith({ messages: [{ role: 'arc', text: 'Where should we start?', topic: 'focus' }, { role: 'user', text: 'Lat pulldown' }] })
     expect(screen.queryByRole('group', { name: /where to start/i })).not.toBeInTheDocument()
+  })
+
+  it('skips a question, or skips the rest and builds the week from what was said', async () => {
+    onboarding
+      .mockResolvedValueOnce({ reply: 'How tall are you?', messageId: 'm1', done: false, offline: true, topic: 'height' })
+      .mockResolvedValueOnce({ reply: 'And your weight?', messageId: 'm2', done: false, offline: true, topic: 'weight' })
+      .mockResolvedValueOnce({ reply: 'Your week is ready.', messageId: 'm3', done: true, offline: true })
+    renderPage()
+    await screen.findByText('How tall are you?')
+    fireEvent.click(screen.getByRole('button', { name: /skip this question/i }))
+    await screen.findByText('And your weight?')
+    expect(onboarding).toHaveBeenLastCalledWith({ messages: [{ role: 'arc', text: 'How tall are you?', topic: 'height' }, { role: 'user', text: 'Skip' }] })
+    fireEvent.click(screen.getByRole('button', { name: /build my week now/i }))
+    await screen.findByText('Your week is ready.')
+    expect(onboarding).toHaveBeenLastCalledWith({
+      finish: true,
+      messages: [
+        { role: 'arc', text: 'How tall are you?', topic: 'height' },
+        { role: 'user', text: 'Skip' },
+        { role: 'arc', text: 'And your weight?', topic: 'weight' },
+      ],
+    })
+    expect(screen.queryByRole('button', { name: /skip this question/i })).not.toBeInTheDocument()
   })
 
   it('can be skipped at any point, straight to the dashboard', async () => {

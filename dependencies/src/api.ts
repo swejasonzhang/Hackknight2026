@@ -143,13 +143,20 @@ export interface ProfileDto {
 /** The coach is always called Arc. */
 export const COACH_NAME = 'Arc'
 
-export const ChatTurnSchema = z.object({ role: z.enum(['arc', 'user']), text: z.string().trim().min(1).max(2000) })
+/** What Arc asks about, in order. The page shows a lamp per topic and quick replies for the current one. */
+export const ONBOARDING_TOPICS = ['goals', 'trainingGoal', 'focus', 'side', 'limitations', 'experience', 'days', 'height', 'weight'] as const
+export type OnboardingTopic = (typeof ONBOARDING_TOPICS)[number]
+
+/** One line of the chat; Arc's lines carry the topic they asked, so each answer is read for its question. */
+export const ChatTurnSchema = z.object({ role: z.enum(['arc', 'user']), text: z.string().trim().min(1).max(2000), topic: z.enum(ONBOARDING_TOPICS).optional() })
 export type ChatTurn = z.infer<typeof ChatTurnSchema>
 
 /** One onboarding turn: the conversation so far, and the profile to fill (else Arc creates one). */
 export const OnboardingInputSchema = z.object({
   messages: z.array(ChatTurnSchema).max(40),
   profileId: z.string().min(1).optional(),
+  /** Skip the rest: build the week now from what has been said, with defaults for the rest. */
+  finish: z.boolean().optional(),
 })
 export type OnboardingInput = z.infer<typeof OnboardingInputSchema>
 
@@ -177,9 +184,6 @@ export const CoachIntakeSchema = z.object({
 })
 export type CoachIntake = z.infer<typeof CoachIntakeSchema>
 
-/** What Arc asks about, in order. The page shows a lamp per topic and quick replies for the current one. */
-export const ONBOARDING_TOPICS = ['goals', 'trainingGoal', 'focus', 'side', 'limitations', 'experience', 'days', 'height', 'weight'] as const
-export type OnboardingTopic = (typeof ONBOARDING_TOPICS)[number]
 
 export interface OnboardingReply {
   /** Arc's next line. */

@@ -5,8 +5,8 @@
  */
 import { z } from 'zod'
 import { PlanInputSchema, WeekdaySchema, type CoachIntake, type PlanDto, type PlanInput, type TrainingGoal } from './api.ts'
-import { EXERCISE_LIST, EXERCISES } from './engine/exercises.ts'
-import type { ExerciseId } from './engine/types.ts'
+import { BODY_AREAS, EXERCISE_LIST, EXERCISES } from './engine/exercises.ts'
+import type { BodyArea, ExerciseId } from './engine/types.ts'
 
 type Range = readonly [number, number]
 
@@ -172,11 +172,35 @@ export function parseWeightKg(raw: string): number | undefined {
 
 const LEVEL = { new: 0, some: 0.5, regular: 1 } as const
 
+/** The order areas follow through a week: upper body, legs, back, core, then round again. */
+const AREA_CYCLE: BodyArea[] = ['upper', 'legs', 'back', 'core']
+const areaName = (a: BodyArea) => BODY_AREAS.find((x) => x.id === a)!.name
+
+/** The body area a training day works: its first movement's. */
+export function areaOfDay(day: Pick<ProgramDay, 'items'>): BodyArea {
+  return EXERCISES[day.items[0]!.exercise].area
+}
+
 /**
- * Arc's own week from the answers, used whenever Gemini is off or sends something unusable.
- * Every day opens with the focus movement on the member's side; anyone past "new" gets a second,
- * rotating movement for variety from the focus's own body area. Sets and reps sit higher in the goal's range with experience,
- * rest lower.
+ * A week worth training: no body area on two training days running (Monday-first order), and at
+ * least three areas once there are three days or more (two days: two areas).
+ */
+export function isDiverseWeek(days: Pick<ProgramDay, 'weekday' | 'items'>[]): boolean {
+  const areas = [...days].sort((a, b) => mondayFirst(a.weekday, b.weekday)).map(areaOfDay)
+  if (areas.some((a, i) => i > 0 && a === areas[i - 1])) return false
+  return new Set(areas).size >= Math.min(areas.length, 3)
+}
+
+/** "upper body, legs and back". */
+const listOf = (items: string[]) => (items.length <= 1 ? (items[0] ?? '') : `${items.slice(0, -1).join(', ')} and ${items.at(-1)}`)
+
+/**
+ * Arc's own week from the answers, used whenever Gemini is off or sends something unusable. Each
+ * training day works one body area, in turn from the focus's area (upper body, legs, back, core),
+ * so no area comes two training days running and the week covers as many areas as it has days.
+ * The focus movement opens the week; an area that comes round again uses its other movements.
+ * Someone new does one movement a day, everyone else two. Sets and reps sit higher in the goal's
+ * range with experience, rest lower.
  */
 export function programFromIntake(intake: CoachIntake): ProgramInput {
   const goal = intake.trainingGoal ?? 'hypertrophy'
@@ -189,17 +213,24 @@ export function programFromIntake(intake: CoachIntake): ProgramInput {
   const item = (exercise: PlanInput['exercise']): PlanInput => ({ exercise, side: intake.side, sets, reps, restSeconds, targetDeg: EXERCISES[exercise].targetDeg })
 
   const weekdays = (intake.trainingDays?.length ? [...new Set(intake.trainingDays)] : spreadDays(intake.daysPerWeek)).sort(mondayFirst)
-  // Variety comes from the focus's own body area (a squat week adds lunges and knee extensions).
-  const area = EXERCISES[intake.focus].area
-  const others = EXERCISE_LIST.filter((e) => e.area === area && e.id !== intake.focus).map((e) => e.id)
-  const days: ProgramDay[] = weekdays.map((weekday, i) => {
-    const items = [item(intake.focus)]
-    if (intake.experience !== 'new' && others.length) items.push(item(others[i % others.length]!))
-    return { weekday, title: items.map((x) => EXERCISES[x.exercise].name).join(' + ').slice(0, 60), items }
-  })
   const focus = EXERCISES[intake.focus]
+  const start = AREA_CYCLE.indexOf(focus.area)
+  const perDay = intake.experience === 'new' ? 1 : 2
+  const seen = new Map<BodyArea, number>()
+  const days: ProgramDay[] = weekdays.map((weekday, i) => {
+    const area = AREA_CYCLE[(start + i) % AREA_CYCLE.length]!
+    // The area's movements, the focus first when it is the focus's area.
+    const pool = EXERCISE_LIST.filter((e) => e.area === area).sort((a, b) => Number(b.id === focus.id) - Number(a.id === focus.id))
+    const round = seen.get(area) ?? 0
+    seen.set(area, round + 1)
+    const picks = Array.from({ length: Math.min(perDay, pool.length) }, (_, k) => pool[(round * perDay + k) % pool.length]!.id)
+    const items = picks.map(item)
+    return { weekday, title: `${areaName(area)} · ${picks.map((id) => EXERCISES[id].short).join(' + ')}`.slice(0, 60), items }
+  })
   const count = weekdays.length
-  const summary = `${count} ${count === 1 ? 'day' : 'days'} a week (${weekdayList(weekdays)}), built for ${range.label}: ${sets} sets of ${reps} with ${restSeconds} seconds of rest. Every day starts with your ${intake.side} ${focus.name.toLowerCase()}, aiming for ${focus.targetDeg} degrees.`
+  const areas = [...new Set(days.map(areaOfDay))].map((a) => areaName(a).toLowerCase())
+  const spread = count === 1 ? `working your ${areas[0]}` : `a different area each day: ${listOf(areas)}`
+  const summary = `${count} ${count === 1 ? 'day' : 'days'} a week (${weekdayList(weekdays)}), built for ${range.label}: ${sets} sets of ${reps} with ${restSeconds} seconds of rest, ${spread}. Your ${intake.side} ${focus.name.toLowerCase()} opens the week, aiming for ${focus.targetDeg} degrees.`
   return { summary, days }
 }
 
