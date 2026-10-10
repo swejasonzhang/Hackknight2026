@@ -53,7 +53,7 @@ class RoutineExercise:
         self.best_endpoint_coords = None  # Stores (vertex_point, endpoint) in pixel coords
 
     def evaluate_rep_quality(self, min_ang, max_ang):
-        """Calculates live visual feedback score for HUD display only."""
+        """Calculates live visual feedback score for data logs only."""
         if max_ang > self.max_allowed_extension:
             return "POOR FORM (OVER-EXTENSION)", (0, 0, 255)
 
@@ -252,8 +252,8 @@ class ExerciseTracker:
                 "name": "Ab Twist",
                 "type": "twist",
                 "indices": (LEFT_SHOULDER, RIGHT_SHOULDER, 0),
-                "flex_threshold": 2.5,   # Very responsive threshold for easy triggering
-                "extend_threshold": 8.5,   # Lowered range for lighter torso rotation
+                "flex_threshold": 2.5,
+                "extend_threshold": 8.5,
                 "default_reps": 10,
                 "default_sets": 1,
                 "invert_logic": True,
@@ -292,7 +292,6 @@ class ExerciseTracker:
         self.routine = routine if routine is not None else self.build_custom_routine()
         self.current_index = 0
         self.waiting_for_ready = False
-        self.last_rep_feedback = ("READY", (255, 255, 255))
         self.warning_status = ("NORMAL", (0, 255, 0))
 
         self.rest_duration = default_rest_duration
@@ -347,7 +346,6 @@ class ExerciseTracker:
                         ex_type = ex_data.get("type")
 
                         if ex_type in ["arm_dual", "leg_dual"]:
-                            # Add both Left and Right side variations automatically when 'all' is chosen
                             routine.append(
                                 RoutineExercise(
                                     name=f"{ex_data['name']} (Right)",
@@ -665,10 +663,9 @@ class ExerciseTracker:
                     else 0.0
                 )
 
-                score, color = current_exercise.evaluate_rep_quality(
+                current_exercise.evaluate_rep_quality(
                     current_exercise.current_rep_min, current_exercise.current_rep_max
                 )
-                self.last_rep_feedback = (score, color)
 
                 current_exercise.rep_logs.append(
                     {
@@ -719,10 +716,9 @@ class ExerciseTracker:
                     else 0.0
                 )
 
-                score, color = current_exercise.evaluate_rep_quality(
+                current_exercise.evaluate_rep_quality(
                     current_exercise.current_rep_min, current_exercise.current_rep_max
                 )
-                self.last_rep_feedback = (score, color)
 
                 current_exercise.rep_logs.append(
                     {
@@ -928,14 +924,13 @@ class ExerciseTracker:
                 if not self.waiting_for_ready and not self.in_rest_period and not self.in_grace_period:
                     self.process_reps(active_exercise, angle, p2_px=p2, p3_px=p3)
 
-                # --- REFINED SIDE-AWARE & CORRECTED SPATIAL GUIDES ---
+                # --- SPATIAL PACING GUIDES ---
                 cycle_time = 2.5
                 progress = 0.5 + 0.5 * math.sin(now * (2 * math.pi / cycle_time))
 
                 ex_name = active_exercise.name
 
                 if active_exercise.name == "Ab Twist":
-                    # Explicit Ab Twist guidance rendering
                     center_x, center_y = int(w // 2), int(h // 3)
                     direction_sign = 1 if math.sin(now * math.pi) > 0 else -1
                     target_x = int(center_x + 80 * direction_sign * progress)
@@ -959,7 +954,6 @@ class ExerciseTracker:
                         cv2.arrowedLine(frame, (base_x, base_y + 40), (base_x, target_y), (255, 0, 0), 4, tipLength=0.3)
                         cv2.putText(frame, label_txt, (base_x - 50, base_y - 15), cv2.FONT_HERSHEY_SIMPLEX, 0.55, (255, 0, 0), 2)
                     elif "Lateral Raise" in ex_name:
-                        # Side-specific lateral raise arrow pointing precisely to the side of the working arm
                         side_offset = 70 if "Right" in ex_name else -70
                         target_x = int(base_x + side_offset * progress)
                         cv2.arrowedLine(frame, (base_x, base_y), (target_x, base_y), (255, 0, 0), 4, tipLength=0.3)
@@ -978,7 +972,6 @@ class ExerciseTracker:
                         cv2.arrowedLine(frame, (base_x, base_y - 60), (base_x, target_y), (255, 0, 0), 4, tipLength=0.3)
                         cv2.putText(frame, "PACE & PULL", (base_x - 45, base_y - 75), cv2.FONT_HERSHEY_SIMPLEX, 0.55, (255, 0, 0), 2)
                     elif "Crunches" in ex_name:
-                        # Corrected crunch direction pointing upward/forward toward knees
                         target_y = int(base_y + 65 - 100 * progress)
                         cv2.arrowedLine(frame, (base_x, base_y + 65), (base_x, target_y), (255, 0, 0), 4, tipLength=0.3)
                         cv2.putText(frame, "PACE & CURL", (base_x - 45, base_y - 15), cv2.FONT_HERSHEY_SIMPLEX, 0.55, (255, 0, 0), 2)
@@ -990,8 +983,9 @@ class ExerciseTracker:
                         cv2.arrowedLine(frame, (base_x, base_y), (guide_x, guide_y), (255, 0, 0), 4, tipLength=0.25)
                         cv2.putText(frame, "PACE PATH", (base_x - 35, base_y - 15), cv2.FONT_HERSHEY_SIMPLEX, 0.55, (255, 0, 0), 2)
 
+                # --- HUD OVERLAY (FORM RATING TEXT REMOVED) ---
                 overlay = frame.copy()
-                cv2.rectangle(overlay, (20, 20), (540, 310), (0, 0, 0), -1)
+                cv2.rectangle(overlay, (20, 20), (540, 275), (0, 0, 0), -1)
                 alpha = 0.6
                 frame = cv2.addWeighted(overlay, alpha, frame, 1 - alpha, 0)
 
@@ -1042,17 +1036,8 @@ class ExerciseTracker:
                 )
                 cv2.putText(
                     frame,
-                    f"Last Rep Form: {self.last_rep_feedback[0]}",
-                    (35, 230),
-                    cv2.FONT_HERSHEY_SIMPLEX,
-                    0.65,
-                    self.last_rep_feedback[1],
-                    2,
-                )
-                cv2.putText(
-                    frame,
                     f"Status: {self.warning_status[0]}",
-                    (35, 260),
+                    (35, 230),
                     cv2.FONT_HERSHEY_SIMPLEX,
                     0.65,
                     self.warning_status[1],
@@ -1061,7 +1046,7 @@ class ExerciseTracker:
                 cv2.putText(
                     frame,
                     f"Rest Config: {int(self.rest_duration)}s | Grace: {int(self.grace_duration)}s",
-                    (35, 290),
+                    (35, 260),
                     cv2.FONT_HERSHEY_SIMPLEX,
                     0.55,
                     (180, 180, 180),
