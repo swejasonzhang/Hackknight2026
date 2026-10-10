@@ -41,7 +41,8 @@ interface Config {
  * exercise's joint has been in view for a moment, counts the plan's sets with the shared rep
  * counter (smoothed by the One Euro filter), runs the rest between sets by itself, and finishes
  * after the last set (or early, keeping what was done). `toSessionInput` is the body for
- * POST /api/sessions; the server recomputes fatigue and the summary from the reps.
+ * POST /api/sessions and, as each later set finishes, PUT /api/sessions/:id; the server
+ * recomputes fatigue and the summary from the reps.
  */
 export class SessionRecorder {
   private readonly cfg: Config

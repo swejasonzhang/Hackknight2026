@@ -46,7 +46,7 @@ export function RecordPage() {
 
   return (
     <Page>
-      <PageHeader eyebrow="Record · live" title={selected?.name ?? 'Record'} subtitle="Arc counts every rep through the webcam. Sets and rests run by themselves; the session saves when the last set ends." actions={<ProfilePicker />} />
+      <PageHeader eyebrow="Record · live" title={selected?.name ?? 'Record'} subtitle="Arc counts every rep through the webcam. Sets and rests run by themselves; each set is saved as it finishes." actions={<ProfilePicker />} />
       <div className="rule-strong" />
       <div className="mt-6">
         {noProfiles ? (

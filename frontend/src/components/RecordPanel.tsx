@@ -25,7 +25,7 @@ export function RecordPanel({ prescription }: { prescription: Prescription }) {
             Record a session
           </h2>
           <p className="t-desc mt-1 max-w-[62ch]">
-            Arc tracks your body through the webcam right here, with nothing to install. It finds the joints of the movement, measures every rep in degrees, counts your sets and times the rest, then saves the session to this dashboard. The video never leaves this device; only the angles are saved.
+            Arc tracks your body through the webcam right here, with nothing to install. It finds the joints of the movement, measures every rep in degrees, counts your sets and times the rest, saving each set to this dashboard as it finishes. The video never leaves this device; only the angles are saved.
           </p>
           <p className="t-meta mt-3 text-navy">
             {SOURCE[p.source]} · <span className="normal-case">{summary}</span>

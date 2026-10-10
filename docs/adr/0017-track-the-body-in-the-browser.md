@@ -1,7 +1,7 @@
 # ADR-0017: Track the body in the browser
 
 - Date: 2026-10-10
-- Status: accepted (supersedes ADR-0015 and the launcher in ADR-0016; amends ADR-0004)
+- Status: accepted (supersedes ADR-0015 and the launcher in ADR-0016; amends ADR-0004); amended by ADR-0023 (each set is saved as it finishes); ADR-0021 took the rep thresholds from the camera app's catalog
 
 ## Context
 

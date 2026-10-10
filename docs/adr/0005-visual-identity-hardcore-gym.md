@@ -13,7 +13,7 @@ The first design read as a generic SaaS dashboard. The product is a strength and
 - Palette: blood red (`--primary`) for actions and emphasis, industrial orange (`--primary-2`) for goals and warnings in context, metallic silver (`--accent`) for secondary data. Semantic green/amber/red stay for status.
 - Type: Barlow Condensed (600 to 900) for headlines, labels, buttons and table headers, uppercase with wide tracking; Inter for body and numbers.
 - Components: solid high-contrast buttons with hover, focus ring (orange), active and disabled states; inputs with strong borders and red focus; cards with coloured top bars for stat tiles; squared tabs with a sliding red block; squared badges and avatars.
-- Motion from ADR-0004's design pass is kept (page reveals, live arc, marquee) and respects reduced motion.
+- Motion from the earlier landing-page design pass is kept (page reveals, live arc, marquee) and respects reduced motion.
 - Registration: email, password and confirm password with independent show/hide controls, inline validation tied to the fields, a disabled submit until valid, and a loading state.
 
 ## Consequences

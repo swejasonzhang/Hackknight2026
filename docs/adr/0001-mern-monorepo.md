@@ -1,7 +1,7 @@
 # ADR-0001: MERN stack in a three-package npm workspace
 
 - Date: 2026-10-09
-- Status: accepted
+- Status: accepted; amended by ADR-0004 (the web app's `MotionSource` is gone) and ADR-0017 (the browser records through `frontend/src/record`)
 
 ## Context
 

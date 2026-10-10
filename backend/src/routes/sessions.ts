@@ -5,7 +5,10 @@ import { HttpError, toObjectId, validate } from '../http.ts'
 import { Session, toSessionDto, type SessionShape } from '../models/Session.ts'
 import { requireProfile } from '../services/profiles.ts'
 
-/** Mounted at /api/sessions (behind `authenticate`). POST is how the CV module stores a session. */
+/**
+ * Mounted at /api/sessions (behind `authenticate`). The browser saves a recording here set by set
+ * (POST, then PUT), the camera app the whole session at once (POST with its key).
+ */
 export const sessionsRouter = Router()
 
 /** What a session body stores. Never trust client-side derived numbers: fatigue per set and the summary are recomputed. */

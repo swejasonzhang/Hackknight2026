@@ -1,7 +1,7 @@
 # ADR-0002: Rep counting, fatigue proxy and session flow live in `dependencies`, and fatigue is a labelled proxy
 
 - Date: 2026-10-09
-- Status: accepted
+- Status: accepted; amended by ADR-0004 (the session state machine was removed); the browser recorder of ADR-0017 runs the engine's rep counter and filter
 
 ## Context
 

@@ -283,7 +283,7 @@ export function DashboardPage() {
               description={
                 <>
                   Press <strong>Start recording</strong> above: Arc counts {selected?.name ? <strong>{selected.name}</strong> : 'your'}
-                  {selected?.name ? "'s" : ''} reps through the webcam, right in the browser, and the readout lands here when the last set ends. Or switch movement in the panel, or load the demo data.
+                  {selected?.name ? "'s" : ''} reps through the webcam, right in the browser, and the readout lands here as soon as the first set ends. Or switch movement in the panel, or load the demo data.
                 </>
               }
               action={demoButton(true)}

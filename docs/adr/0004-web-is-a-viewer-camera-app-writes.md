@@ -1,7 +1,7 @@
 # ADR-0004: The web app visualises; the camera app records sessions; accounts with JWT and an API key
 
 - Date: 2026-10-09
-- Status: accepted
+- Status: accepted; amended by ADR-0017 (the web app also records, in the browser) and ADR-0023 (it saves each set as it finishes; the camera app's uploads are built)
 
 ## Context
 

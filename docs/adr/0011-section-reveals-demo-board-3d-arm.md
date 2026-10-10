@@ -1,7 +1,7 @@
 # ADR-0011: Section reveals, a live demo board and a 3D arm on the landing page
 
 - Date: 2026-10-10
-- Status: accepted (amends the Motion bullet of ADR-0010)
+- Status: partly superseded: the 3D arm by ADR-0014's whole body, `WhenVisible` by ADR-0012's folds; amends the Motion bullet of ADR-0010
 
 ## Context
 

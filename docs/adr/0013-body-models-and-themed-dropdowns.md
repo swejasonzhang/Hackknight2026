@@ -1,7 +1,7 @@
 # ADR-0013: A body model that moves with the joints, and dropdowns from Radix
 
 - Date: 2026-10-10
-- Status: accepted
+- Status: partly superseded by ADR-0014 (the body parts); the themed dropdowns stand
 
 ## Context
 

@@ -16,4 +16,4 @@ As a <role> I want <capability> so that <outcome>.
 
 ## Notes
 
-Owner: FS / CV · Points: · Depends on:
+Owner: FS / CV / AI · Points: · Depends on:

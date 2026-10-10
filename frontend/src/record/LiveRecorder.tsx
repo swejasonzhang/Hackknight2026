@@ -5,6 +5,7 @@ import { api } from '../api/client'
 import { Lamp, StatTile } from '../components/ui'
 import { deg } from '../format'
 import { readJoint, type JointReading, type Landmark } from './angle'
+import { visibleJoints, visibleSegments } from './overlay'
 import type { PoseTracker } from './pose'
 import { SessionSaver } from './saver'
 import { SessionRecorder, type RecorderView } from './recorder'
@@ -20,10 +21,6 @@ export interface RecordConfig {
 
 type Status = { kind: 'camera' } | { kind: 'model' } | { kind: 'live' } | { kind: 'saving' } | { kind: 'empty' } | { kind: 'error'; message: string }
 
-/** The body's outline drawn faintly under the tracked joint (MediaPipe landmark pairs). */
-const OUTLINE: [number, number][] = [
-  [11, 12], [11, 13], [13, 15], [12, 14], [14, 16], [11, 23], [12, 24], [23, 24], [23, 25], [25, 27], [24, 26], [26, 28],
-]
 /** "shoulder, elbow and wrist": the joints a movement is measured at, in plain words. */
 const LANDMARK_WORDS: Record<number, string> = { 11: 'shoulder', 12: 'shoulder', 13: 'elbow', 14: 'elbow', 15: 'wrist', 16: 'wrist', 23: 'hip', 24: 'hip', 25: 'knee', 26: 'knee', 27: 'ankle', 28: 'ankle' }
 const JOINT_NAMES = Object.fromEntries(
@@ -89,17 +86,27 @@ function draw(canvas: HTMLCanvasElement, aspect: number, landmarks: Landmark[] |
   const box = fit(cw, ch, aspect)
   const px = (p: { x: number; y: number }) => [box.x + p.x * box.w, box.y + p.y * box.h] as const
   ctx.lineCap = 'round'
-  ctx.strokeStyle = 'rgba(255,255,255,0.55)'
-  ctx.lineWidth = 2
-  for (const [a, b] of OUTLINE) {
-    const p = landmarks[a]
-    const q = landmarks[b]
-    if (!p || !q || (p.visibility ?? 1) < 0.5 || (q.visibility ?? 1) < 0.5) continue
+  // The whole body in white, head to feet, as the camera app draws it; a soft dark edge keeps it
+  // readable against a bright room.
+  ctx.shadowColor = 'rgba(11,27,58,0.55)'
+  ctx.shadowBlur = 3
+  ctx.strokeStyle = 'rgba(255,255,255,0.92)'
+  ctx.lineWidth = 3
+  for (const [p, q] of visibleSegments(landmarks)) {
     ctx.beginPath()
     ctx.moveTo(...px(p))
     ctx.lineTo(...px(q))
     ctx.stroke()
   }
+  ctx.fillStyle = '#ffffff'
+  for (const p of visibleJoints(landmarks)) {
+    ctx.beginPath()
+    ctx.arc(...px(p), 3.5, 0, 2 * Math.PI)
+    ctx.fill()
+  }
+  ctx.shadowBlur = 0
+  ctx.shadowColor = 'transparent'
+  // The measured joint on top, in cobalt, with its angle.
   if (!reading.tracked || !reading.points) return
   const [base, mid, end] = reading.points.map(([x, y]) => px({ x, y }))
   ctx.strokeStyle = '#0b3dff'
@@ -136,8 +143,9 @@ function draw(canvas: HTMLCanvasElement, aspect: number, landmarks: Landmark[] |
 /**
  * Recording in the browser, with nothing to press: the camera starts as soon as this opens, the
  * pose model loads, and counting begins once the movement's joints are in view. The plan's sets
- * and rests run by themselves; after the last set (or "Finish and save") the session is saved
- * as the signed-in user and its report opens. The video stays in the browser.
+ * and rests run by themselves. Each set is saved to MongoDB as it finishes, into one session; the
+ * last set (or "Finish and save") marks it complete and opens its report. Over the video, the
+ * whole white skeleton and the measured joint. The video stays in the browser.
  */
 export function LiveRecorder({ profileId, config, simulate = false }: { profileId: string; config: RecordConfig; simulate?: boolean }) {
   const navigate = useNavigate()

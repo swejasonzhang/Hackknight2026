@@ -30,15 +30,50 @@ function centreOf(exercise: ExerciseId, mirror: number): [number, number] {
  */
 export function simulatedLandmarks(exercise: ExerciseId, side: Side, metricDeg: number, aspect = 16 / 9): Landmark[] {
   const all: Landmark[] = Array.from({ length: 33 }, () => ({ x: 0, y: 0, visibility: 0 }))
-  const { joints, overlay } = skeletonFor(exercise, metricDeg)
+  const { joints, overlay, view } = skeletonFor(exercise, metricDeg)
   const mirror = side === 'left' ? -1 : 1
   const [cx, cy] = centreOf(exercise, mirror)
   const k = 0.11 // frame heights per body unit: a standing body fills about two thirds of the picture
   const seen = ([x, y]: [number, number]): Landmark => ({ x: 0.5 + ((x * mirror - cx) * k) / aspect, y: 0.5 - (y - cy) * k, visibility: 0.99 })
+  const at = (name: JointName) => joints[side === 'left' ? other(name) : name]
   for (const [name, index] of Object.entries(LANDMARK_OF) as [JointName, number][]) {
-    const [x, y] = joints[side === 'left' ? other(name) : name]
+    const [x, y] = at(name)
     all[index] = seen([x, y])
   }
+  // The rest of MediaPipe's 33, placed from the figure, so the white skeleton runs head to feet:
+  // the face from the head, the hands round the fingertips, the heels and toes from the feet.
+  const [hx, hy] = [(joints.headBase[0] + joints.headTop[0]) / 2, (joints.headBase[1] + joints.headTop[1]) / 2]
+  const ahead = view === 'side' ? 0.22 : 0 // seen side on, the face points the way the body faces
+  const across = view === 'side' ? 0.04 : 0.13
+  const face: [number, number, number][] = [
+    [0, ahead + 0.02, -0.05], // nose
+    [1, ahead - 0.03, 0.08], [2, ahead - 0.06, 0.08], [3, ahead - 0.09, 0.08], // left eye, from the viewer's right
+    [4, ahead + 0.03, 0.08], [5, ahead + 0.06, 0.08], [6, ahead + 0.09, 0.08], // right eye
+    [7, -across - 0.14, 0.04], [8, across + 0.14, 0.04], // ears
+    [9, ahead - 0.04, -0.2], [10, ahead + 0.04, -0.2], // mouth
+  ]
+  for (const [index, dx, dy] of face) {
+    const spread = view === 'side' ? dx : index >= 1 && index <= 3 ? -Math.abs(dx) - across : index >= 4 && index <= 6 ? Math.abs(dx) + across : dx
+    all[index] = seen([hx + spread, hy + dy])
+  }
+  const hand = (wrist: JointName, tip: JointName, pinky: number, index: number, thumb: number) => {
+    const [wx, wy] = at(wrist)
+    const [tx, ty] = at(tip)
+    const [dx, dy] = [tx - wx, ty - wy]
+    all[pinky] = seen([wx + dx * 0.7 - dy * 0.15, wy + dy * 0.7 + dx * 0.15])
+    all[index] = seen([wx + dx * 0.8 + dy * 0.1, wy + dy * 0.8 - dx * 0.1])
+    all[thumb] = seen([wx + dx * 0.45 + dy * 0.25, wy + dy * 0.45 - dx * 0.25])
+  }
+  hand('lWrist', 'lFingertip', 17, 19, 21)
+  hand('rWrist', 'rFingertip', 18, 20, 22)
+  const foot = (ankle: JointName, toe: JointName, heel: number, tip: number) => {
+    const [ax, ay] = at(ankle)
+    const [tx, ty] = at(toe)
+    all[heel] = seen([ax - (tx - ax) * 0.3, ay - 0.15])
+    all[tip] = seen([tx, ty])
+  }
+  foot('lAnkle', 'lToe', 29, 31)
+  foot('rAnkle', 'rToe', 30, 32)
   // The measured landmarks sit where the goniometer does: the shoulder movements measure from
   // the trunk line, so the pretend hip sits under the shoulder, as for a person standing square.
   const cfg = EXERCISES[exercise]
