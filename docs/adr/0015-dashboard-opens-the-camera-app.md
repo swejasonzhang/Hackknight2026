@@ -1,7 +1,7 @@
 # ADR-0015: The dashboard opens the camera app through a local launcher
 
 - Date: 2026-10-10
-- Status: accepted
+- Status: superseded by ADR-0017 (the web app tracks the body in the browser; the launcher is removed)
 
 ## Context
 

@@ -1,9 +1,10 @@
 """Turn an Arc plan into the camera app's routine, so the app can start without asking anything.
 
-The dashboard sends the selected profile's plan (exercise, side, sets, reps, rest); the launcher
-validates it with `validate_plan` and starts `main.py` with `plan_arguments(plan)`; `main.py`
-reads them back with `plan_from_arguments` and builds the routine with `build_routine`. Pure
-Python, no OpenCV or MediaPipe, so it is tested on its own.
+`main.py --exercise elbow_flexion --side right --sets 3 --reps 8 --rest 45` (Arc's plan fields,
+checked by `validate_plan` against the same limits as the web app) builds the routine with
+`build_routine` and starts counting straight away. `plan_arguments` writes those flags for a
+plan. Pure Python, no OpenCV or MediaPipe, so it is tested on its own. (The web app now tracks
+the body in the browser itself; this is for running the Python app directly.)
 """
 
 from __future__ import annotations

@@ -2,8 +2,8 @@ import { EXERCISE_LIST, EXERCISES, type ExerciseId, type PlanDto, type ProgressD
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { api } from '../api/client'
-import { CameraLauncher } from '../components/CameraLauncher'
 import { Folds, type FoldItem } from '../components/Folds'
+import { RecordPanel } from '../components/RecordPanel'
 import { IconActivity, IconCalendar, IconFlame, IconTarget } from '../components/icons'
 import { AnimatedNumber, Item, Page, Stagger } from '../components/motion'
 import { ProfilePicker } from '../components/ProfilePicker'
@@ -175,7 +175,7 @@ export function DashboardPage() {
             />
           </Item>
           <Item>
-            <StatTile label="Latest session" icon={<IconActivity />} value={latest ? <AnimatedNumber value={latest.bestPeakDeg} suffix="°" /> : none} hint={latest ? `${formatDate(latest.date)} · ${latest.totalReps} reps` : 'waiting for the camera app'} tone={latest ? 'primary' : 'default'} />
+            <StatTile label="Latest session" icon={<IconActivity />} value={latest ? <AnimatedNumber value={latest.bestPeakDeg} suffix="°" /> : none} hint={latest ? `${formatDate(latest.date)} · ${latest.totalReps} reps` : 'no session yet'} tone={latest ? 'primary' : 'default'} />
           </Item>
           <Item>
             <StatTile label="Sessions this week" icon={<IconCalendar />} value={data ? <AnimatedNumber value={thisWeek} /> : none} hint={data ? `${data.sessions.length} total for ${cfg.name.toLowerCase()}` : 'no sessions yet'} tone={thisWeek >= 3 ? 'good' : 'default'} />
@@ -211,7 +211,7 @@ export function DashboardPage() {
           </div>
         )}
 
-        <CameraLauncher plan={plan} exercise={exercise} />
+        <RecordPanel plan={plan} exercise={exercise} />
 
         {noProfiles && (
           <Strip index="00" title="Setup">
@@ -233,10 +233,11 @@ export function DashboardPage() {
         {noSignal && (
           <Strip index="00" title="Waiting for a session">
             <EmptyState
-              title={`No signal for ${cfg.name.toLowerCase()}`}
+              title={`No sessions yet for ${cfg.name.toLowerCase()}`}
               description={
                 <>
-                  Sessions arrive from the camera app. Open it, choose <strong>{selected?.name}</strong>, do a set of {cfg.name.toLowerCase()}, and the readout lands here within seconds. Switch movement in the panel, or load the demo data.
+                  Press <strong>Start recording</strong> above: Arc counts {selected?.name ? <strong>{selected.name}</strong> : 'your'}
+                  {selected?.name ? "'s" : ''} reps through the webcam, right in the browser, and the readout lands here when the last set ends. Or switch movement in the panel, or load the demo data.
                 </>
               }
               action={demoButton(true)}

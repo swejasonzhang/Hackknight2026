@@ -6,7 +6,7 @@ import { EXERCISE_IDS, type ExerciseId } from '@arc/dependencies'
  * (shoulder at 0.82 of height, hip joint at 0.52, knee at 0.28; upper arm 0.19, forearm 0.15,
  * hand 0.11, thigh 0.245, shin 0.245, foot 0.15). +Y is up, the floor is y = 0, and the camera
  * looks down −Z. Only the exercising limb moves with the reading; the
- * rest of the body holds a natural pose. The tracked landmarks the camera app follows are joints
+ * rest of the body holds a natural pose. The tracked landmarks the pose tracker follows are joints
  * of this body, so the overlay (rings, segments, the goniometer arc) sits exactly on it.
  * Pure maths, tested without WebGL; the scene turns joints into sculpted parts.
  */

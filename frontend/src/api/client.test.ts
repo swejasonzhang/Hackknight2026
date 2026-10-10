@@ -31,6 +31,17 @@ describe('api client', () => {
     expect(JSON.parse(init.body)).toEqual({ tzOffsetMinutes: new Date().getTimezoneOffset() })
   })
 
+  it('saves a recorded session as the signed-in user', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse({ id: 's1' }, 201))
+    vi.stubGlobal('fetch', fetchMock)
+    const input = { profileId: 'p1', exercise: 'elbow_flexion' as const, side: 'right' as const, startedAt: 1, endedAt: 2, plan: { sets: 1, reps: 1, restSeconds: 45, targetDeg: 140 }, sets: [] }
+    await api.sessions.create(input)
+    const [url, init] = fetchMock.mock.calls[0]!
+    expect(url).toBe('/api/sessions')
+    expect(init.method).toBe('POST')
+    expect(JSON.parse(init.body)).toEqual(input)
+  })
+
   it('builds query strings for progress', async () => {
     const fetchMock = vi.fn().mockResolvedValue(jsonResponse({ sessions: [] }))
     vi.stubGlobal('fetch', fetchMock)
