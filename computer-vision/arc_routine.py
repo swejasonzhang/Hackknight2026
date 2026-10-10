@@ -124,6 +124,7 @@ def plan_from_arguments(argv: list[str]) -> dict | None:
     parser.add_argument("--sets", type=int, default=3)
     parser.add_argument("--reps", type=int, default=8)
     parser.add_argument("--rest", type=int, default=45)
+    parser.add_argument("--profile", help="Arc profile id: send the finished session to Arc (see arc_upload.py)")
     args = parser.parse_args(argv)
     if args.exercise is None:
         return None

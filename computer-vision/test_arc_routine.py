@@ -125,6 +125,10 @@ class CommandLineTest(unittest.TestCase):
         self.assertEqual(args, ["--exercise", "elbow_flexion", "--side", "right", "--sets", "3", "--reps", "8", "--rest", "45"])
         self.assertEqual(arc_routine.plan_from_arguments(args), PLAN)
 
+    def test_a_profile_to_send_the_session_to_leaves_the_plan_alone(self):
+        args = arc_routine.plan_arguments(PLAN) + ["--profile", "p1"]
+        self.assertEqual(arc_routine.plan_from_arguments(args), PLAN)
+
     def test_no_arguments_means_the_interactive_builder(self):
         self.assertIsNone(arc_routine.plan_from_arguments([]))
 

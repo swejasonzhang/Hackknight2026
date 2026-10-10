@@ -180,7 +180,13 @@ export function SessionDetailPage() {
           <span aria-hidden="true">/</span>
           <span>{formatDateTime(session.startedAt)}</span>
           {session.demo && <Tag soft>Demo</Tag>}
+          {session.complete === false && <Tag soft>Stopped early</Tag>}
         </div>
+        {session.complete === false && (
+          <p className="t-desc mt-3 max-w-[62ch] text-[14px]">
+            This recording stopped before its last set. Every set that finished was saved as it ended, so {session.sets.length === 1 ? 'its set is' : `its ${session.sets.length} sets are`} all here.
+          </p>
+        )}
         <h1 className="t-title mt-3">
           {exercise.name} <span className="font-medium text-muted">· {session.side}</span>
         </h1>
@@ -235,7 +241,7 @@ export function SessionDetailPage() {
 
       {/* Secondary readouts, a three-row ledger beside the numeral. */}
       <div className={AREA.readouts}>
-        <StatTile label="Reps" value={<AnimatedNumber value={session.summary.totalReps} />} hint={`${session.sets.length} sets`} tone="primary" />
+        <StatTile label="Reps" value={<AnimatedNumber value={session.summary.totalReps} />} hint={`${session.sets.length} ${session.sets.length === 1 ? 'set' : 'sets'}`} tone="primary" />
         <StatTile label="Mean rep" value={<AnimatedNumber value={session.summary.meanPeakDeg} suffix="°" />} hint={exercise.metricLabel} />
         <StatTile label="Fatigue proxy" value={<AnimatedNumber value={session.summary.fatigueIndex} decimals={2} />} hint={fatigue.text} tone={fatigue.tone} />
       </div>

@@ -27,6 +27,6 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - name: Camera app routine tests
+      - name: Camera app tests (routine, upload to Arc)
         working-directory: computer-vision
-        run: python -m unittest test_arc_routine
+        run: python -m unittest

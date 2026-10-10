@@ -100,6 +100,8 @@ export const api = {
     get: (id: string) => request<SessionDto>(`/api/sessions/${id}`),
     /** A session recorded in the browser, saved as the signed-in user (the server recomputes fatigue and the summary). */
     create: (input: CreateSessionInput) => request<SessionDto>('/api/sessions', { method: 'POST', body: input }),
+    /** A recording saved as it goes: every set so far, `complete` at the end. */
+    update: (id: string, input: CreateSessionInput) => request<SessionDto>(`/api/sessions/${id}`, { method: 'PUT', body: input }),
   },
   progress: (profileId: string, exercise: ExerciseId) =>
     request<ProgressDto>(`/api/profiles/${profileId}/progress?exercise=${exercise}`),
