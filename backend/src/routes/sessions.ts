@@ -24,6 +24,7 @@ function recordOf(input: CreateSessionInput) {
     summary: summarizeSets(sets),
     complete: input.complete ?? true,
     ...(input.events?.length ? { events: input.events } : {}),
+    ...(input.loadKg != null ? { loadKg: input.loadKg } : {}),
   }
 }
 

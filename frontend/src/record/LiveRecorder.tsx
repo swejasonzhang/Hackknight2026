@@ -15,11 +15,14 @@ import { createSpeaker, type Speaker, type SpokenLine } from '../voice/speaker'
 import { elevenLabsVoice } from '../voice/status'
 import { cueFor, shouldCue } from './cues'
 import { FormGuide } from './FormGuide'
+import { LoadField } from './LoadField'
 
 export interface RecordConfig {
   exercise: ExerciseId
   side: Side
   plan: SessionPlan
+  /** The weight held last time for this movement, the field's starting value. */
+  loadKg?: number | null
 }
 
 type Status = { kind: 'camera' } | { kind: 'model' } | { kind: 'live' } | { kind: 'saving' } | { kind: 'empty' } | { kind: 'error'; message: string }
@@ -263,10 +266,14 @@ export function LiveRecorder({ profileId, config, simulate = false, below }: { p
     }
   }, [runCommand])
 
+  // The weight held goes out with every save of the session.
+  const loadRef = useRef<number | null>(config.loadKg ?? null)
+  const withLoad = useCallback(<T extends object>(input: T | null): (T & { loadKg?: number }) | null => (input && loadRef.current != null ? { ...input, loadKg: loadRef.current } : input), [])
+
   const save = useCallback(async () => {
     if (savingRef.current) return
     savingRef.current = true
-    const input = recorderRef.current?.toSessionInput(profileId, true)
+    const input = withLoad(recorderRef.current?.toSessionInput(profileId, true) ?? null)
     if (!input || !saverRef.current) {
       setStatus({ kind: 'empty' })
       return
@@ -280,7 +287,7 @@ export function LiveRecorder({ profileId, config, simulate = false, below }: { p
       savingRef.current = false
       setStatus({ kind: 'error', message: err instanceof Error ? `The session could not be saved: ${err.message}` : 'The session could not be saved.' })
     }
-  }, [navigate, profileId])
+  }, [navigate, profileId, withLoad])
 
   useEffect(() => {
     let cancelled = false
@@ -366,7 +373,7 @@ export function LiveRecorder({ profileId, config, simulate = false, below }: { p
           setsRead = finished.length
           const set = finished.at(-1)!
           // Into MongoDB now, not only at the end.
-          const soFar = recorder.toSessionInput(profileId, false)
+          const soFar = withLoad(recorder.toSessionInput(profileId, false))
           const count = finished.length
           if (soFar && next.phase !== 'done')
             saverRef.current
@@ -396,7 +403,7 @@ export function LiveRecorder({ profileId, config, simulate = false, below }: { p
       tracker?.close()
     }
     // A new attempt (Try again) restarts everything.
-  }, [config, simulate, save, attempt, profileId, say])
+  }, [config, simulate, save, attempt, profileId, say, withLoad])
 
   // Listen while live, when hands-free is on.
   useEffect(() => {
@@ -501,6 +508,7 @@ export function LiveRecorder({ profileId, config, simulate = false, below }: { p
             <StatTile label="Rep" value={`${view?.repsInSet ?? 0} / ${config.plan.reps}`} hint={`${view?.totalReps ?? 0} counted in all`} tone={phase === 'active' ? 'primary' : 'default'} />
             <StatTile label="Best rep" value={view?.bestDeg != null ? deg(view.bestDeg) : '–'} hint={`goal ${config.plan.targetDeg}°`} tone={view?.bestDeg != null && view.bestDeg >= config.plan.targetDeg ? 'good' : 'default'} />
           </div>
+          <LoadField initialKg={config.loadKg} onChange={(kg) => (loadRef.current = kg)} />
 
           {status.kind === 'error' && (
             <div role="alert" className="t-mono mt-4 flex items-start gap-2 text-bad">
