@@ -52,6 +52,8 @@ EXERCISES = (*CATALOG_IDS, "seated_knee_extension")
 SIDES = ("right", "left")
 # The same limits as Arc's plan schema (dependencies/src/api.ts, PlanInputSchema).
 LIMITS = {"sets": (1, 10), "reps": (1, 50), "restSeconds": (10, 600)}
+# The weight held, in kilograms, as Arc's session schema allows (CreateSessionSchema.loadKg).
+LOAD_KG = (0, 500)
 
 
 class PlanError(ValueError):
@@ -72,6 +74,11 @@ def validate_plan(plan: Any) -> dict:
         if not isinstance(value, int) or isinstance(value, bool) or not lo <= value <= hi:
             raise PlanError(f"{key} must be a whole number from {lo} to {hi}")
         clean[key] = value
+    if plan.get("loadKg") is not None:
+        load = plan["loadKg"]
+        if not isinstance(load, (int, float)) or isinstance(load, bool) or not LOAD_KG[0] <= load <= LOAD_KG[1]:
+            raise PlanError(f"loadKg must be a number of kilograms from {LOAD_KG[0]} to {LOAD_KG[1]}")
+        clean["loadKg"] = load
     return clean
 
 
@@ -113,7 +120,8 @@ def build_routine(spec: dict, lookup: Callable[[str], dict | None], make_exercis
 def plan_arguments(plan: dict) -> list[str]:
     """Command-line arguments for main.py, from a validated plan (enums and whole numbers only)."""
     plan = validate_plan(plan)
-    return ["--exercise", plan["exercise"], "--side", plan["side"], "--sets", str(plan["sets"]), "--reps", str(plan["reps"]), "--rest", str(plan["restSeconds"])]
+    args = ["--exercise", plan["exercise"], "--side", plan["side"], "--sets", str(plan["sets"]), "--reps", str(plan["reps"]), "--rest", str(plan["restSeconds"])]
+    return args + (["--weight", str(plan["loadKg"])] if "loadKg" in plan else [])
 
 
 def plan_from_arguments(argv: list[str]) -> dict | None:
@@ -124,8 +132,12 @@ def plan_from_arguments(argv: list[str]) -> dict | None:
     parser.add_argument("--sets", type=int, default=3)
     parser.add_argument("--reps", type=int, default=8)
     parser.add_argument("--rest", type=int, default=45)
+    parser.add_argument("--weight", type=float, help="the weight held, in kilograms (0 for bodyweight); saved with the session")
     parser.add_argument("--profile", help="Arc profile id: send the finished session to Arc (see arc_upload.py)")
     args = parser.parse_args(argv)
     if args.exercise is None:
         return None
-    return validate_plan({"exercise": args.exercise, "side": args.side, "sets": args.sets, "reps": args.reps, "restSeconds": args.rest})
+    plan = {"exercise": args.exercise, "side": args.side, "sets": args.sets, "reps": args.reps, "restSeconds": args.rest}
+    if args.weight is not None:
+        plan["loadKg"] = args.weight
+    return validate_plan(plan)
