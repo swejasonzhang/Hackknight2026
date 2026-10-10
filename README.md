@@ -2,7 +2,7 @@
 
 **Range of motion is an arc.** Arc is a webcam goniometer for home use, for anyone at any age, live at [getarc.health](https://getarc.health). A separate **camera app** (built by the computer-vision teammates) watches you exercise, measures joint range of motion (ROM) in degrees, counts reps and sets, and stores each session in MongoDB. **This repository is the web app and API around that data**: accounts, one profile per person in the household, and dashboards that show progress over weeks. It is a personal tool, not a clinical one: no doctor or therapist sees the data.
 
-Stack: MongoDB Atlas · Express 5 · React 19 · Node 20 (MERN), TypeScript everywhere, Vite, Tailwind CSS 4, Motion, React Three Fiber (a whole 3D human body for every movement, and progress bars), Radix (accordion, select, tabs, tooltip), Vitest. Hosted on Render, domain at Porkbun. Visual identity "Calibre": white and blue, an instrument on paper; Unbounded, IBM Plex Sans and IBM Plex Mono; navy rail, cobalt readouts, 3D body models whose joints the camera app tracks (ADR-0010, ADR-0013). Every dropdown is a Radix Select drawn in the same system. The landing page runs a 3D arm through elbow-flexion reps and a demo board that draws six random weeks with the app's own generator and charts (ADR-0011).
+Stack: MongoDB Atlas · Express 5 · React 19 · Node 20 (MERN), TypeScript everywhere, Vite, Tailwind CSS 4, Motion, React Three Fiber (a whole 3D human body for every movement, and progress bars), Radix (accordion, select, tabs, tooltip), Vitest. Hosted on Render, domain at Porkbun. Visual identity "Calibre": white and blue, an instrument on paper; Unbounded, IBM Plex Sans and IBM Plex Mono; navy rail, cobalt readouts, 3D body models whose joints the camera app tracks (ADR-0010, ADR-0013). Every dropdown is a Radix Select drawn in the same system. The landing page runs a whole 3D body through elbow-flexion reps and a demo board that draws six random weeks with the app's own generator and charts (ADR-0011).
 
 ---
 
@@ -126,6 +126,17 @@ uv run main.py   # opens the webcam window
 
 It does not yet send finished sessions to the API; that is backlog story C4 (`POST /api/sessions` with the `x-api-key` header, section 4 above).
 
+### Opening it from the dashboard
+
+The dashboard's **Record a session** panel has an **Open the camera app** button. A web page cannot start a program on your computer by itself, so a small launcher does it (ADR-0015):
+
+```bash
+cd computer-vision
+uv run launcher.py   # or: python3 launcher.py (standard library only); leave the window open
+```
+
+The launcher listens on `http://127.0.0.1:8765` (this computer only). When the button is pressed it opens the camera app in a new terminal window, where the app asks for the routine and then opens the webcam window. It only accepts requests from Arc's own pages (`https://getarc.health`, and `http://localhost:5173` in development; add more with `ARC_LAUNCHER_ORIGINS`), which must also send an `X-Arc-Launcher: 1` header, so no other website can trigger it. It runs one fixed command (`uv run main.py`, else the project's `.venv` Python, else `python3 main.py`) and nothing it is sent. Change the port with `ARC_LAUNCHER_PORT` and point the web app at it with `VITE_CAMERA_LAUNCHER_URL`. When the launcher is not running, the panel shows the command above; on a phone it explains that the camera app runs on a laptop or desktop.
+
 ## 5. API reference
 
 Base URL in development: `http://localhost:8787`. All bodies are JSON. Validation errors return `400 { error: "Invalid request", issues: [...] }`; unknown or foreign ids return `404`; missing credentials return `401`.
@@ -178,6 +189,8 @@ The project is developed **test-first**: write the failing test, make it pass, t
 - `dependencies/src/**/*.test.ts`: engine behaviour (rep counting, hysteresis, jitter rejection, fatigue arithmetic, summaries, schema validation), the demo generator (repeatable per seed, upward trends, local training hours) and the progress builder.
 - `backend/test/*.test.ts`: every API route through supertest against a throwaway in-memory MongoDB, including sign-up, login, token checks, API-key access and profile isolation between accounts. Tests never touch the cluster in `.env`.
 - `frontend/src/**/*.test.ts(x)`: the API wrapper (token header, 401 handling), the route guards (app pages send visitors to `/login`, sign-up and log-in send signed-in users to `/dashboard`), the app logo leading to the landing page and the landing page's buttons for visitors and signed-in users, the sign-up / login form, UI primitives, the themed dropdown and the plan form that uses it, the 3D body's skeleton (every part present, the tracked landmarks on its joints, the joint angle equal to the reading, no limb stretching, the rest of the body still, feet on the floor, every pose in frame), the sticky columns that never scroll on their own, the dashboard's chart folds, the plan page's day log (stepping, rest days, progress against the previous session and the goal) and its local-calendar day arithmetic, and the hero's rep detector.
+
+- `computer-vision/test_launcher.py`: the camera launcher (listens on 127.0.0.1 only, answers Arc's pages and the preflight, opens the camera app once per press, refuses other sites and requests without the header, picks uv, the virtualenv or python3). `cd computer-vision && python3 -m unittest test_launcher`; CI runs it too.
 
 How the team works (sprints, stories, definition of done, PR checklist) is in [CONTRIBUTING.md](CONTRIBUTING.md) and [docs/](docs/).
 
