@@ -1,5 +1,6 @@
 import { EXERCISES, isDiverseWeek, MAX_DAY_ITEMS, muscleOf, MUSCLES, sideLabel, titleForDay, WEEKDAY_NAMES, type ExerciseId, type ProgramDay, type ProgramDto, type ProgramItem, type Side } from '@arc/dependencies'
 import { useEffect, useId, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { api } from '../api/client'
 import { exerciseOptions, MUSCLE_OPTIONS, type Target } from '../components/muscleOptions'
 import { Select } from '../components/Select'
@@ -42,6 +43,8 @@ interface Props {
   history?: boolean
   /** The side a new one-sided movement starts on. */
   side?: Side
+  /** Today's next movement in the week in force, offered as the way to record once the week is saved. */
+  todayNext?: ExerciseId | null
 }
 
 /**
@@ -50,7 +53,7 @@ interface Props {
  * its own sets, reps, rest, goal and side. Saving makes it the week in force; the earlier ones
  * stay in history and can be started from again.
  */
-export function WeekEditor({ profileId, program, onSaved, history = false, side = 'right' }: Props) {
+export function WeekEditor({ profileId, program, onSaved, history = false, side = 'right', todayNext = null }: Props) {
   const base = useId()
   const [draft, setDraft] = useState<Draft>(() => toDraft(program))
   const [dirty, setDirty] = useState(false)
@@ -285,6 +288,12 @@ export function WeekEditor({ profileId, program, onSaved, history = false, side 
           <span className="t-mono flex items-center gap-2 text-ok" role="status">
             <Lamp tone="good" /> Saved · it's your week now
           </span>
+        )}
+        {/* Saved with something to do today: straight to recording it. */}
+        {savedAt && !dirty && todayNext && (
+          <Link to={`/record?exercise=${todayNext}`} className="btn btn-block">
+            <Lamp tone="primary" /> Record today: {EXERCISES[todayNext].name} →
+          </Link>
         )}
       </div>
     </div>

@@ -6,7 +6,7 @@ import { Page } from '../components/motion'
 import { ProfilePicker } from '../components/ProfilePicker'
 import { Alert, EmptyState, PageHeader, Skeleton, Strip } from '../components/ui'
 import { useProfiles } from '../hooks/useProfiles'
-import { plannedDay } from '../plan/checklist'
+import { nextEntry, plannedDay } from '../plan/checklist'
 import { DayLog } from '../plan/DayLog'
 import { dayKey, defaultDay, parseDayKey, type DayKey } from '../plan/days'
 import { WeekEditor } from '../plan/WeekEditor'
@@ -55,6 +55,7 @@ export function PlanPage() {
   // Today when it is a training day, so the day's workout is the first thing on the page.
   const day: DayKey = requested && requested <= today ? requested : sessions && plannedDay(program, sessions, today) ? today : defaultDay(sessions ?? [])
   const setDay = (next: DayKey) => setParams({ day: next }, { replace: true })
+  const todayNext = sessions ? (nextEntry(plannedDay(program, sessions, today)?.list ?? [])?.item.exercise ?? null) : null
   const noProfiles = !profilesLoading && profiles.length === 0
 
   return (
@@ -90,7 +91,7 @@ export function PlanPage() {
           <div className="min-w-0">
             <Strip index="01" title="Week" aside={program ? 'Yours to change' : 'Build one by hand, or with Arc'}>
               {selectedId && sessions ? (
-                <WeekEditor profileId={selectedId} program={program} onSaved={setProgram} history side={selected?.intake?.side} />
+                <WeekEditor profileId={selectedId} program={program} onSaved={setProgram} history side={selected?.intake?.side} todayNext={todayNext} />
               ) : (
                 <Skeleton height={420} />
               )}

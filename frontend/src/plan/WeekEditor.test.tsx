@@ -1,5 +1,6 @@
 import { programFromIntake, type ProgramDto } from '@arc/dependencies'
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { MemoryRouter } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const putProgram = vi.fn()
@@ -60,6 +61,18 @@ describe('WeekEditor', () => {
     expect(days.map((d) => d.weekday)).toEqual([1, 3, 5])
     expect(days[1]).toMatchObject({ weekday: 3, title: 'Back · Lower back', items: [{ exercise: 'deadlift', muscle: 'lower_back' }] })
     expect(onSaved).toHaveBeenCalledWith(expect.objectContaining({ id: 'w2', source: 'member' }))
+  })
+
+  it("offers today's next movement to record once the week is saved", async () => {
+    render(
+      <MemoryRouter>
+        <WeekEditor profileId="p1" program={PROGRAM} onSaved={() => {}} todayNext="squat" />
+      </MemoryRouter>,
+    )
+    expect(screen.queryByRole('link', { name: /record today/i })).not.toBeInTheDocument()
+    fireEvent.click(within(day('Monday')).getByRole('button', { name: 'Remove lunge' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Save my week' }))
+    expect(await screen.findByRole('link', { name: 'Record today: Squat →' })).toHaveAttribute('href', '/record?exercise=squat')
   })
 
   it('reorders, changes and removes movements; a side only for one-sided ones', () => {
