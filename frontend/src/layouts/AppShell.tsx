@@ -3,14 +3,15 @@ import { useEffect, useState } from 'react'
 import { Link, NavLink, Outlet } from 'react-router-dom'
 import { api } from '../api/client'
 import { useAuth } from '../auth/AuthContext'
-import { APP_NAME } from '../brand'
-import { IconChart, IconLogOut, IconUsers, Logo } from '../components/icons'
 import { Hint } from '../components/Hint'
-import { ProfilePicker } from '../components/ProfilePicker'
-import { Avatar } from '../components/ui'
+import { IconLogOut, Logo } from '../components/icons'
+import { Avatar, Lamp, type Tone } from '../components/ui'
 
-function ApiStatus() {
-  const [state, setState] = useState<'checking' | 'ok' | 'down'>('checking')
+type ApiState = 'checking' | 'ok' | 'down'
+
+/** Polls /api/health every 30 s: the lamp on the rail and on the phone bar. */
+function useApiState(): ApiState {
+  const [state, setState] = useState<ApiState>('checking')
   useEffect(() => {
     let cancelled = false
     const check = () =>
@@ -25,83 +26,91 @@ function ApiStatus() {
       clearInterval(id)
     }
   }, [])
-  const dot = state === 'ok' ? 'bg-good shadow-[0_0_8px_rgb(46_210_114/0.8)]' : state === 'down' ? 'bg-bad' : 'bg-muted'
-  const text = state === 'ok' ? 'Connected' : state === 'down' ? 'API unreachable' : 'Checking…'
+  return state
+}
+
+const API_TEXT: Record<ApiState, string> = { ok: 'Connected', down: 'API unreachable', checking: 'Checking…' }
+const API_TONE: Record<ApiState, Tone> = { ok: 'good', down: 'bad', checking: 'default' }
+
+function ApiLamp({ state }: { state: ApiState }) {
   return (
-    <Hint label="API and database status, checked every 30 seconds">
-      <div className="flex w-max items-center gap-2 text-[12px] font-medium text-muted">
-        <span className={`h-2 w-2 rounded-full ${dot}`} /> {text}
-      </div>
+    <Hint label={`API and database: ${API_TEXT[state].toLowerCase()}. Checked every 30 seconds.`} side="right">
+      <span tabIndex={0} className="inline-flex h-8 w-8 items-center justify-center">
+        <Lamp tone={API_TONE[state]} blink={state === 'checking'} />
+        <span className="sr-only">API status: {API_TEXT[state]}</span>
+      </span>
     </Hint>
   )
 }
 
-const links = [
-  { to: '/dashboard', label: 'Dashboard', icon: IconChart, end: true },
-  { to: '/profiles', label: 'Profiles', icon: IconUsers, end: false },
+const LINKS = [
+  { to: '/dashboard', label: 'Dashboard', end: true },
+  { to: '/profiles', label: 'Profiles', end: false },
 ]
 
-/** Signed-in frame: black sidebar with a glowing active pill, black top bar with the profile switcher, page outlet. */
+/**
+ * The signed-in frame: a 56 px navy instrument rail (wordmark, two vertical mono labels with a
+ * sliding cobalt edge, a ruler, the API lamp, the account tag and log out) beside the vellum
+ * bench where each page lays out its own panels. On phones the rail becomes a bottom bar.
+ * There is no top bar: the profile switcher lives in the dashboard's measurement panel.
+ */
 export function AppShell() {
   const { user, logout } = useAuth()
+  const apiState = useApiState()
+
   return (
-    <div className="min-h-screen md:grid md:grid-cols-[264px_minmax(0,1fr)]">
-      <aside className="border-b border-line bg-black md:sticky md:top-0 md:flex md:h-screen md:flex-col md:gap-8 md:border-r md:border-b-0 md:px-5 md:py-7">
-        <div className="flex items-center gap-2 px-4 py-3 md:block md:p-0">
-          <Link to="/dashboard" className="flex items-center gap-2.5 text-[20px] font-semibold tracking-[-0.02em] text-ink no-underline hover:no-underline">
-            <Logo size={32} />
-            <span className="hidden sm:inline">{APP_NAME}</span>
-          </Link>
-
-          <nav className="ml-1 flex gap-1 md:mt-8 md:ml-0 md:flex-col" aria-label="Main">
-            {links.map(({ to, label, icon: Icon, end }) => (
-              <NavLink key={to} to={to} end={end} className="relative rounded-full px-3.5 py-2 text-[14px] font-medium text-muted no-underline transition-colors hover:text-ink hover:no-underline focus-visible:ring-[3px] focus-visible:ring-primary/40 focus-visible:outline-none md:px-4 md:py-2.5">
-                {({ isActive }) => (
-                  <>
-                    {isActive && <motion.span layoutId="nav-pill" className="absolute inset-0 rounded-full bg-primary shadow-blue" transition={{ type: 'spring', stiffness: 500, damping: 40 }} />}
-                    <span className={`relative z-10 flex items-center gap-2 ${isActive ? 'text-white' : ''}`}>
-                      <Icon size={18} /> {label}
-                    </span>
-                  </>
-                )}
-              </NavLink>
-            ))}
-          </nav>
-
-          <button className="btn btn-sm ml-auto px-2.5 md:hidden" onClick={logout} aria-label="Log out" title="Log out">
-            <IconLogOut size={16} />
-          </button>
-        </div>
-
-        <div className="hidden md:mt-auto md:flex md:flex-col md:gap-4 md:border-t md:border-line md:pt-5">
-          <ApiStatus />
+    <div className="min-h-screen bg-vellum sm:pl-[56px]">
+      <aside className="rail hidden sm:flex" aria-label="App">
+        <Link to="/dashboard" className="flex h-[72px] w-full items-center justify-center border-b border-white/10 hover:no-underline" aria-label="Arc dashboard">
+          <Logo size={26} tone="paper" />
+        </Link>
+        <nav aria-label="Main" className="mt-4 flex flex-col">
+          {LINKS.map(({ to, label, end }) => (
+            <NavLink key={to} to={to} end={end} className="rail-link">
+              {({ isActive }) => (
+                <>
+                  {isActive && <motion.span layoutId="rail-edge" aria-hidden="true" className="absolute top-0 right-0 h-full w-[3px] bg-cobalt" transition={{ duration: 0.24, ease: [0.2, 0, 0, 1] }} />}
+                  {label}
+                </>
+              )}
+            </NavLink>
+          ))}
+        </nav>
+        <div className="rail-ruler" aria-hidden="true" />
+        <div className="flex flex-col items-center gap-3 border-t border-white/10 py-4">
+          <ApiLamp state={apiState} />
           {user && (
-            <div className="flex min-w-0 items-center gap-2.5">
-              <Avatar name={user.name} size={36} />
-              <div className="min-w-0">
-                <div className="truncate text-[14px] font-medium text-ink">{user.name}</div>
-                <div className="truncate text-[12px] text-muted">{user.email}</div>
-              </div>
-            </div>
+            <Hint label={`${user.name} · ${user.email}`} side="right">
+              <span tabIndex={0} role="img" aria-label={`Signed in as ${user.name}`} className="inline-flex">
+                <Avatar name={user.name} size={32} />
+              </span>
+            </Hint>
           )}
-          <button className="btn btn-sm w-full" onClick={logout}>
-            <IconLogOut size={15} /> Log out
+          <button type="button" onClick={logout} aria-label="Log out" className="inline-flex h-9 w-9 cursor-pointer items-center justify-center text-rail-muted transition-colors hover:text-white">
+            <IconLogOut size={18} />
           </button>
         </div>
       </aside>
 
-      <div className="flex min-w-0 flex-col">
-        <header className="sticky top-0 z-10 flex items-center gap-3 border-b border-line bg-black/80 px-4 py-3 backdrop-blur-md md:px-8">
-          <ProfilePicker />
-          <span className="flex-1" />
-          <Link className="btn btn-ghost btn-sm" to="/profiles">
-            Manage profiles
-          </Link>
-        </header>
-        <main className="w-full max-w-[1240px] px-5 py-7 md:px-8 md:py-9">
-          <Outlet />
-        </main>
-      </div>
+      <main className="mx-auto w-full max-w-[1440px] px-4 pt-5 pb-[calc(80px+env(safe-area-inset-bottom))] sm:px-6 sm:pt-6 sm:pb-12 lg:px-8 lg:pt-8">
+        <Outlet />
+      </main>
+
+      <nav className="bar sm:hidden" aria-label="Main">
+        <div className="flex items-center justify-center gap-1.5 border-r border-white/10">
+          <Logo size={20} tone="paper" />
+          <Lamp tone={API_TONE[apiState]} blink={apiState === 'checking'} />
+          <span className="sr-only">API status: {API_TEXT[apiState]}</span>
+        </div>
+        {LINKS.map(({ to, label, end }) => (
+          <NavLink key={to} to={to} end={end} className="bar-link">
+            {label}
+          </NavLink>
+        ))}
+        <button type="button" onClick={logout} aria-label="Log out" className="flex cursor-pointer items-center justify-center border-l border-white/10 text-rail-muted">
+          <IconLogOut size={18} />
+        </button>
+      </nav>
     </div>
   )
 }

@@ -25,7 +25,7 @@ export function AuthLayout() {
           <div className="flex items-center justify-between gap-4">
             <Link to="/" className="flex items-center gap-3 text-white no-underline hover:no-underline">
               <Logo size={28} tone="paper" />
-              <span className="font-display text-[15px] font-600 tracking-[0.02em]">{APP_NAME}</span>
+              <span className="font-display text-[15px] font-semibold tracking-[0.02em]">{APP_NAME}</span>
               <span className="t-meta hidden text-rail-muted sm:inline">Range-of-motion readout</span>
             </Link>
             <Link to="/" className="t-meta text-rail-muted hover:text-white">
@@ -41,7 +41,6 @@ export function AuthLayout() {
                     <span className={`t-meta flex items-center gap-2 ${lit ? 'text-white' : 'text-rail-muted'}`}>
                       <Lamp tone={lit ? 'primary' : 'default'} />
                       0{i + 1} {step}
-                      {!lit && <span className="hidden sm:inline">· next</span>}
                     </span>
                     {i < STEPS.length - 1 && <span aria-hidden="true" className="h-px w-6 bg-white/30 sm:w-10" />}
                   </li>
