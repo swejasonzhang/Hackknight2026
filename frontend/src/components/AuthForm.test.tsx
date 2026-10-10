@@ -1,3 +1,4 @@
+import { EMAIL_REQUIREMENT, NAME_REQUIREMENT } from '@arc/dependencies'
 import { fireEvent, render, screen } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 import { AuthForm } from './AuthForm'
@@ -83,6 +84,34 @@ describe('AuthForm (sign up)', () => {
     expect(screen.getByLabelText(/^email/i)).toHaveAttribute('aria-invalid', 'true')
   })
 
+  it('states the name and email requirements up front and holds the form until both are met', () => {
+    render(<AuthForm mode="signup" onSubmit={vi.fn()} />)
+    expect(screen.getByLabelText(/^name/i)).toHaveAccessibleDescription(NAME_REQUIREMENT)
+    expect(screen.getByLabelText(/^email/i)).toHaveAccessibleDescription(EMAIL_REQUIREMENT)
+    type(/^name/i, 'Ada99')
+    blur(/^name/i)
+    type(/^email/i, 'ada@example.com')
+    type(/^password/i, 'correct horse battery')
+    type(/confirm password/i, 'correct horse battery')
+    expect(screen.getByText('Use only letters, spaces, apostrophes, hyphens or periods.')).toBeInTheDocument()
+    expect(screen.getByLabelText(/^name/i)).toHaveAttribute('aria-invalid', 'true')
+    const button = screen.getByRole('button', { name: /create account/i })
+    expect(button).toBeDisabled()
+    type(/^name/i, "Ada O'Brien")
+    expect(button).toBeEnabled()
+  })
+
+  it('trims the name and email it submits', async () => {
+    const onSubmit = vi.fn().mockResolvedValue(undefined)
+    render(<AuthForm mode="signup" onSubmit={onSubmit} />)
+    type(/^name/i, '  Ada  ')
+    type(/^email/i, ' ada@example.com ')
+    type(/^password/i, 'correct horse battery')
+    type(/confirm password/i, 'correct horse battery')
+    fireEvent.click(screen.getByRole('button', { name: /create account/i }))
+    await vi.waitFor(() => expect(onSubmit).toHaveBeenCalledWith({ name: 'Ada', email: 'ada@example.com', password: 'correct horse battery' }))
+  })
+
   it('shows a loading state and ignores a second click while submitting', async () => {
     let resolve!: () => void
     const onSubmit = vi.fn().mockImplementation(() => new Promise<void>((r) => (resolve = r)))
@@ -117,6 +146,14 @@ describe('AuthForm (log in)', () => {
     type(/^password/i, 'secret-pass')
     fireEvent.click(screen.getByRole('button', { name: /log in/i }))
     await vi.waitFor(() => expect(onSubmit).toHaveBeenCalledWith({ email: 'ada@example.com', password: 'secret-pass' }))
+  })
+
+  it('states the email requirement on log in too', () => {
+    render(<AuthForm mode="login" onSubmit={vi.fn()} />)
+    expect(screen.getByLabelText(/^email/i)).toHaveAccessibleDescription(EMAIL_REQUIREMENT)
+    type(/^email/i, 'ada@')
+    type(/^password/i, 'secret-pass')
+    expect(screen.getByRole('button', { name: /log in/i })).toBeDisabled()
   })
 
   it('shows the server error and keeps the entered values when submission fails', async () => {
