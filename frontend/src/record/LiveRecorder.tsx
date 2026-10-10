@@ -6,6 +6,7 @@ import { Lamp, StatTile } from '../components/ui'
 import { deg } from '../format'
 import { readJoint, type JointReading, type Landmark } from './angle'
 import type { PoseTracker } from './pose'
+import { SessionSaver } from './saver'
 import { SessionRecorder, type RecorderView } from './recorder'
 import { COMMAND_LABEL, parseCommand } from '../voice/commands'
 import { createListener, type Listener, type ListenerState } from '../voice/listener'
@@ -144,6 +145,9 @@ export function LiveRecorder({ profileId, config, simulate = false }: { profileI
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const recorderRef = useRef<SessionRecorder | null>(null)
   const savingRef = useRef(false)
+  // Every set goes to MongoDB as it finishes, into one session, so nothing is lost if the tab closes.
+  const saverRef = useRef<SessionSaver | null>(null)
+  const [savedSets, setSavedSets] = useState(0)
   const [status, setStatus] = useState<Status>({ kind: 'camera' })
   const [view, setView] = useState<RecorderView | null>(null)
   const [aspect, setAspect] = useState(16 / 9)
@@ -212,16 +216,16 @@ export function LiveRecorder({ profileId, config, simulate = false }: { profileI
   const save = useCallback(async () => {
     if (savingRef.current) return
     savingRef.current = true
-    const input = recorderRef.current?.toSessionInput(profileId)
-    if (!input) {
+    const input = recorderRef.current?.toSessionInput(profileId, true)
+    if (!input || !saverRef.current) {
       setStatus({ kind: 'empty' })
       return
     }
     setStatus({ kind: 'saving' })
     try {
-      const session = await api.sessions.create(input)
+      const id = await saverRef.current.save(input)
       listenerRef.current?.stop()
-      navigate(`/sessions/${session.id}`, { state: { from: '/dashboard', label: 'Dashboard', arcRead: true } })
+      navigate(`/sessions/${id}`, { state: { from: '/dashboard', label: 'Dashboard', arcRead: true } })
     } catch (err) {
       savingRef.current = false
       setStatus({ kind: 'error', message: err instanceof Error ? `The session could not be saved: ${err.message}` : 'The session could not be saved.' })
@@ -235,6 +239,8 @@ export function LiveRecorder({ profileId, config, simulate = false }: { profileI
     let tracker: PoseTracker | null = null
     savingRef.current = false
     recorderRef.current = new SessionRecorder(config)
+    saverRef.current = new SessionSaver({ create: api.sessions.create, update: api.sessions.update })
+    setSavedSets(0)
     setView(recorderRef.current.view)
 
     const run = async () => {
@@ -299,6 +305,14 @@ export function LiveRecorder({ profileId, config, simulate = false }: { profileI
         if (finished.length > setsRead) {
           setsRead = finished.length
           const set = finished.at(-1)!
+          // Into MongoDB now, not only at the end.
+          const soFar = recorder.toSessionInput(profileId, false)
+          const count = finished.length
+          if (soFar && next.phase !== 'done')
+            saverRef.current
+              ?.save(soFar)
+              .then(() => !cancelled && setSavedSets(count))
+              .catch(() => {})
           if (next.phase === 'rest') {
             api.coach
               .setFeedback({ profileId, exercise: config.exercise, side: config.side, plan: config.plan, setNumber: set.setNumber, reps: set.reps })
@@ -405,7 +419,10 @@ export function LiveRecorder({ profileId, config, simulate = false }: { profileI
 
           {(status.kind === 'camera' || status.kind === 'model') && <div className="hatch absolute inset-8 opacity-30" aria-hidden="true" />}
         </div>
-        <p className="t-meta mt-3">The video stays on this device. Only the angle of each rep is saved.</p>
+        <p className="t-meta mt-3" aria-live="polite">
+          The video stays on this device. Each set's angles are saved to your account as the set finishes
+          {savedSets > 0 ? ` · saved through set ${savedSets}` : ''}.
+        </p>
       </div>
 
       <aside className="min-w-0" aria-label="Live readings">

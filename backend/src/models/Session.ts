@@ -25,6 +25,7 @@ export interface SessionShape {
   demo: boolean
   events?: SessionEvent[]
   coachSummary?: CoachSummary | null
+  complete?: boolean
 }
 
 const RepSchema = new Schema(
@@ -111,6 +112,8 @@ const SessionSchema = new Schema<SessionShape>({
   demo: { type: Boolean, required: true, default: false },
   events: { type: [EventSchema], default: undefined },
   coachSummary: { type: CoachSummarySchema },
+  /** False while a recording is saved set by set; sessions from before this field are complete. */
+  complete: { type: Boolean, default: true },
 })
 SessionSchema.index({ profileId: 1, startedAt: -1 })
 SessionSchema.index({ profileId: 1, exercise: 1, startedAt: 1 })
@@ -154,6 +157,7 @@ export function toSessionDto(s: SessionShape): SessionDto {
       fatigueIndex: s.summary.fatigueIndex,
     },
     demo: s.demo,
+    complete: s.complete !== false,
     ...(s.events?.length ? { events: s.events.map((e) => ({ at: e.at, command: e.command })) } : {}),
     ...(s.coachSummary ? { coachSummary: { text: s.coachSummary.text, messageId: s.coachSummary.messageId, createdAt: s.coachSummary.createdAt, offline: s.coachSummary.offline } } : {}),
   }

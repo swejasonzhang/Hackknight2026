@@ -228,16 +228,18 @@ export class SessionRecorder {
   }
 
   /** The body for POST /api/sessions, or null when no rep was counted. */
-  toSessionInput(profileId: string): CreateSessionInput | null {
+  /** The session so far: `complete` false while it is still being recorded and saved set by set. */
+  toSessionInput(profileId: string, complete = true): CreateSessionInput | null {
     if (this.sets.length === 0 || this.startedAt == null) return null
     return {
       profileId,
+      complete,
       exercise: this.cfg.exercise,
       side: this.cfg.side,
       startedAt: this.startedAt,
       endedAt: this.endedAt ?? this.lastT,
       plan: this.cfg.plan,
-      sets: this.sets,
+      sets: [...this.sets],
       ...(this.events.length ? { events: this.events } : {}),
     }
   }

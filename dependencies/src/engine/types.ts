@@ -153,6 +153,11 @@ export interface SessionRecord {
   summary: SessionSummary
   /** Seeded demo data, labelled on the dashboard. */
   demo: boolean
+  /**
+   * False while a recording is still being saved set by set (or if it stopped before its end);
+   * every set it holds is real. Absent or true once finished.
+   */
+  complete?: boolean
   /** Voice commands the member gave while recording, in order. */
   events?: SessionEvent[]
   /** Arc's plain-English read of the session (Gemini, or a template when Gemini is off). */
