@@ -27,6 +27,6 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - name: Camera launcher tests
+      - name: Camera launcher and routine tests
         working-directory: computer-vision
-        run: python -m unittest test_launcher
+        run: python -m unittest test_launcher test_arc_routine
