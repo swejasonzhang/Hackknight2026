@@ -206,7 +206,7 @@ Production env on `getarc-api`: `NODE_ENV=production`, `MONGODB_URI`, `JWT_SECRE
 
 - **"API unreachable" in the nav bar**: the server is not running or crashed on start. Run `npm run dev:backend` alone and read its output.
 - **API exits with "MONGODB_URI is not set" / "JWT_SECRET is not set"**: create `.env` at the repo root from `.env.example` (locally) or set the variables on the Render service.
-- **API logs "Could not connect to MongoDB … IP that isn't whitelisted"**: in Atlas open *Network Access* → *Add IP Address* → *Allow access from anywhere* (`0.0.0.0/0`, fine for the hackathon). The API retries every 10 s and connects on its own once the rule is active.
+- **API logs "Could not connect to MongoDB … IP that isn't whitelisted"**: in Atlas open *Network Access* → *Add IP Address* → *Allow access from anywhere* (`0.0.0.0/0`, fine for the hackathon). The API retries every 10 s and connects on its own once the rule is active. While the database is unreachable the API stays up: `/api/health` reports `db: "disconnected"` and data routes answer `503 Database unavailable`; it reconnects by itself (retrying every 10 s) once Atlas accepts the connection, so nothing needs restarting.
 - **Camera app gets 401**: it must send `x-api-key` with the exact value of `CV_API_KEY` in the API's `.env`.
 - **`npm install` fails with "Cannot read properties of null (reading 'edgesOut')"**: an npm 10 workspace bug; the repo's `.npmrc` (`legacy-peer-deps=true`) avoids it.
 - **CI fails with "Cannot find native binding" for rolldown**: the lockfile was generated without the Linux build of Vite's bundler. Regenerate it from a clean install (`rm -rf node_modules package-lock.json && npm install`) and commit `package-lock.json`.
