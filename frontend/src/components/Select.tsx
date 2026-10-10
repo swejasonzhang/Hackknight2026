@@ -26,7 +26,8 @@ interface Props<T extends string> {
  */
 export function Select<T extends string>({ value, options, onChange, id, variant = 'field', disabled, className = '', ...rest }: Props<T>) {
   return (
-    <RS.Root value={value} onValueChange={(v) => onChange(v as T)} disabled={disabled}>
+    // Radix reports '' when the options change under a chosen value; no option is ever ''.
+    <RS.Root value={value} onValueChange={(v) => v !== '' && onChange(v as T)} disabled={disabled}>
       <RS.Trigger id={id} aria-label={rest['aria-label']} className={`${variant === 'field' ? 'input select-trigger' : 'select-readout'} ${className}`.trim()}>
         <span className="min-w-0 truncate">
           <RS.Value />

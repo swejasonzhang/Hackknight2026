@@ -34,6 +34,39 @@ export type ExerciseId = (typeof EXERCISE_IDS)[number]
 /** The dashboard's four tabs. */
 export type BodyArea = 'upper' | 'back' | 'legs' | 'core'
 
+/**
+ * The muscle groups the exercises work, as a trainer names them. The back is three groups, not a
+ * left and a right: the upper back (rhomboids and the middle of the trapezius), the lats and the
+ * lower back (the spinal erectors).
+ */
+export const MUSCLE_IDS = [
+  'chest',
+  'front_delts',
+  'side_delts',
+  'rear_delts',
+  'biceps',
+  'triceps',
+  'forearms',
+  'traps',
+  'upper_back',
+  'lats',
+  'lower_back',
+  'abs',
+  'obliques',
+  'glutes',
+  'quads',
+  'hamstrings',
+  'calves',
+] as const
+
+export type MuscleId = (typeof MUSCLE_IDS)[number]
+
+/** What an exercise works: the muscles it targets, and the ones that help or hold the body steady. */
+export interface MuscleWork {
+  primary: readonly MuscleId[]
+  secondary: readonly MuscleId[]
+}
+
 /** Indices into MediaPipe's 33-landmark pose model, as the browser recorder, the 3D figure and the camera app number them. */
 export const LM = {
   LEFT_SHOULDER: 11,
@@ -59,6 +92,13 @@ export interface ExerciseConfig {
   /** A word or two for tight spots: tabs, calendar cells. */
   short: string
   area: BodyArea
+  /**
+   * True when one arm or leg does the work and the member picks which (a curl, a lunge). False when
+   * both sides work together or the trunk does (a squat, a deadlift, a crunch): there is no side to
+   * pick, and the recorder measures whichever side the camera sees better.
+   */
+  sided: boolean
+  muscles: MuscleWork
   /** One-line instruction for the user, including how to face the camera. */
   cue: string
   /**

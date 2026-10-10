@@ -1,4 +1,4 @@
-import { EXERCISES, programDayOn, WEEKDAY_NAMES, type ExerciseId, type ProgramDto, type SessionDto } from '@arc/dependencies'
+import { EXERCISES, programDayOn, sideLabel, WEEKDAY_NAMES, type ExerciseId, type ProgramDto, type SessionDto } from '@arc/dependencies'
 import { useEffect, useId, useMemo, useRef, useState, type KeyboardEvent } from 'react'
 import { Link } from 'react-router-dom'
 import { api, ApiRequestError } from '../api/client'
@@ -262,7 +262,7 @@ export function PlanCalendar({ profileId, exercise, now = Date.now() }: { profil
               <ul className="mt-2">
                 {sel.items.map((item, i) => (
                   <li key={i} className="border-b border-rule py-2 font-mono text-[12.5px] leading-[1.5] text-ink-2 last:border-b-0">
-                    {EXERCISES[item.exercise].name} · {item.side} · {item.sets} × {item.reps} · {item.restSeconds} s rest · goal {item.targetDeg}°
+                    {EXERCISES[item.exercise].name} · {sideLabel(item.exercise, item.side)} · {item.sets} × {item.reps} · {item.restSeconds} s rest · goal {item.targetDeg}°
                   </li>
                 ))}
               </ul>

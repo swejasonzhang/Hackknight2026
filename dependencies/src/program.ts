@@ -230,7 +230,7 @@ export function programFromIntake(intake: CoachIntake): ProgramInput {
   const count = weekdays.length
   const areas = [...new Set(days.map(areaOfDay))].map((a) => areaName(a).toLowerCase())
   const spread = count === 1 ? `working your ${areas[0]}` : `a different area each day: ${listOf(areas)}`
-  const summary = `${count} ${count === 1 ? 'day' : 'days'} a week (${weekdayList(weekdays)}), built for ${range.label}: ${sets} sets of ${reps} with ${restSeconds} seconds of rest, ${spread}. Your ${intake.side} ${focus.name.toLowerCase()} opens the week, aiming for ${focus.targetDeg} degrees.`
+  const summary = `${count} ${count === 1 ? 'day' : 'days'} a week (${weekdayList(weekdays)}), built for ${range.label}: ${sets} sets of ${reps} with ${restSeconds} seconds of rest, ${spread}. ${focus.sided ? `Your ${intake.side} ${focus.name.toLowerCase()}` : `The ${focus.name.toLowerCase()}`} opens the week, aiming for ${focus.targetDeg} degrees.`
   return { summary, days }
 }
 

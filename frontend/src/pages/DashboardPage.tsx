@@ -17,6 +17,7 @@ import { deg, fatigueLabel, formatDate, weekStartIso } from '../format'
 import { useStickyTop } from '../components/useStickyTop'
 import { useProfiles } from '../hooks/useProfiles'
 import { PlanCalendar } from '../plan/PlanCalendar'
+import { MuscleKey } from '../components/MuscleKey'
 
 const isExercise = (v: string | null): v is ExerciseId => EXERCISE_IDS.includes(v as ExerciseId)
 
@@ -180,6 +181,7 @@ export function DashboardPage() {
             </span>
           )}
         </div>
+        <MuscleKey exercise={exercise} className="mt-3" />
 
         <div className="flex items-end justify-between gap-4 border-b border-rule pt-4 pb-4">
           {latest ? (

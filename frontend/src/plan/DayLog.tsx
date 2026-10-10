@@ -1,4 +1,4 @@
-import { EXERCISES, type SessionDto } from '@arc/dependencies'
+import { EXERCISES, sideLabel, type SessionDto } from '@arc/dependencies'
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react'
 import { useId, useMemo, useRef, type KeyboardEvent } from 'react'
 import { Link } from 'react-router-dom'
@@ -160,7 +160,7 @@ function WorkoutRow({ session: s, sessions, day }: { session: SessionDto; sessio
         <div className="flex min-w-0 items-baseline gap-3">
           <span className="t-meta w-[68px] flex-none tabular-nums">{time(s.startedAt)}</span>
           <h4 id={headingId} className="font-sans text-[16px] font-medium text-ink">
-            {name} <span className="t-meta">· {s.side}</span>
+            {name} <span className="t-meta">· {sideLabel(s.exercise, s.side)}</span>
           </h4>
           {s.demo && <Tag soft>Demo</Tag>}
         </div>

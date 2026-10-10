@@ -49,6 +49,19 @@ describe('readJoint', () => {
     expect(readJoint(pose({ 11: [0.6, 0.3 + rise], 12: [0.4, 0.3] }), 'ab_twist', 'right').metricDeg).toBeCloseTo(25, 6)
   })
 
+  it('reads a movement with no side on whichever side faces the camera, and a one-sided one only on its own side', () => {
+    // Left hip 23, knee 25, ankle 27: the member faces the other way from the plan's side.
+    const left = pose({ 23: [0.4, 0.4], 25: [0.6, 0.4], 27: [0.6, 0.7] })
+    const squat = readJoint(left, 'squat', 'right')
+    expect(squat.tracked).toBe(true)
+    expect(squat.metricDeg).toBeCloseTo(90, 6)
+    // Both sides in view: the chosen one wins.
+    const both = pose({ 23: [0.4, 0.4], 25: [0.6, 0.4], 27: [0.6, 0.7], 24: [0.4, 0.4], 26: [0.4, 0.6], 28: [0.4, 0.8] })
+    expect(readJoint(both, 'squat', 'right').metricDeg).toBeCloseTo(0, 6)
+    // Left leg in view, right lunge chosen: the lunge waits for the right leg.
+    expect(readJoint(left, 'lunge', 'right').tracked).toBe(false)
+  })
+
   it('is not tracked when a joint is hidden or there is nobody in view', () => {
     expect(readJoint(pose({ 12: [0.5, 0.2], 14: [0.5, 0.4], 16: [0.7, 0.4] }, 0.2), 'elbow_flexion', 'right').tracked).toBe(false)
     expect(readJoint(pose({ 12: [0.5, 0.2], 14: [0.5, 0.4] }), 'elbow_flexion', 'right').tracked).toBe(false)
