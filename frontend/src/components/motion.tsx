@@ -87,19 +87,6 @@ export function MaskLines({ lines, className = '', as: Tag = 'h2', trigger = 'vi
   )
 }
 
-/** Mounts its children only once they scroll into view, so charts draw in front of the reader. */
-export function WhenVisible({ children, height, className = '' }: { children: ReactNode; height: number | string; className?: string }) {
-  const ref = useRef<HTMLDivElement>(null)
-  const inView = useInView(ref, { once: true, margin: '0px 0px -80px 0px' })
-  const reduce = useReducedMotion()
-  const show = inView || reduce || typeof IntersectionObserver === 'undefined'
-  return (
-    <div ref={ref} className={className} style={{ minHeight: height }}>
-      {show ? children : null}
-    </div>
-  )
-}
-
 /** Kept for API compatibility: on this system a hover does not lift; it is a plain container. */
 export function Lift({ children, className = '' }: { children: ReactNode; className?: string }) {
   return <div className={className}>{children}</div>

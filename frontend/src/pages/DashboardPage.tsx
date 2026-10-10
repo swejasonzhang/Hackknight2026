@@ -1,61 +1,46 @@
-import { EXERCISE_LIST, EXERCISES, type ExerciseId, type PlanDto, type ProgressDto, type SessionDto } from '@arc/dependencies'
+import { EXERCISE_LIST, EXERCISES, type ExerciseId, type PlanDto, type ProgressDto } from '@arc/dependencies'
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { api } from '../api/client'
+import { Folds, type FoldItem } from '../components/Folds'
 import { IconActivity, IconCalendar, IconFlame, IconTarget } from '../components/icons'
 import { AnimatedNumber, Item, Page, Stagger } from '../components/motion'
-import { PlanEditor } from '../components/PlanEditor'
 import { ProfilePicker } from '../components/ProfilePicker'
-import { ProgressCharts } from '../components/ProgressCharts'
+import { FatigueChart, PeakChart, RepChart, WeeklyChart } from '../components/ProgressCharts'
 import { LazyJointScene, LazyProgressScene } from '../components/three/lazy'
-import { Alert, EmptyState, Lamp, Segmented, Skeleton, StatTile, Strip, Tag } from '../components/ui'
-import { deg, fatigueLabel, formatDate, formatDateTime, weekStartIso } from '../format'
+import { Alert, EmptyState, Lamp, Segmented, Skeleton, StatTile, Strip } from '../components/ui'
+import { deg, fatigueLabel, formatDate, weekStartIso } from '../format'
 import { useProfiles } from '../hooks/useProfiles'
 
 /** The switch carries short labels; the full exercise name is printed on the stage beneath it. */
 const SHORT: Record<ExerciseId, string> = { elbow_flexion: 'Elbow', shoulder_abduction: 'Shoulder', seated_knee_extension: 'Knee' }
 const EXERCISE_OPTIONS = EXERCISE_LIST.map((e) => ({ value: e.id, label: SHORT[e.id] }))
 
-function useIsPhone(): boolean {
-  const query = '(max-width: 639px)'
-  const [phone, setPhone] = useState(() => typeof window !== 'undefined' && window.matchMedia(query).matches)
-  useEffect(() => {
-    const m = window.matchMedia(query)
-    const update = () => setPhone(m.matches)
-    m.addEventListener?.('change', update)
-    return () => m.removeEventListener?.('change', update)
-  }, [])
-  return phone
-}
-
 /**
  * The dashboard as an instrument: a sticky measurement panel (who, which movement, the 3D
- * specimen posed at the latest best rep, a ledger of readings, the plan in one line) beside a
- * single scrolling column of numbered, ruled strips (charts, the 3D trend, the log, the plan).
+ * specimen posed at the latest best rep, a ledger of readings, the plan in one line linking to
+ * the plan page) beside the readout column, where every chart is folded behind a plus with its
+ * latest reading on the row. The plan and the log live on /plan.
  */
 export function DashboardPage() {
   const { profiles, selected, selectedId, setSelectedId, reload, loading: profilesLoading } = useProfiles()
   const [exercise, setExercise] = useState<ExerciseId>('elbow_flexion')
   const [progress, setProgress] = useState<ProgressDto | null>(null)
   const [plan, setPlan] = useState<PlanDto | null>(null)
-  const [sessions, setSessions] = useState<SessionDto[]>([])
   const [loading, setLoading] = useState(false)
   const [seeding, setSeeding] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [open3d, setOpen3d] = useState(false)
-  const phone = useIsPhone()
 
   useEffect(() => {
     if (!selectedId) return
     let cancelled = false
     setLoading(true)
     setError(null)
-    Promise.all([api.progress(selectedId, exercise), api.plan.get(selectedId).catch(() => null), api.sessions.list(selectedId)])
-      .then(([p, pl, s]) => {
+    Promise.all([api.progress(selectedId, exercise), api.plan.get(selectedId).catch(() => null)])
+      .then(([p, pl]) => {
         if (cancelled) return
         setProgress(p)
         setPlan(pl)
-        setSessions(s)
         // Follow the plan's exercise the first time a profile is picked.
         if (pl && p.sessions.length === 0 && pl.exercise !== exercise) setExercise(pl.exercise)
       })
@@ -183,13 +168,11 @@ export function DashboardPage() {
           </Item>
         </Stagger>
 
-        {plan && (
-          <a href="#plan" className="t-meta mt-4 flex items-center justify-between gap-3 text-ink-2 hover:no-underline">
-            <span>
-              Plan {plan.sets} × {plan.reps} · {plan.restSeconds} s · {plan.targetDeg}°
-            </span>
-            <span className="text-cobalt">Edit ↓</span>
-          </a>
+        {!noProfiles && !firstLoad && (
+          <Link to="/plan" className="t-meta mt-4 flex items-center justify-between gap-3 text-ink-2 hover:no-underline">
+            <span>{plan ? `Plan ${plan.sets} × ${plan.reps} · ${plan.restSeconds} s · ${plan.targetDeg}°` : 'No plan yet'}</span>
+            <span className="text-cobalt">{plan ? 'Plan & log →' : 'Set one →'}</span>
+          </Link>
         )}
       </section>
 
@@ -249,95 +232,84 @@ export function DashboardPage() {
           </div>
         )}
 
-        {data && data.sessions.length > 0 && (
-          <>
-            <ProgressCharts progress={data} metricLabel={cfg.metricLabel} />
-            <Strip index="05" title="Peak per session, in 3D" aside="Drag to orbit · lighter is higher">
-              {phone ? (
-                <details onToggle={(e) => setOpen3d((e.currentTarget as HTMLDetailsElement).open)} className="border-t border-rule">
-                  <summary className="t-meta flex cursor-pointer list-none items-center gap-3 py-3 text-ink-2 [&::-webkit-details-marker]:hidden">
-                    <span className="font-mono text-[14px] leading-none text-navy" aria-hidden="true">
-                      {open3d ? '−' : '+'}
-                    </span>
-                    Open the 3D view
-                  </summary>
-                  {open3d && (
-                    <div className="stage h-[240px]">
-                      <LazyProgressScene points={data.sessions.map((s) => ({ label: formatDate(s.date), value: s.bestPeakDeg, sub: `${s.totalReps} reps` }))} goal={goal} className="h-full" label={`Best ${cfg.name.toLowerCase()} per session as 3D bars`} fallback={<div className="hatch h-full" />} />
-                    </div>
-                  )}
-                </details>
-              ) : (
-                <div className="stage h-[300px]">
-                  <LazyProgressScene
-                    points={data.sessions.map((s) => ({ label: formatDate(s.date), value: s.bestPeakDeg, sub: `${s.totalReps} reps` }))}
-                    goal={goal}
-                    className="h-full"
-                    label={`Best ${cfg.name.toLowerCase()} per session as 3D bars${goal != null ? ` against a ${goal} degree goal` : ''}`}
-                    fallback={<div className="hatch h-full" />}
-                  />
-                </div>
-              )}
-            </Strip>
-          </>
-        )}
-
-        {!noProfiles && (
-          <Strip index="06" title="Log" aside="All movements · newest first">
-            {sessions.length === 0 ? (
-              <p className="t-mono">No sessions yet.</p>
-            ) : (
-              <div className="-mx-1 overflow-x-auto px-1">
-                <table className="ledger">
-                  <thead>
-                    <tr>
-                      <th scope="col">When</th>
-                      <th scope="col">Movement</th>
-                      <th scope="col" className="num">
-                        Reps
-                      </th>
-                      <th scope="col" className="num">
-                        Best
-                      </th>
-                      <th scope="col" className="num hidden sm:table-cell">
-                        Mean
-                      </th>
-                      <th scope="col" className="num hidden sm:table-cell">
-                        Fatigue
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {sessions.slice(0, 12).map((s) => (
-                      <tr key={s.id}>
-                        <td className="whitespace-nowrap">
-                          <Link className="font-mono text-[12.5px]" to={`/sessions/${s.id}`}>
-                            {formatDateTime(s.startedAt)}
-                          </Link>
-                          {s.demo && <Tag soft className="ml-2">Demo</Tag>}
-                        </td>
-                        <td>
-                          <span className="font-medium text-ink">{EXERCISES[s.exercise].name}</span> <span className="t-meta">· {s.side}</span>
-                        </td>
-                        <td className="num">{s.summary.totalReps}</td>
-                        <td className="num font-medium text-navy">{deg(s.summary.bestPeakDeg)}</td>
-                        <td className="num hidden sm:table-cell">{deg(s.summary.meanPeakDeg)}</td>
-                        <td className="num hidden sm:table-cell">{s.summary.fatigueIndex.toFixed(2)}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </Strip>
-        )}
-
-        {!noProfiles && selectedId && (
-          <Strip index="07" title="Plan" aside="Read by the camera app" id="plan">
-            <PlanEditor profileId={selectedId} plan={plan} onSaved={setPlan} />
-          </Strip>
+        {data && latest && (
+          <Folds
+            label="Charts, folded"
+            items={chartFolds({ data, latest, goal, bestAll, thisWeek, metricLabel: cfg.metricLabel, name: cfg.name })}
+          />
         )}
       </div>
     </Page>
   )
+}
+
+/** The dashboard's charts as folds, each row carrying its latest reading. */
+function chartFolds({
+  data,
+  latest,
+  goal,
+  bestAll,
+  thisWeek,
+  metricLabel,
+  name,
+}: {
+  data: ProgressDto
+  latest: ProgressDto['sessions'][number]
+  goal: number | null
+  bestAll: number | null
+  thisWeek: number
+  metricLabel: string
+  name: string
+}): FoldItem[] {
+  const points = data.sessions.map((s) => ({ label: formatDate(s.date), value: s.bestPeakDeg, sub: `${s.totalReps} reps` }))
+  return [
+    {
+      id: 'peak',
+      index: '01',
+      title: `Peak ${metricLabel.toLowerCase()} per session`,
+      summary: `${deg(bestAll)} best${goal != null ? ` · goal ${goal}°` : ''}`,
+      render: () => <PeakChart progress={data} />,
+    },
+    {
+      id: 'reps',
+      index: '02',
+      title: 'Latest session, rep by rep',
+      summary: `${formatDate(latest.date)} · ${data.latestSessionReps.length} reps`,
+      render: () => <RepChart progress={data} />,
+    },
+    {
+      id: 'fatigue',
+      index: '03',
+      title: 'Fatigue per session',
+      summary: `${latest.fatigueIndex.toFixed(2)} latest`,
+      aside: 'ROM decay + tempo drift · a proxy, not a clinical measure',
+      render: () => <FatigueChart progress={data} />,
+    },
+    {
+      id: 'weekly',
+      index: '04',
+      title: 'Sessions per week',
+      summary: `${thisWeek} this week`,
+      aside: 'Consistency moves every other number',
+      render: () => <WeeklyChart progress={data} />,
+    },
+    {
+      id: '3d',
+      index: '05',
+      title: 'Peak per session, in 3D',
+      summary: `${data.sessions.length} sessions`,
+      aside: 'Drag to orbit · lighter is higher',
+      render: () => (
+        <div className="stage h-[260px] sm:h-[300px]">
+          <LazyProgressScene
+            points={points}
+            goal={goal}
+            className="h-full"
+            label={`Best ${name.toLowerCase()} per session as 3D bars${goal != null ? ` against a ${goal} degree goal` : ''}`}
+            fallback={<div className="hatch h-full" />}
+          />
+        </div>
+      ),
+    },
+  ]
 }
