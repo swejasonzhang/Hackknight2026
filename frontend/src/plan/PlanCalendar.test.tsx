@@ -1,4 +1,4 @@
-import { EXERCISES, programFromIntake, type ProgramDto, type SessionDto } from '@arc/dependencies'
+import { EXERCISES, programFromIntake, sideLabel, type ProgramDto, type SessionDto } from '@arc/dependencies'
 import { fireEvent, render, screen, within } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
@@ -66,7 +66,7 @@ describe('PlanCalendar', () => {
     const details = screen.getByRole('region', { name: /selected day/i })
     const first = week.days[1]!.items[0]!
     // Wednesday is a legs day: the week works a different area each training day.
-    expect(within(details).getByText(`${EXERCISES[first.exercise].name} · right · ${first.sets} × ${first.reps} · ${first.restSeconds} s rest · goal ${first.targetDeg}°`)).toBeInTheDocument()
+    expect(within(details).getByText(`${EXERCISES[first.exercise].name} · ${sideLabel(first.exercise, 'right')} · ${first.sets} × ${first.reps} · ${first.restSeconds} s rest · goal ${first.targetDeg}°`)).toBeInTheDocument()
     expect(EXERCISES[first.exercise].area).toBe('legs')
     expect(within(details).getByRole('link', { name: /start recording/i })).toHaveAttribute('href', '/record')
     expect(within(details).getByRole('link', { name: /open in the log/i })).toHaveAttribute('href', '/plan?day=2026-10-14')

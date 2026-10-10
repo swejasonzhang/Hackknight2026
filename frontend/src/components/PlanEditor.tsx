@@ -1,6 +1,7 @@
-import { EXERCISE_LIST, type ExerciseId, type PlanDto, type PlanInput, type Side } from '@arc/dependencies'
+import { EXERCISE_LIST, EXERCISES, exercisesFor, MUSCLE_IDS, MUSCLES, type ExerciseId, type MuscleId, type PlanDto, type PlanInput, type Side } from '@arc/dependencies'
 import { useEffect, useId, useState, type ChangeEvent, type FormEvent } from 'react'
 import { api } from '../api/client'
+import { MuscleKey } from './MuscleKey'
 import { Select } from './Select'
 import { Alert, Lamp } from './ui'
 
@@ -12,7 +13,15 @@ interface Props {
   compact?: boolean
 }
 
-const EXERCISE_OPTIONS = EXERCISE_LIST.map((ex) => ({ value: ex.id, label: ex.name }))
+type Target = MuscleId | 'all'
+const MUSCLE_OPTIONS: { value: Target; label: string }[] = [{ value: 'all', label: 'Every muscle' }, ...MUSCLE_IDS.map((m) => ({ value: m, label: MUSCLES[m].name }))]
+
+/** The movements for a muscle: those that target it, then those it helps in; every movement for "all". */
+function exerciseOptions(target: Target): { value: ExerciseId; label: string }[] {
+  if (target === 'all') return EXERCISE_LIST.map((ex) => ({ value: ex.id, label: ex.name }))
+  const { primary, secondary } = exercisesFor(target)
+  return [...primary.map((ex) => ({ value: ex.id, label: ex.name })), ...secondary.map((ex) => ({ value: ex.id, label: `${ex.name} (also works it)` }))]
+}
 const SIDE_OPTIONS: { value: Side; label: string }[] = [
   { value: 'right', label: 'Right' },
   { value: 'left', label: 'Left' },
@@ -21,6 +30,9 @@ const SIDE_OPTIONS: { value: Side; label: string }[] = [
 /** The plan as a datasheet: one ruled row per setting, the save as the sheet's last row. */
 export function PlanEditor({ profileId, plan, onSaved, compact = false }: Props) {
   const [form, setForm] = useState<PlanInput>(toForm(plan))
+  const [target, setTarget] = useState<Target>(EXERCISES[toForm(plan).exercise].muscles.primary[0]!)
+  const options = exerciseOptions(target)
+  const sided = EXERCISES[form.exercise].sided
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [savedAt, setSavedAt] = useState<number | null>(null)
@@ -29,7 +41,16 @@ export function PlanEditor({ profileId, plan, onSaved, compact = false }: Props)
 
   useEffect(() => {
     setForm(toForm(plan))
+    setTarget(EXERCISES[toForm(plan).exercise].muscles.primary[0]!)
   }, [plan])
+
+  // A new muscle keeps the movement when it works that muscle, else takes the first that targets it.
+  const pickTarget = (next: Target) => {
+    setTarget(next)
+    const list = exerciseOptions(next)
+    if (!list.some((o) => o.value === form.exercise)) pickExercise(list[0]!.value)
+  }
+  const pickExercise = (exercise: ExerciseId) => setForm((f) => ({ ...f, exercise, targetDeg: f.exercise === exercise ? f.targetDeg : EXERCISES[exercise].targetDeg }))
 
   const submit = async (e: FormEvent) => {
     e.preventDefault()
@@ -60,21 +81,25 @@ export function PlanEditor({ profileId, plan, onSaved, compact = false }: Props)
     <form onSubmit={submit} className={compact ? 'max-w-[640px] lg:max-w-none' : 'max-w-[640px]'}>
       <p className="t-desc mb-4">{plan ? 'Recording this movement uses this plan: its sets, reps, rest and goal. Other movements follow your week.' : 'No plan yet. Recording follows your week, or your goal\'s ranges; save one to set your own numbers.'}</p>
       <div className="datasheet">
-        {row(
-          'exercise',
-          'Exercise',
-          <Select<ExerciseId> id={id('exercise')} value={form.exercise} options={EXERCISE_OPTIONS} onChange={(exercise) => setForm({ ...form, exercise })} />,
-        )}
-        {row(
-          'side',
-          'Side',
-          <Select<Side> id={id('side')} value={form.side} options={SIDE_OPTIONS} onChange={(side) => setForm({ ...form, side })} />,
+        {row('target', 'Target muscle', <Select<Target> id={id('target')} value={target} options={MUSCLE_OPTIONS} onChange={pickTarget} />)}
+        {row('exercise', 'Exercise', <Select<ExerciseId> id={id('exercise')} value={form.exercise} options={options} onChange={pickExercise} />)}
+        {sided ? (
+          row('side', 'Side', <Select<Side> id={id('side')} value={form.side} options={SIDE_OPTIONS} onChange={(side) => setForm({ ...form, side })} />)
+        ) : (
+          <div className={compact ? 'field-row field-row-stacked' : 'field-row'}>
+            <span className="field-label">Side</span>
+            <div className="field-cell">
+              <span className="t-mono text-ink">Both sides</span>
+              <span className="t-meta ml-2 normal-case">Arc measures the side facing the camera</span>
+            </div>
+          </div>
         )}
         {row('sets', 'Sets', <input id={id('sets')} className="input input-mono" type="number" min={1} max={10} value={form.sets} onChange={num('sets')} />)}
         {row('reps', 'Reps per set', <input id={id('reps')} className="input input-mono" type="number" min={1} max={50} value={form.reps} onChange={num('reps')} />)}
         {row('rest', 'Rest (seconds)', <input id={id('rest')} className="input input-mono" type="number" min={10} max={600} value={form.restSeconds} onChange={num('restSeconds')} />)}
         {row('goal', 'Goal (degrees)', <input id={id('goal')} className="input input-mono" type="number" min={0} max={180} value={form.targetDeg} onChange={num('targetDeg')} />)}
       </div>
+      <MuscleKey exercise={form.exercise} className="mt-4" />
       {error && (
         <div className="mt-4">
           <Alert tone="bad">{error}</Alert>

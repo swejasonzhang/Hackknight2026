@@ -98,6 +98,9 @@ describe('programFromIntake', () => {
     for (const item of program.days.flatMap((d) => d.items)) PlanInputSchema.parse(item)
     expect(program.summary).toMatch(/Monday, Wednesday and Friday/)
     expect(program.summary).toMatch(/upper body, legs and back/)
+    expect(program.summary).toMatch(/Your right bicep curl opens the week/)
+    // A movement with no side to pick names none.
+    expect(programFromIntake({ ...intake, focus: 'deadlift' }).summary).toMatch(/The deadlift opens the week/)
   })
 
   it('works a different body area each day: never the same area two training days running', () => {

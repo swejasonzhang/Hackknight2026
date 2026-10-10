@@ -1,4 +1,4 @@
-import { EXERCISE_LIST, EXERCISES, type ExerciseId, type SessionPlan, type Side, type VoiceCommand } from '@arc/dependencies'
+import { EXERCISE_LIST, EXERCISES, sideLabel, type ExerciseId, type SessionPlan, type Side, type VoiceCommand } from '@arc/dependencies'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { api } from '../api/client'
@@ -14,6 +14,7 @@ import { createListener, type Listener, type ListenerState } from '../voice/list
 import { createSpeaker, type Speaker, type SpokenLine } from '../voice/speaker'
 import { elevenLabsVoice } from '../voice/status'
 import { cueFor, shouldCue } from './cues'
+import { FormGuide } from './FormGuide'
 
 export interface RecordConfig {
   exercise: ExerciseId
@@ -450,7 +451,7 @@ export function LiveRecorder({ profileId, config, simulate = false }: { profileI
           <canvas ref={canvasRef} className="pointer-events-none absolute inset-0 h-full w-full -scale-x-100" aria-hidden="true" />
 
           <span className="callout z-10 top-3 left-3">
-            {cfg.name} · {config.side}
+            {cfg.name} · {sideLabel(config.exercise, config.side)}
           </span>
           <span className="callout z-10 top-3 right-3 flex items-center gap-2">
             <Lamp tone={live && view?.tracked ? 'good' : 'default'} blink={!live || phase === 'waiting'} /> {statusLine}
@@ -484,6 +485,8 @@ export function LiveRecorder({ profileId, config, simulate = false }: { profileI
         </p>
       </div>
 
+      <div className="flex min-w-0 flex-col gap-4">
+      <FormGuide exercise={config.exercise} side={config.side} targetDeg={config.plan.targetDeg} />
       <aside className="min-w-0" aria-label="Live readings">
         <div className="panel p-4 sm:p-5">
           <div className="t-label flex items-center gap-2">
@@ -569,6 +572,7 @@ export function LiveRecorder({ profileId, config, simulate = false }: { profileI
           </div>
         </div>
       </aside>
+      </div>
     </div>
   )
 }

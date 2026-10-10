@@ -1,4 +1,4 @@
-import { EXERCISES, FATIGUE_MIN_REPS, type SessionDto } from '@arc/dependencies'
+import { EXERCISES, FATIGUE_MIN_REPS, sideLabel, type SessionDto } from '@arc/dependencies'
 import { useEffect, useState } from 'react'
 import { Link, useLocation, useParams } from 'react-router-dom'
 import { Bar, BarChart, CartesianGrid, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
@@ -11,6 +11,7 @@ import { useRepLoop } from '../components/three/useRepLoop'
 import { Alert, Lamp, Skeleton, StatTile, Strip, Tag } from '../components/ui'
 import { deg, fatigueLabel, formatDateTime, pct } from '../format'
 import { useStickyTop } from '../components/useStickyTop'
+import { MuscleKey } from '../components/MuscleKey'
 
 const MONO = "'IBM Plex Mono', ui-monospace, monospace"
 
@@ -188,7 +189,7 @@ export function SessionDetailPage() {
           </p>
         )}
         <h1 className="t-title mt-3">
-          {exercise.name} <span className="font-medium text-muted">· {session.side}</span>
+          {exercise.name} <span className="font-medium text-muted">· {sideLabel(session.exercise, session.side)}</span>
         </h1>
       </header>
 
@@ -220,6 +221,7 @@ export function SessionDetailPage() {
                 angle={loop ?? best}
                 rangeDeg={best}
                 goalDeg={goal}
+                mirrored={exercise.sided && session.side === 'left'}
                 className="h-full w-full"
                 label={`A 3D figure doing ${exercise.name.toLowerCase()} through its whole range, from rest to this session's best rep of ${deg(best)}`}
                 fallback={<div aria-hidden="true" className="hatch absolute inset-8" />}
@@ -228,6 +230,7 @@ export function SessionDetailPage() {
             <span className="callout pointer-events-none top-3 left-3">Best rep · {exercise.metricLabel}</span>
             <span className="callout pointer-events-none top-3 right-3">Goal {deg(goal)}</span>
           </div>
+          <MuscleKey exercise={session.exercise} className="border-t border-rule p-4" />
         </div>
         <dl className="border-t border-rule-strong">
           {spec.map(([k, v]) => (

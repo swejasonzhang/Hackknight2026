@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { BODY_AREAS, EXERCISE_LIST, EXERCISES, exercisesIn } from './exercises.ts'
-import { EXERCISE_IDS, LM } from './types.ts'
+import { BODY_AREAS, EXERCISE_LIST, EXERCISES, exercisesFor, exercisesIn, MUSCLES, sideLabel } from './exercises.ts'
+import { EXERCISE_IDS, LM, MUSCLE_IDS } from './types.ts'
 
 describe('the exercise catalog', () => {
   it("covers the camera app's fourteen movements and the seated knee extension, in four areas", () => {
@@ -45,5 +45,32 @@ describe('the exercise catalog', () => {
     expect(EXERCISES.tricep_extension.metricFromInnerAngle(170)).toBe(170)
     expect(EXERCISES.lat_pulldown.metricFromInnerAngle(60)).toBe(120)
     expect(EXERCISES.deadlift.metricFromInnerAngle(175)).toBe(175)
+  })
+
+  it('names what every movement works: at least one target muscle, never one muscle twice', () => {
+    for (const e of EXERCISE_LIST) {
+      expect(e.muscles.primary.length, e.id).toBeGreaterThan(0)
+      const all = [...e.muscles.primary, ...e.muscles.secondary]
+      expect(new Set(all).size, e.id).toBe(all.length)
+      for (const m of all) expect(MUSCLE_IDS, e.id).toContain(m)
+    }
+    expect(Object.keys(MUSCLES)).toEqual([...MUSCLE_IDS])
+  })
+
+  it('splits the back into upper back, lats and lower back, each worked by a back exercise', () => {
+    expect(exercisesFor('upper_back').primary.map((e) => e.id)).toEqual(['bent_over_row'])
+    expect(exercisesFor('lats').primary.map((e) => e.id)).toEqual(['lat_pulldown', 'bent_over_row'])
+    expect(exercisesFor('lower_back').primary.map((e) => e.id)).toEqual(['deadlift'])
+    expect(exercisesFor('lower_back').secondary.map((e) => e.id)).toEqual(['bent_over_row', 'squat', 'ab_twist'])
+    // The most focused movement first: the lateral raise works only the side shoulders.
+    expect(exercisesFor('side_delts').primary.map((e) => e.id)).toEqual(['shoulder_abduction', 'shoulder_press'])
+  })
+
+  it('asks for a side only where one arm or leg does the work', () => {
+    const sided = EXERCISE_LIST.filter((e) => e.sided).map((e) => e.id)
+    expect(sided).toEqual(['elbow_flexion', 'tricep_extension', 'shoulder_abduction', 'front_raise', 'bent_over_row', 'lunge', 'seated_knee_extension'])
+    expect(sideLabel('elbow_flexion', 'left')).toBe('left')
+    expect(sideLabel('deadlift', 'right')).toBe('both sides')
+    expect(sideLabel('ab_twist', 'left')).toBe('both sides')
   })
 })
