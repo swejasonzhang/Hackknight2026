@@ -13,6 +13,7 @@ import type {
   UserDto,
 } from '@arc/dependencies'
 import { getToken, signOutLocally } from '../auth/token'
+import { subscribe, type StreamHandlers } from './sse'
 
 export class ApiRequestError extends Error {
   readonly status: number
@@ -86,6 +87,8 @@ export const api = {
     list: (profileId: string, exercise?: ExerciseId) =>
       request<SessionDto[]>(`/api/profiles/${profileId}/sessions${exercise ? `?exercise=${exercise}` : ''}`),
     get: (id: string) => request<SessionDto>(`/api/sessions/${id}`),
+    /** Live feed of sessions stored for a profile (Server-Sent Events). Returns the unsubscribe function. */
+    stream: (profileId: string, handlers: StreamHandlers) => subscribe(`/api/profiles/${profileId}/stream`, handlers),
   },
   progress: (profileId: string, exercise: ExerciseId) =>
     request<ProgressDto>(`/api/profiles/${profileId}/progress?exercise=${exercise}`),

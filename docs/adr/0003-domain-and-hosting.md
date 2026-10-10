@@ -1,7 +1,7 @@
 # ADR-0003: getarc.health on Porkbun; Render hosts the web app and the API; MongoDB Atlas holds the data
 
 - Date: 2026-10-09
-- Status: accepted
+- Status: accepted (data store superseded by ADR-0007: Tiger Cloud replaced MongoDB Atlas on 2026-10-09)
 
 ## Context
 

@@ -1,7 +1,7 @@
 # Render Blueprint for Arc (getarc.health). Dashboard → New → Blueprint → this repo, branch main.
 # Spec: https://render.com/docs/blueprint-spec · schema: https://render.com/schema/render.yaml.json
 services:
-  # API: Express + Mongoose, runs from TypeScript source with tsx (a runtime dependency).
+  # API: Express + node-postgres against Tiger Cloud (TimescaleDB), run from TypeScript source with tsx.
   - type: web
     name: getarc-api
     runtime: node
@@ -16,8 +16,8 @@ services:
         value: production
       - key: NODE_VERSION
         value: 20.19.4
-      - key: MONGODB_URI
-        sync: false # pasted once in the dashboard: the Atlas connection string
+      - key: DATABASE_URL
+        sync: false # pasted once in the dashboard: the Tiger Cloud connection string (…/tsdb?sslmode=require)
       - key: JWT_SECRET
         generateValue: true
       - key: CV_API_KEY

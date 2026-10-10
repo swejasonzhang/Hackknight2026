@@ -2,6 +2,7 @@ import { EXERCISE_LIST, EXERCISES, type ExerciseId, type PlanDto, type ProgressD
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { api } from '../api/client'
+import type { StreamStatus } from '../api/sse'
 import { IconActivity, IconCalendar, IconCamera, IconFlame, IconTarget, IconUsers } from '../components/icons'
 import { AnimatedNumber, Item, Page, Stagger } from '../components/motion'
 import { PlanEditor } from '../components/PlanEditor'
@@ -21,6 +22,29 @@ export function DashboardPage() {
   const [loading, setLoading] = useState(false)
   const [seeding, setSeeding] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [live, setLive] = useState<StreamStatus>('closed')
+  const [arrived, setArrived] = useState<SessionDto | null>(null)
+  const [refreshKey, setRefreshKey] = useState(0)
+
+  // Live feed: the API pushes each session the camera app stores; reload the numbers when one lands.
+  useEffect(() => {
+    if (!selectedId) return
+    setArrived(null)
+    return api.sessions.stream(selectedId, {
+      onStatus: setLive,
+      onEvent: (event, data) => {
+        if (event !== 'session') return
+        setArrived(data as SessionDto)
+        setRefreshKey((k) => k + 1)
+      },
+    })
+  }, [selectedId])
+
+  useEffect(() => {
+    if (!arrived) return
+    const id = setTimeout(() => setArrived(null), 8_000)
+    return () => clearTimeout(id)
+  }, [arrived])
 
   useEffect(() => {
     if (!selectedId) return
@@ -46,7 +70,7 @@ export function DashboardPage() {
       cancelled = true
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedId, exercise])
+  }, [selectedId, exercise, refreshKey])
 
   const seedDemo = async () => {
     setSeeding(true)
@@ -102,9 +126,25 @@ export function DashboardPage() {
       <PageHeader
         eyebrow="Dashboard"
         title={selected?.name ?? 'Dashboard'}
-        subtitle={`${exerciseName}. Progress from the sessions the camera app recorded.`}
+        subtitle={
+          <>
+            {exerciseName}. Progress from the sessions the camera app recorded.{' '}
+            <span className={`badge ml-1 align-middle ${live === 'open' ? 'bg-good-soft text-good' : ''}`} title={live === 'open' ? 'New sessions appear here the moment they are stored' : 'Live feed reconnecting'}>
+              <span className={`mr-1 inline-block h-1.5 w-1.5 rounded-full ${live === 'open' ? 'bg-good' : 'bg-muted'}`} /> {live === 'open' ? 'Live' : 'Offline'}
+            </span>
+          </>
+        }
         actions={<Segmented label="Exercise" options={EXERCISE_OPTIONS} value={exercise} onChange={setExercise} />}
       />
+
+      {arrived && (
+        <div className="mb-5">
+          <Alert tone="good">
+            New session just landed: {EXERCISES[arrived.exercise].name}, {arrived.summary.totalReps} reps, best {deg(arrived.summary.bestPeakDeg)}.{' '}
+            <Link to={`/sessions/${arrived.id}`}>Open it</Link>
+          </Alert>
+        </div>
+      )}
 
       {error && (
         <div className="mb-5">

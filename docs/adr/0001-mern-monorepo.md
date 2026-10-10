@@ -1,7 +1,7 @@
 # ADR-0001: MERN stack in a three-package npm workspace
 
 - Date: 2026-10-09
-- Status: accepted
+- Status: accepted (database choice superseded by ADR-0007: Postgres/TimescaleDB on Tiger Cloud replaced MongoDB on 2026-10-09)
 
 ## Context
 

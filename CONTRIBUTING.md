@@ -19,7 +19,7 @@ Where tests live and what they cover:
 |---|---|---|---|
 | `dependencies` engine | unit | `dependencies/src/**/*.test.ts` | pure functions |
 | `backend` services | unit | `backend/src/**/*.test.ts` | pure functions |
-| `backend` API | integration | `backend/test/*.test.ts` | the real Express app + an in-memory MongoDB |
+| `backend` API | integration | `backend/test/*.test.ts` | the real Express app + an in-process Postgres (PGlite) |
 | `frontend` logic | unit | `frontend/src/**/*.test.ts` | API wrapper and auth helpers (fetch stubbed) |
 | `frontend` UI | component | `frontend/src/**/*.test.tsx` | route guards and forms with Testing Library in jsdom |
 

@@ -1,11 +1,11 @@
 import { timingSafeEqual } from 'node:crypto'
 import type { Request, RequestHandler } from 'express'
 import jwt from 'jsonwebtoken'
-import mongoose from 'mongoose'
 import { HttpError } from './http.ts'
+import { isUuid } from './sql.ts'
 
 /** Who is calling: a signed-in account, or the computer-vision module with the shared API key. */
-export type Principal = { kind: 'user'; userId: mongoose.Types.ObjectId } | { kind: 'service' }
+export type Principal = { kind: 'user'; userId: string } | { kind: 'service' }
 
 declare global {
   namespace Express {
@@ -63,11 +63,11 @@ export const authenticate: RequestHandler = (req, _res, next) => {
   const header = req.header('authorization') ?? ''
   const token = header.startsWith('Bearer ') ? header.slice('Bearer '.length).trim() : ''
   const userId = token ? verifyToken(token) : null
-  if (!userId || !mongoose.isValidObjectId(userId)) {
+  if (!userId || !isUuid(userId)) {
     next(new HttpError(401, 'Not signed in'))
     return
   }
-  req.principal = { kind: 'user', userId: new mongoose.Types.ObjectId(userId) }
+  req.principal = { kind: 'user', userId }
   next()
 }
 
@@ -77,7 +77,7 @@ export function principalOf(req: Request): Principal {
 }
 
 /** For routes only a signed-in person may use (creating profiles, seeding demo data). */
-export function requireUser(req: Request): mongoose.Types.ObjectId {
+export function requireUser(req: Request): string {
   const p = principalOf(req)
   if (p.kind !== 'user') throw new HttpError(403, 'Sign in as a user to do this')
   return p.userId

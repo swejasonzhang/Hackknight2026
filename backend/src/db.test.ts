@@ -1,10 +1,34 @@
 import { describe, expect, it, vi } from 'vitest'
-import { connectWithRetry, describeUri } from './db.ts'
+import { connectWithRetry, describeUri, splitSslMode } from './db.ts'
 
 describe('describeUri', () => {
   it('masks the password and nothing else', () => {
-    expect(describeUri('mongodb+srv://ada:s3cr3t@cluster0.example.net/ptg?x=1')).toBe('mongodb+srv://ada:***@cluster0.example.net/ptg?x=1')
-    expect(describeUri('mongodb://127.0.0.1:27017/ptg')).toBe('mongodb://127.0.0.1:27017/ptg')
+    expect(describeUri('postgres://tsdbadmin:s3cr3t@abc.tsdb.cloud.timescale.com:30133/tsdb?sslmode=require')).toBe(
+      'postgres://tsdbadmin:***@abc.tsdb.cloud.timescale.com:30133/tsdb?sslmode=require',
+    )
+    expect(describeUri('postgres://127.0.0.1:5432/arc')).toBe('postgres://127.0.0.1:5432/arc')
+  })
+})
+
+describe('splitSslMode', () => {
+  it('turns sslmode=require into encryption without certificate checks and removes it from the URL', () => {
+    expect(splitSslMode('postgres://u:p@h.example.com:30133/tsdb?sslmode=require')).toEqual({
+      connectionString: 'postgres://u:p@h.example.com:30133/tsdb',
+      ssl: { rejectUnauthorized: false },
+    })
+  })
+
+  it('verifies certificates for verify-full and keeps other query parameters', () => {
+    expect(splitSslMode('postgres://u:p@h.example.com/tsdb?application_name=arc&sslmode=verify-full')).toEqual({
+      connectionString: 'postgres://u:p@h.example.com/tsdb?application_name=arc',
+      ssl: { rejectUnauthorized: true },
+    })
+  })
+
+  it('is plain for local hosts and disable, encrypted for remote hosts without an sslmode', () => {
+    expect(splitSslMode('postgres://127.0.0.1:54329/arc').ssl).toBe(false)
+    expect(splitSslMode('postgres://u:p@h.example.com/tsdb?sslmode=disable').ssl).toBe(false)
+    expect(splitSslMode('postgres://u:p@h.example.com/tsdb').ssl).toEqual({ rejectUnauthorized: false })
   })
 })
 

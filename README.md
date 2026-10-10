@@ -1,19 +1,19 @@
 # Arc
 
-**Range of motion is an arc.** Arc is a webcam goniometer for home use, for anyone at any age, live at [getarc.health](https://getarc.health). A separate **camera app** (built by the computer-vision teammates) watches you exercise, measures joint range of motion (ROM) in degrees, counts reps and sets, and stores each session in MongoDB. **This repository is the web app and API around that data**: accounts, one profile per person in the household, and dashboards that show progress over weeks. It is a personal tool, not a clinical one: no doctor or therapist sees the data.
+**Range of motion is an arc.** Arc is a webcam goniometer for home use, for anyone at any age, live at [getarc.health](https://getarc.health). A separate **camera app** (built by the computer-vision teammates) watches you exercise, measures joint range of motion (ROM) in degrees, counts reps and sets, and stores each session in Postgres (TimescaleDB on Tiger Cloud). **This repository is the web app and API around that data**: accounts, one profile per person in the household, and dashboards that show progress over weeks. It is a personal tool, not a clinical one: no doctor or therapist sees the data.
 
-Stack: MongoDB Atlas · Express 5 · React 19 · Node 20 (MERN), TypeScript everywhere, Vite, Tailwind CSS 4, Motion, Vitest. Hosted on Render, domain at Porkbun. Visual identity: white and blue, Manrope, Lucide icons (ADR-0006).
+Stack: Postgres + TimescaleDB on Tiger Cloud · Express 5 · React 19 · Node 20, TypeScript everywhere, Vite, Tailwind CSS 4, Motion, Vitest. Hosted on Render, domain at Porkbun. Visual identity: white and blue, Manrope, Lucide icons (ADR-0006).
 
 ---
 
 ## 1. Quick start
 
-Prerequisites: **Node 20.19 or newer** (`.nvmrc` says 20; `nvm use` picks it), npm 10, and the team's MongoDB Atlas connection string.
+Prerequisites: **Node 20.19 or newer** (`.nvmrc` says 20; `nvm use` picks it), npm 10, and the team's Tiger Cloud (TimescaleDB) connection string.
 
 ```bash
 git clone https://github.com/swejasonzhang/Hackknight2026.git arc && cd arc
-npm install            # all three workspaces; first run also downloads a MongoDB test binary (~150 MB)
-cp .env.example .env   # fill in MONGODB_URI, JWT_SECRET and CV_API_KEY (see below)
+npm install            # all three workspaces (backend tests run on an in-process Postgres, nothing to download)
+cp .env.example .env   # fill in DATABASE_URL, JWT_SECRET and CV_API_KEY (see below)
 npm run dev            # API on :8787, web app on :5173
 ```
 
@@ -30,7 +30,7 @@ Copy `.env.example` to `.env` at the repo root. Only the backend reads it.
 
 | Variable | Meaning |
 |---|---|
-| `MONGODB_URI` | **Required.** `mongodb+srv://<user>:<password>@<cluster>.mongodb.net/arc?retryWrites=true&w=majority`. A local server also works: `mongodb://127.0.0.1:27017/arc`. If the cluster refuses the connection the API prints why and retries every 10 s. |
+| `DATABASE_URL` | **Required.** Postgres connection string. Production: the Tiger Cloud service, `postgres://tsdbadmin:<password>@<service>.tsdb.cloud.timescale.com:<port>/tsdb?sslmode=require`. Any Postgres 13+ works locally, e.g. `postgres://postgres@127.0.0.1:5432/arc`. The schema is created on first start; `reps` becomes a hypertable when TimescaleDB is present. |
 | `JWT_SECRET` | **Required.** Signs login tokens. Any long random string: `openssl rand -hex 32`. |
 | `CV_API_KEY` | Shared secret the camera app sends as `x-api-key` when it stores sessions or reads a plan. `openssl rand -hex 32`. Without it the camera app cannot write. |
 | `PORT` | API port, default `8787`. The Vite dev server proxies `/api/*` here. |
@@ -46,7 +46,7 @@ Run from the repo root.
 | Command | What it does |
 |---|---|
 | `npm run dev` | API + web app with hot reload (`npm run dev:backend` / `npm run dev:frontend` for one of them) |
-| `npm test` | All test suites: shared engine, API (against a throwaway in-memory MongoDB), frontend |
+| `npm test` | All test suites: shared engine, API (against an in-process Postgres, PGlite), frontend |
 | `npm run test:watch -w dependencies` (or `-w backend`, `-w frontend`) | Watch mode for one workspace while doing TDD |
 | `npm run typecheck` | TypeScript across all workspaces |
 | `npm run build` | Production build of the web app into `frontend/dist` |
@@ -158,7 +158,7 @@ Exercise ids: `elbow_flexion`, `shoulder_abduction`, `seated_knee_extension`. Si
 ```
 dependencies/  @arc/dependencies  pure TypeScript shared by both sides: domain types, exercise configs,
                rep counter, One Euro filter, fatigue proxy, session summary, zod API schemas
-backend/       @arc/backend       Express 5 + Mongoose: models (User, Profile, Plan, Session), auth,
+backend/       @arc/backend       Express 5 + node-postgres: schema, store (users, profiles, plans, sessions), auth,
                routes, services; src/app.ts builds the app, src/index.ts connects and listens, test/ = API tests
 frontend/      @arc/frontend      Vite + React 19 + Tailwind + Motion: pages (Landing, Signup, Login, Dashboard,
                Profiles, SessionDetail), auth (token, context, route guards), api/client.ts (typed fetch wrapper)
@@ -174,7 +174,7 @@ The three JavaScript packages are npm workspaces; the camera app is a separate P
 The project is developed **test-first**: write the failing test, make it pass, then clean up. `npm test` must be green before a pull request is opened, and CI (`.github/workflows/ci.yml`) runs typecheck, tests and the build on every push and PR.
 
 - `dependencies/src/**/*.test.ts`: engine behaviour (rep counting, hysteresis, jitter rejection, fatigue arithmetic, summaries, schema validation).
-- `backend/test/*.test.ts`: every API route through supertest against a throwaway in-memory MongoDB, including sign-up, login, token checks, API-key access and profile isolation between accounts. Tests never touch the cluster in `.env`.
+- `backend/test/*.test.ts`: every API route through supertest against an in-process Postgres (PGlite), including sign-up, login, token checks, API-key access and profile isolation between accounts. Tests never touch the cluster in `.env`.
 - `frontend/src/**/*.test.ts(x)`: the API wrapper (token header, 401 handling), the route guards (app pages send visitors to `/login`, the landing page sends signed-in users to `/dashboard`), the sign-up / login form, UI primitives and the hero's rep detector.
 
 How the team works (sprints, stories, definition of done, PR checklist) is in [CONTRIBUTING.md](CONTRIBUTING.md) and [docs/](docs/).
@@ -186,8 +186,8 @@ The domain **getarc.health** is registered at Porkbun, which also serves its DNS
 ### One-time setup (about 15 minutes)
 
 1. **Connect GitHub to Render.** At dashboard.render.com choose *New → Blueprint*, pick the `swejasonzhang/Hackknight2026` repo and the `main` branch. Render reads `render.yaml` and creates `getarc-web` and `getarc-api`. (If you created services from an earlier version of the file, delete those first so the names don't collide.)
-2. **Set the secret** it asks for: `MONGODB_URI` (the Atlas string). `JWT_SECRET` and `CV_API_KEY` are generated; copy `CV_API_KEY` from `getarc-api` → *Environment* and give it to the camera-app team.
-3. **Allow Render in Atlas.** Atlas → Network Access → add the outbound IPs shown on `getarc-api` → *Networking* (or `0.0.0.0/0` for the hackathon).
+2. **Set the secret** it asks for: `DATABASE_URL` (the Tiger Cloud string, ending in `/tsdb?sslmode=require`). `JWT_SECRET` and `CV_API_KEY` are generated; copy `CV_API_KEY` from `getarc-api` → *Environment* and give it to the camera-app team.
+3. **Tiger Cloud needs no allow list** for a new service; if you turned one on, add the outbound IPs shown on `getarc-api` → *Networking*.
 4. **Check it on Render's URLs first:** `https://getarc-api.onrender.com/api/health` returns `{ ok: true, db: "connected" }`, and `https://getarc-web.onrender.com` lands on the sign-up page. If Render gave a service a suffixed hostname (the name was taken), update the rewrite destination in `render.yaml` to match.
 5. **Point the domain at Render.** The blueprint deliberately leaves domains out (Render refuses a blueprint whose domain is attached anywhere else). Add `getarc.health` under `getarc-web` → *Settings → Custom Domains* and `api.getarc.health` under `getarc-api`; if Render says a domain is taken, it names the service or workspace that holds it. Then at Porkbun → *Domain Management* → `getarc.health` → **DNS Records**, delete the default records (the `A` records for the root and `*` pointing at `192.0.79.151` / `192.0.79.171`, and any `AAAA` records; the `_acme-challenge` TXT records are Porkbun's own SSL automation and can go too) and add these. Porkbun's *Host* field takes only the part before the domain: leave it blank for the root.
 
@@ -200,14 +200,14 @@ The domain **getarc.health** is registered at Porkbun, which also serves its DNS
    ALIAS is Porkbun's root-level CNAME, so you never have to copy an IP from Render. (If you prefer an `A` record for the root, Render's apex address is `216.24.57.1`, shown on the Custom Domains screen.) Render verifies the domain within minutes and issues HTTPS; `www.getarc.health` redirects to the root automatically.
 6. **Final check:** `https://api.getarc.health/api/health` and `https://getarc.health`.
 
-Production env on `getarc-api`: `NODE_ENV=production`, `MONGODB_URI`, `JWT_SECRET`, `CV_API_KEY`, `CORS_ORIGINS`. The camera app talks to `https://api.getarc.health` (or `https://getarc-api.onrender.com`) with the API key.
+Production env on `getarc-api`: `NODE_ENV=production`, `DATABASE_URL`, `JWT_SECRET`, `CV_API_KEY`, `CORS_ORIGINS`. The camera app talks to `https://api.getarc.health` (or `https://getarc-api.onrender.com`) with the API key.
 
 ## 9. Troubleshooting
 
 - **"API unreachable" in the nav bar**: the server is not running or crashed on start. Run `npm run dev:backend` alone and read its output.
-- **API exits with "MONGODB_URI is not set" / "JWT_SECRET is not set"**: create `.env` at the repo root from `.env.example` (locally) or set the variables on the Render service.
-- **API logs "Could not connect to MongoDB … IP that isn't whitelisted"**: in Atlas open *Network Access* → *Add IP Address* → *Allow access from anywhere* (`0.0.0.0/0`, fine for the hackathon). The API retries every 10 s and connects on its own once the rule is active.
+- **API exits with "DATABASE_URL is not set" / "JWT_SECRET is not set"**: create `.env` at the repo root from `.env.example` (locally) or set the variables on the Render service.
+- **API logs "Could not connect to Postgres …"**: check the URL (user, password, host, port, `/tsdb?sslmode=require`) in the Tiger Cloud console; a paused free service resumes on first connection (retry after a minute for the hackathon). The API retries every 10 s and connects on its own once the rule is active.
 - **Camera app gets 401**: it must send `x-api-key` with the exact value of `CV_API_KEY` in the API's `.env`.
 - **`npm install` fails with "Cannot read properties of null (reading 'edgesOut')"**: an npm 10 workspace bug; the repo's `.npmrc` (`legacy-peer-deps=true`) avoids it.
 - **CI fails with "Cannot find native binding" for rolldown**: the lockfile was generated without the Linux build of Vite's bundler. Regenerate it from a clean install (`rm -rf node_modules package-lock.json && npm install`) and commit `package-lock.json`.
-- **Backend tests fail at `MongoMemoryServer.create` the first time**: the MongoDB test binary is still downloading. Run `npm test -w backend` again.
+- **Backend tests are slow the first time**: PGlite loads a WebAssembly Postgres per test file; later runs are cached by Node.

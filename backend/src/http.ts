@@ -1,5 +1,4 @@
 import type { ErrorRequestHandler, RequestHandler } from 'express'
-import mongoose from 'mongoose'
 import type { ZodType } from 'zod'
 
 /** Thrown from route handlers; the error middleware turns it into a JSON response. */
@@ -21,15 +20,12 @@ export function validate<T>(schema: ZodType<T>, data: unknown): T {
   return result.data
 }
 
-/** Parse a route param as an ObjectId, or null when it cannot be one (which callers treat as 404). */
-export function toObjectId(id: string | undefined): mongoose.Types.ObjectId | null {
-  if (!id || !mongoose.isValidObjectId(id)) return null
-  return new mongoose.Types.ObjectId(id)
-}
-
 export const notFound: RequestHandler = (_req, res) => {
   res.status(404).json({ error: 'Not found' })
 }
+
+/** Postgres SQLSTATE for a unique-constraint violation. */
+const UNIQUE_VIOLATION = '23505'
 
 export const errorHandler: ErrorRequestHandler = (err, _req, res, _next) => {
   if (err instanceof HttpError) {
@@ -40,7 +36,7 @@ export const errorHandler: ErrorRequestHandler = (err, _req, res, _next) => {
     res.status(400).json({ error: 'Invalid JSON' })
     return
   }
-  if (typeof err === 'object' && err !== null && 'code' in err && err.code === 11000) {
+  if (typeof err === 'object' && err !== null && 'code' in err && err.code === UNIQUE_VIOLATION) {
     res.status(409).json({ error: 'Already exists' })
     return
   }

@@ -19,18 +19,18 @@ if (!process.env.CV_API_KEY) {
   console.warn('[api] CV_API_KEY is not set: the computer-vision module cannot store sessions until it is.')
 }
 
-const uri = process.env.MONGODB_URI
-if (!uri) {
-  console.error('[api] MONGODB_URI is not set. Put the MongoDB Atlas connection string in .env at the repo root (see .env.example).')
+const url = process.env.DATABASE_URL
+if (!url) {
+  console.error('[api] DATABASE_URL is not set. Put the Tiger Cloud (TimescaleDB) connection string in .env at the repo root (see .env.example).')
   process.exit(1)
 }
 
-// Keep trying in development (fix the Atlas access list or your Wi-Fi and it connects by itself);
+// Keep trying in development (start the database or fix the URL and it connects by itself);
 // in production give up after a minute so the host restarts the process.
 const RETRY_MS = 10_000
-let db: DbHandle
+let database: DbHandle
 try {
-  db = await connectWithRetry(() => connectDb(uri), {
+  database = await connectWithRetry(() => connectDb(url), {
     maxAttempts: isProduction ? 6 : Infinity,
     delayMs: RETRY_MS,
     onError: (err, attempt, max) => {
@@ -47,13 +47,13 @@ const app = createApp({ corsOrigins })
 // 0.0.0.0 = every network interface, so the API is reachable from other devices too.
 const server = app.listen(port, '0.0.0.0', () => {
   console.log(`[api] listening on http://localhost:${port} (all interfaces)`)
-  console.log(`[api] database: ${db.label}`)
+  console.log(`[api] database: ${database.label} (${database.timescale ? 'TimescaleDB, reps is a hypertable' : 'plain Postgres, no timescaledb extension'})`)
 })
 
 async function shutdown(signal: string): Promise<void> {
   console.log(`[api] ${signal} received, shutting down`)
   server.close()
-  await db.stop()
+  await database.stop()
   process.exit(0)
 }
 process.on('SIGINT', () => void shutdown('SIGINT'))
