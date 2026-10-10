@@ -21,6 +21,7 @@ import {
   type ChatTurn,
   type CoachIntake,
   type ExerciseId,
+  type LiveContext,
   type OnboardingTopic,
   type PlanInput,
   type ProgramDay,
@@ -394,19 +395,46 @@ export interface SetFeedbackContext {
   intake?: CoachIntake | null
 }
 
+/** "2.4". */
+const seconds = (ms: number) => (Math.round(ms / 100) / 10).toFixed(1)
+
+/**
+ * Arc's own read of a set when Gemini is off: the best and the lowest rep, how many reached the
+ * goal, how the range and the tempo held, and one concrete thing for the next set.
+ */
 function setFeedbackTemplate(c: SetFeedbackContext): string {
-  const best = Math.round(Math.max(...c.reps.map((r) => r.peakDeg)))
+  const peaks = c.reps.map((r) => Math.round(r.peakDeg))
+  const best = Math.max(...peaks)
+  const low = Math.min(...peaks)
+  const target = c.plan.targetDeg
+  const reached = peaks.filter((p) => p >= target).length
   const fatigue = estimateFatigue(c.reps)
-  const first = c.reps[0] ? Math.round(c.reps[0].peakDeg) : best
-  const last = c.reps.at(-1) ? Math.round(c.reps.at(-1)!.peakDeg) : best
-  const range =
+  const first = peaks[0] ?? best
+  const last = peaks.at(-1) ?? best
+  const durations = c.reps.map((r) => r.durationMs)
+  const mean = durations.reduce((a, b) => a + b, 0) / Math.max(1, durations.length)
+  const parts = [`Set ${c.setNumber} done: ${plural(c.reps.length, 'rep')}, best ${best} degrees, lowest ${low}.`]
+  parts.push(reached === c.reps.length ? `Every rep reached your ${target} degree goal.` : `${reached} of ${c.reps.length} reps reached your ${target} degree goal.`)
+  parts.push(
     fatigue.index >= 0.25
-      ? `Your range dropped from ${first} to ${last} degrees by the end, so take the full rest.`
+      ? `Your range dropped from ${first} to ${last} degrees by the end.`
       : fatigue.index >= 0.12
-        ? 'Your range slipped a little late in the set; keep the last reps slow.'
-        : 'Your range held steady.'
-  const next = c.setNumber < c.plan.sets ? `Rest ${c.plan.restSeconds} seconds; set ${c.setNumber + 1} starts by itself.` : 'That was the last set.'
-  return `Set ${c.setNumber} done: ${plural(c.reps.length, 'rep')}, best ${best} degrees. ${range} ${next}`
+        ? `Your range slipped from ${first} to ${last} late in the set.`
+        : 'Your range held steady.',
+  )
+  const slowing = durations.length >= 2 && durations.at(-1)! > durations[0]! * 1.15
+  parts.push(`Reps took ${seconds(mean)} seconds on average${slowing ? `, slowing to ${seconds(durations.at(-1)!)} by the end` : ''}.`)
+  const more = c.setNumber < c.plan.sets
+  const step =
+    fatigue.index >= 0.25
+      ? `take the full ${c.plan.restSeconds} seconds and lower each rep slowly`
+      : reached === c.reps.length
+        ? 'try one more rep, or a slower lowering'
+        : best < target
+          ? `aim for ${target} on every rep: ${target - Math.round(peaks.reduce((a, b) => a + b, 0) / peaks.length)} more degrees than your average`
+          : `keep the last reps as deep as the first, past ${target}`
+  parts.push(more ? `Next set, ${step}. Rest ${c.plan.restSeconds} seconds; set ${c.setNumber + 1} starts by itself.` : `That was the last set. Next time, ${step}.`)
+  return parts.join(' ')
 }
 
 export async function setFeedback(c: SetFeedbackContext): Promise<{ text: string; offline: boolean }> {
@@ -488,6 +516,72 @@ export async function sessionSummary(c: SessionSummaryContext): Promise<{ text: 
       maxOutputTokens: 320,
     })
     return { text: text.slice(0, 1500), offline: false }
+  } catch {
+    return { text: template, offline: true }
+  }
+}
+
+// ---------------------------------------------------------------------------------------------
+// Mid-workout: whatever the member says to Arc
+
+export interface AskContext {
+  name: string
+  exercise: ExerciseId
+  side: Side
+  text: string
+  live: LiveContext
+  intake?: CoachIntake | null
+}
+
+const PAIN = /\b(hurts?|hurting|pain|painful|sore|aches?|aching|sharp|injur\w*|twinge|pinch\w*)\b/i
+const PROGRESS = /how am i|how('?s| is) it going|how did i|how'?m i|doing so far|progress|how many|score/i
+const FORM = /\bform\b|technique|doing it right|right way|correct|posture|depth|too fast|too slow/i
+const HARD = /\b(hard|tough|tired|heavy|exhausted|struggl\w*|can'?t)\b/i
+const EASY = /\b(easy|too light|bored|more reps|step it up)\b/i
+
+/** Arc's own answer when Gemini is off, read from the live numbers. */
+function askTemplate({ exercise, text, live }: AskContext): string {
+  const cfg = EXERCISES[exercise]
+  const target = live.targetDeg
+  const recent = live.recentPeaks.map(Math.round)
+  const last = recent.at(-1)
+  const first = recent[0]
+  const fading = recent.length >= 3 && first != null && last != null && first - last >= Math.max(4, (target - cfg.restDeg) * 0.06)
+  const where = `Set ${live.setNumber} of ${live.setsPlanned}: ${live.repsInSet} of ${live.repsPlanned} reps so far, ${live.totalReps} in all`
+  if (PAIN.test(text)) return "If it's sharp or getting worse, stop now and check with a professional before you carry on. If it's only effort, take your rest and keep the next reps small and slow."
+  if (FORM.test(text)) {
+    if (last == null) return `${cfg.cue.split('. ')[0]}. I'll tell you how deep each rep goes once you start.`
+    const depth = last >= target ? `right at your ${target} degree goal` : `${target - last} short of your ${target} degree goal, so go a little deeper`
+    return `Your last rep reached ${last} degrees, ${depth}.${fading ? ` Your range is fading from ${first}, so slow the lowering.` : ''} ${cfg.cue.split('. ')[0]}.`
+  }
+  if (PROGRESS.test(text)) {
+    const best = live.bestDeg != null ? `, best ${Math.round(live.bestDeg)} degrees against your ${target} degree goal` : ''
+    return `${where}${best}.${last != null ? ` Your last rep reached ${last}.` : ''}`
+  }
+  if (HARD.test(text)) return `Then take the whole rest, and drop a rep next set if you need to. Quality first: ${last != null ? `your last rep still reached ${last} degrees.` : 'slow, full reps.'}`
+  if (EASY.test(text)) return `Then make it count: add one rep per set, or lower over three seconds. ${last != null && last < target ? `And chase the depth: ${target - last} degrees to your goal.` : 'You are at your goal, so a higher goal is next.'}`
+  return `I'm listening. ${where}. Ask me how you're doing or about your form, or say pause, skip or stop.`
+}
+
+/** Arc's answer to the member mid-workout: Gemini's words when it is configured, else Arc's own. */
+export async function askArc(c: AskContext): Promise<{ text: string; offline: boolean }> {
+  const template = askTemplate(c)
+  if (!geminiConfigured()) return { text: template, offline: true }
+  const cfg = EXERCISES[c.exercise]
+  const l = c.live
+  const context = [
+    `Member: ${firstName(c.name)}${c.intake ? `; goals: ${c.intake.goals}; limits: ${c.intake.limitations}` : ''}`,
+    `Exercise: ${cfg.name}, ${c.side} side, goal ${l.targetDeg} degrees. ${cfg.cue}`,
+    `Now: ${l.phase}; set ${l.setNumber} of ${l.setsPlanned}, ${l.repsInSet} of ${l.repsPlanned} reps in this set, ${l.totalReps} in all; best ${l.bestDeg == null ? 'none yet' : Math.round(l.bestDeg)} degrees; latest peaks in order: ${l.recentPeaks.map(Math.round).join(', ') || 'none yet'} degrees`,
+    `The member just said: "${c.text}"`,
+  ].join('\n')
+  try {
+    const text = await generate({
+      system: `${PERSONA}\n\nThe member is mid-workout and just spoke to you. Answer in one or two short spoken sentences, using the live numbers when they help. If they mention pain that is sharp or getting worse, tell them to stop and check with a professional. If they ask how they are doing, give the set, the reps and the best angle against the goal. If they ask about form, use the latest peaks and the exercise cue.`,
+      turns: [{ role: 'user', text: context }],
+      maxOutputTokens: 160,
+    })
+    return { text: text.slice(0, 600), offline: false }
   } catch {
     return { text: template, offline: true }
   }

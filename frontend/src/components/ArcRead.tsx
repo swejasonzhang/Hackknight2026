@@ -1,7 +1,8 @@
-import type { CoachStatus, SessionDto } from '@arc/dependencies'
+import type { SessionDto } from '@arc/dependencies'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { api } from '../api/client'
 import { createSpeaker } from '../voice/speaker'
+import { elevenLabsVoice } from '../voice/status'
 import { Lamp, Strip } from './ui'
 
 interface Read {
@@ -22,17 +23,10 @@ export function ArcRead({ session, autoSpeak }: { session: SessionDto; autoSpeak
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [speaking, setSpeaking] = useState(false)
-  const status = useRef<CoachStatus | null>(null)
   const spoken = useRef(false)
-  const speaker = useMemo(() => createSpeaker({ elevenLabs: () => status.current?.voice ?? false, onSpeaking: setSpeaking }), [])
+  const speaker = useMemo(() => createSpeaker({ voice: elevenLabsVoice(), onSpeaking: setSpeaking }), [])
 
-  useEffect(() => {
-    api.coach
-      .status()
-      .then((s) => (status.current = s))
-      .catch(() => {})
-    return () => speaker.stop()
-  }, [speaker])
+  useEffect(() => () => speaker.stop(), [speaker])
 
   const ask = async () => {
     setBusy(true)

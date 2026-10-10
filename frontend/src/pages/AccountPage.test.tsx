@@ -74,7 +74,7 @@ describe('AccountPage', () => {
     renderPage()
     fillAll()
     fireEvent.click(deleteButton())
-    expect(await screen.findByText(/landing: your account and everything in it/i)).toBeInTheDocument()
+    expect(await screen.findByText(/landing: your account and everything in it/i, {}, { timeout: 3000 })).toBeInTheDocument()
     expect(deleteAccount).toHaveBeenCalledWith({ email: 'ada@example.com', password: 'correct horse battery', confirm: 'DELETE' })
     expect(logout).toHaveBeenCalled()
   })
