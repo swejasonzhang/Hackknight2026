@@ -1,0 +1,25 @@
+/* Motion effects that are pure CSS once a component has set the variables. */
+
+.spotlight {
+  position: relative;
+  overflow: hidden;
+}
+.spotlight::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.35s ease;
+  background: radial-gradient(320px circle at var(--mx) var(--my), rgb(0 161 255 / 0.18), transparent 45%);
+}
+.spotlight:hover::before,
+.spotlight:focus-within::before {
+  opacity: 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .spotlight::before {
+    transition: none;
+  }
+}

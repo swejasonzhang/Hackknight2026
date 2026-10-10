@@ -6,6 +6,7 @@ import { api } from '../api/client'
 import { IconActivity, IconArrowLeft, IconFlame, IconTarget, IconTrend } from '../components/icons'
 import { AnimatedNumber, Item, Page, Stagger } from '../components/motion'
 import { axisTick, tooltipStyle } from '../components/ProgressCharts'
+import { LazyJointScene } from '../components/three/lazy'
 import { Alert, Card, PageHeader, Skeleton, StatTile } from '../components/ui'
 import { deg, fatigueLabel, formatDateTime, pct } from '../format'
 
@@ -99,6 +100,15 @@ export function SessionDetailPage() {
       </Stagger>
 
       <div className="flex flex-col gap-5">
+        <Card title="Best rep, in 3D" subtitle={`${exercise.name} posed at ${deg(session.summary.bestPeakDeg)}; the amber tick is the ${deg(session.plan.targetDeg)} goal. Drag to look around.`}>
+          <div className="relative overflow-hidden rounded-[18px] bg-black/60">
+            <LazyJointScene exercise={session.exercise} angle={session.summary.bestPeakDeg} goalDeg={session.plan.targetDeg} className="h-[300px]" label={`${exercise.name} posed at ${deg(session.summary.bestPeakDeg)}`} fallback={<Skeleton height={300} />} />
+            <div className="pointer-events-none absolute top-3 left-3">
+              <div className="text-[2.2rem] leading-none font-semibold tracking-[-0.03em] text-ink tabular-nums">{deg(session.summary.bestPeakDeg)}</div>
+              <div className="mt-1 text-[11px] font-semibold tracking-[0.12em] text-muted uppercase">{exercise.metricLabel} · best rep</div>
+            </div>
+          </div>
+        </Card>
         <Card title="Rep by rep" subtitle={`Peak ${exercise.metricLabel.toLowerCase()} for every rep; the dashed line is the goal.`}>
           <ResponsiveContainer width="100%" height={280}>
             <BarChart data={reps} margin={{ top: 8, right: 12, left: -12, bottom: 0 }}>

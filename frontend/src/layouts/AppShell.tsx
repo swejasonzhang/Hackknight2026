@@ -5,6 +5,7 @@ import { api } from '../api/client'
 import { useAuth } from '../auth/AuthContext'
 import { APP_NAME } from '../brand'
 import { IconChart, IconLogOut, IconUsers, Logo } from '../components/icons'
+import { Hint } from '../components/Hint'
 import { ProfilePicker } from '../components/ProfilePicker'
 import { Avatar } from '../components/ui'
 
@@ -27,9 +28,11 @@ function ApiStatus() {
   const dot = state === 'ok' ? 'bg-good shadow-[0_0_8px_rgb(46_210_114/0.8)]' : state === 'down' ? 'bg-bad' : 'bg-muted'
   const text = state === 'ok' ? 'Connected' : state === 'down' ? 'API unreachable' : 'Checking…'
   return (
-    <div className="flex items-center gap-2 text-[12px] font-medium text-muted" title="API and database status">
-      <span className={`h-2 w-2 rounded-full ${dot}`} /> {text}
-    </div>
+    <Hint label="API and database status, checked every 30 seconds">
+      <div className="flex w-max items-center gap-2 text-[12px] font-medium text-muted">
+        <span className={`h-2 w-2 rounded-full ${dot}`} /> {text}
+      </div>
+    </Hint>
   )
 }
 

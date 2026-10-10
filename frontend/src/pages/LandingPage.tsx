@@ -2,13 +2,15 @@ import * as Accordion from '@radix-ui/react-accordion'
 import { motion, useMotionValueEvent, useReducedMotion, useScroll } from 'motion/react'
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
-import { CartesianGrid, Line, LineChart, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { APP_NAME } from '../brand'
 import { IconActivity, IconArrowRight, IconCamera, IconChevronDown, IconFlame, IconPlus, IconTarget, IconTimer, Logo } from '../components/icons'
 import { Blobs } from '../components/landing/Blobs'
 import { Headline } from '../components/landing/Headline'
-import { LiveArc } from '../components/landing/LiveArc'
+import { LiveJoint } from '../components/landing/LiveJoint'
+import { Magnetic, Parallax, ScrollProgress, SpotlightCard } from '../components/fx'
+import { LazyProgressScene } from '../components/three/lazy'
 import { AnimatedNumber, ease, Item, Lift, Reveal } from '../components/motion'
+import { Skeleton } from '../components/ui'
 
 const NAV = [
   ['#how', 'How it works'],
@@ -101,6 +103,7 @@ export function LandingPage() {
 
   return (
     <div className="relative min-h-screen overflow-x-hidden bg-black">
+      <ScrollProgress />
       {/* ---------- Nav ---------- */}
       <motion.header {...rise(0)} className={`sticky top-0 z-30 border-b bg-black/80 backdrop-blur-md transition-[border-color] duration-300 ${scrolled ? 'border-line' : 'border-transparent'}`}>
         <div className="mx-auto flex h-[76px] max-w-[1280px] items-center gap-3 px-6 sm:px-10">
@@ -134,15 +137,18 @@ export function LandingPage() {
             A camera app measures every rep like a goniometer. Arc shows the trend, so progress is a number you can watch, not a feeling you have to trust.
           </motion.p>
           <motion.div {...rise(0.65)} className="mt-9 flex flex-wrap items-center justify-center gap-3">
-            <Link to="/signup" className="btn btn-primary btn-lg group">
-              Create your account <IconArrowRight size={17} className="transition-transform group-hover:translate-x-0.5" />
-            </Link>
+            <Magnetic>
+              <Link to="/signup" className="btn btn-primary btn-lg group">
+                Create your account <IconArrowRight size={17} className="transition-transform group-hover:translate-x-0.5" />
+              </Link>
+            </Magnetic>
             <a href="#how" className="btn btn-lg">
               See how it works
             </a>
           </motion.div>
 
-          <motion.div {...rise(0.8)} className="relative mt-16 w-full max-w-[680px]">
+          <motion.div {...rise(0.8)} className="relative mt-16 w-full max-w-[720px]">
+            <Parallax offset={28}>
             <div className="rounded-[36px] border border-primary/40 bg-surface p-2 shadow-pop">
               <div className="flex items-center gap-2 px-4 py-2.5 text-[11.5px] font-semibold tracking-[0.1em] text-muted uppercase">
                 <span className="flex gap-1.5" aria-hidden="true">
@@ -155,8 +161,8 @@ export function LandingPage() {
                   <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-bad" /> Live
                 </span>
               </div>
-              <div className="rounded-[28px] bg-black p-5 text-left sm:p-7">
-                <LiveArc />
+              <div className="rounded-[28px] bg-black p-3 text-left sm:p-4">
+                <LiveJoint />
               </div>
               <div className="grid grid-cols-3 gap-2 px-1 pt-2 pb-1 text-[12px] font-medium">
                 {[
@@ -172,6 +178,7 @@ export function LandingPage() {
                 ))}
               </div>
             </div>
+            </Parallax>
           </motion.div>
         </div>
       </section>
@@ -187,7 +194,8 @@ export function LandingPage() {
         <div className="mt-14 grid gap-5 text-left md:grid-cols-12">
           {BENTO.map(({ icon: Icon, title, text, wide, sketch }) => (
             <Item key={title} className={wide ? 'md:col-span-7' : 'md:col-span-5'}>
-              <Lift className="card flex h-full min-h-[300px] flex-col justify-between gap-10 rounded-[32px] p-7 sm:p-9">
+              <Lift className="h-full">
+                <SpotlightCard className="card flex h-full min-h-[300px] flex-col justify-between gap-10 rounded-[32px] p-7 sm:p-9">
                 {sketch ? (
                   <div className="rounded-[20px] border border-line bg-ink/[0.03] p-4">
                     <GoalSketch />
@@ -201,6 +209,7 @@ export function LandingPage() {
                   <h3 className="feature-title">{title}</h3>
                   <p className="mt-4 max-w-[44ch] text-[15.5px] leading-relaxed text-ink-2">{text}</p>
                 </div>
+                </SpotlightCard>
               </Lift>
             </Item>
           ))}
@@ -240,19 +249,14 @@ export function LandingPage() {
                     <AnimatedNumber value={129} suffix="°" duration={1.4} /> <span className="text-[14px] font-semibold text-good">+18° since week 1</span>
                   </div>
                 </div>
-                <span className="rounded-full bg-primary-soft px-3 py-1 text-[12px] font-semibold text-primary">goal 140°</span>
               </div>
-              <ResponsiveContainer width="100%" height={240}>
-                <LineChart data={DEMO} margin={{ top: 8, right: 12, left: -16, bottom: 0 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="var(--chart-grid)" vertical={false} />
-                  <XAxis dataKey="week" interval={1} tick={{ fill: 'var(--chart-axis)', fontSize: 12, fontWeight: 500 }} axisLine={false} tickLine={false} />
-                  <YAxis domain={[90, 150]} unit="°" tick={{ fill: 'var(--chart-axis)', fontSize: 12 }} axisLine={false} tickLine={false} />
-                  <Tooltip contentStyle={{ background: 'var(--surface)', border: '1px solid var(--line-strong)', borderRadius: 14, fontSize: 13, color: 'var(--ink)' }} formatter={(v) => `${Number(v)}°`} />
-                  <ReferenceLine y={140} stroke="var(--chart-goal)" strokeDasharray="6 3" />
-                  <Line type="monotone" dataKey="best" name="Best rep" stroke="var(--chart-1)" strokeWidth={3} dot={{ r: 3.5, strokeWidth: 0, fill: 'var(--chart-1)' }} isAnimationActive={!reduce} />
-                  <Line type="monotone" dataKey="mean" name="Mean rep" stroke="var(--chart-1-soft)" strokeWidth={2} strokeDasharray="4 3" dot={false} isAnimationActive={!reduce} />
-                </LineChart>
-              </ResponsiveContainer>
+              <LazyProgressScene
+                points={DEMO.map((d, i) => ({ label: `${d.week} · session ${(i % 2) + 1}`, value: d.best, sub: `mean ${d.mean}°` }))}
+                goal={140}
+                className="h-[260px]"
+                label="Six weeks of elbow flexion as 3D bars, one per session, rising from 111 to 129 degrees toward a 140 degree goal"
+                fallback={<Skeleton height={260} />}
+              />
               <div className="mt-4 grid grid-cols-3 gap-2 border-t border-line pt-4">
                 {[
                   ['Best', '129°'],
