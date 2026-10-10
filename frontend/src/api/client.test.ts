@@ -22,6 +22,15 @@ describe('api client', () => {
     expect(JSON.parse(init.body)).toEqual({ name: 'Ada' })
   })
 
+  it("sends the browser's timezone offset when loading demo data", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse({ profileId: 'p1', sessions: 40, created: true }, 201))
+    vi.stubGlobal('fetch', fetchMock)
+    await api.dev.seed()
+    const [url, init] = fetchMock.mock.calls[0]!
+    expect(url).toBe('/api/dev/seed')
+    expect(JSON.parse(init.body)).toEqual({ tzOffsetMinutes: new Date().getTimezoneOffset() })
+  })
+
   it('builds query strings for progress', async () => {
     const fetchMock = vi.fn().mockResolvedValue(jsonResponse({ sessions: [] }))
     vi.stubGlobal('fetch', fetchMock)

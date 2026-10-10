@@ -1,5 +1,7 @@
+import { SeedRequestSchema } from '@arc/dependencies'
 import { Router } from 'express'
 import { requireUser } from '../auth.ts'
+import { validate } from '../http.ts'
 import { seedDemoData } from '../services/seed.ts'
 
 /**
@@ -9,6 +11,7 @@ import { seedDemoData } from '../services/seed.ts'
 export const devRouter = Router()
 
 devRouter.post('/seed', async (req, res) => {
-  const result = await seedDemoData(requireUser(req))
+  const input = validate(SeedRequestSchema, req.body)
+  const result = await seedDemoData(requireUser(req), { tzOffsetMinutes: input?.tzOffsetMinutes })
   res.status(result.created ? 201 : 200).json(result)
 })

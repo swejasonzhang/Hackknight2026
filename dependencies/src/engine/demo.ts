@@ -1,4 +1,7 @@
-import { estimateFatigue, EXERCISES, EXERCISE_IDS, summarizeSets, type SetRecord, type SessionRecord } from '@arc/dependencies'
+import { EXERCISES } from './exercises.ts'
+import { estimateFatigue } from './fatigue.ts'
+import { summarizeSets } from './summary.ts'
+import { EXERCISE_IDS, type SessionRecord, type SetRecord } from './types.ts'
 
 /** Small seeded PRNG: random-looking data that a seed reproduces exactly (tests pass a fixed seed). */
 function mulberry32(seed: number): () => number {
@@ -16,7 +19,7 @@ export type DemoSession = Omit<SessionRecord, 'id'>
 
 const DAY = 24 * 3600 * 1000
 const WEEKS = 6
-/** Start times people actually train at, UTC. */
+/** Start times people actually train at, on the viewer's own clock. */
 const HOURS = [7, 8, 12, 17, 18, 19, 20]
 
 /**
@@ -25,15 +28,20 @@ const HOURS = [7, 8, 12, 17, 18, 19, 20]
  * sessions a week on random days (Monday to Saturday) and times; reps fade within a set less as
  * the weeks go by; about one session in eight is an off day with lower range, more fatigue and
  * sometimes a last set ended early. The same seed always gives the same data.
+ *
+ * `tzOffsetMinutes` is the viewer's `Date#getTimezoneOffset()` (240 in New York in October), so
+ * the days and hours read as a real routine on their clock rather than on the server's UTC one.
  */
-export function generateDemoSessions(profileId: string, now = Date.now(), seed = 42): DemoSession[] {
+export function generateDemoSessions(profileId: string, now = Date.now(), seed = 42, tzOffsetMinutes = 0): DemoSession[] {
   const rand = mulberry32(seed)
   const between = (lo: number, hi: number) => lo + rand() * (hi - lo)
   const noise = (amp: number) => (rand() * 2 - 1) * amp
   const sessions: DemoSession[] = []
 
-  // Monday 00:00 UTC of the current week, then walk back WEEKS - 1 weeks.
-  const today = new Date(now)
+  // Work on the viewer's wall clock (local time written as if it were UTC): find this week's
+  // Monday 00:00 there, walk back WEEKS - 1 weeks, then shift each start back to a real instant.
+  const offsetMs = tzOffsetMinutes * 60_000
+  const today = new Date(now - offsetMs)
   const daysSinceMonday = (today.getUTCDay() + 6) % 7
   const thisMonday = Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate() - daysSinceMonday)
 
@@ -47,7 +55,7 @@ export function generateDemoSessions(profileId: string, now = Date.now(), seed =
       const days = [0, 1, 2, 3, 4, 5].sort(() => rand() - 0.5).slice(0, rand() < 0.4 ? 2 : 3).sort((a, b) => a - b)
       for (const day of days) {
         const hour = HOURS[Math.floor(rand() * HOURS.length)]!
-        const startedAt = weekMonday + day * DAY + hour * 3_600_000 + Math.floor(rand() * 4) * 15 * 60_000
+        const startedAt = weekMonday + day * DAY + hour * 3_600_000 + Math.floor(rand() * 4) * 15 * 60_000 + offsetMs
         if (startedAt > now) continue
         const offDay = rand() < 0.12
         const sessionPeak = cfg.targetDeg - gap + gain * week + noise(2.5) - (offDay ? between(4, 9) : 0)

@@ -1,6 +1,7 @@
-import { EXERCISE_IDS, summarizeSets } from '@arc/dependencies'
+import { summarizeSets } from './summary.ts'
+import { EXERCISE_IDS } from './types.ts'
 import { describe, expect, it } from 'vitest'
-import { generateDemoSessions } from './demoData.ts'
+import { generateDemoSessions } from './demo.ts'
 
 const NOW = Date.UTC(2026, 9, 10, 21) // Saturday 10 Oct 2026, 21:00 UTC
 const WEEK = 7 * 24 * 3600 * 1000
@@ -53,5 +54,19 @@ describe('generateDemoSessions', () => {
   it('varies the time of day', () => {
     const hours = new Set(generateDemoSessions('p1', NOW, 11).map((s) => new Date(s.startedAt).getUTCHours()))
     expect(hours.size).toBeGreaterThan(3)
+  })
+
+  it("trains at local hours on local Monday to Saturday for the viewer's timezone offset", () => {
+    for (const offset of [240, 0, -540]) {
+      // Date#getTimezoneOffset: New York in October, UTC, Tokyo.
+      const sessions = generateDemoSessions('p1', NOW, 11, offset)
+      expect(sessions.every((s) => s.startedAt <= NOW)).toBe(true)
+      for (const s of sessions) {
+        const local = new Date(s.startedAt - offset * 60_000)
+        expect(local.getUTCHours()).toBeGreaterThanOrEqual(7)
+        expect(local.getUTCHours()).toBeLessThanOrEqual(20)
+        expect(local.getUTCDay()).not.toBe(0)
+      }
+    }
   })
 })

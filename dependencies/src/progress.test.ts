@@ -1,4 +1,4 @@
-import type { SessionRecord } from '@arc/dependencies'
+import type { SessionRecord } from './engine/types.ts'
 import { describe, expect, it } from 'vitest'
 import { buildProgress, weekStartIso } from './progress.ts'
 

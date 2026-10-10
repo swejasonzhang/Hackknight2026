@@ -1,6 +1,7 @@
 import { Link, Outlet, useLocation } from 'react-router-dom'
 import { APP_NAME } from '../brand'
 import { Logo } from '../components/icons'
+import { MaskLines } from '../components/motion'
 import { Lamp } from '../components/ui'
 
 const STEPS = ['Account', 'Profile', 'Plan']
@@ -47,7 +48,7 @@ export function AuthLayout() {
                 )
               })}
             </ol>
-            <h1 className="t-display-sm text-white sm:text-right">{title}</h1>
+            <MaskLines key={title} as="h1" trigger="mount" className="t-display-sm text-white sm:text-right" lines={[title]} />
           </div>
         </div>
       </header>

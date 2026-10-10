@@ -1,22 +1,26 @@
-import { EXERCISE_LIST } from '@arc/dependencies'
+import { EXERCISE_LIST, generateDemoSessions } from '@arc/dependencies'
 import * as Accordion from '@radix-ui/react-accordion'
+import { motion, useReducedMotion, useScroll, useSpring } from 'motion/react'
+import { useMemo } from 'react'
 import { Link } from 'react-router-dom'
 import { APP_NAME, SITE_URL } from '../brand'
 import { Logo } from '../components/icons'
+import { DemoBoard } from '../components/landing/DemoBoard'
 import { LiveJoint } from '../components/landing/LiveJoint'
-import { DEMO_SESSIONS, ReadoutChart } from '../components/landing/ReadoutChart'
+import { Sparkline } from '../components/landing/Sparkline'
 import { useScrollSpy } from '../components/landing/useScrollSpy'
-import { Item, Page, Reveal } from '../components/motion'
-import { Strip, Tag } from '../components/ui'
+import { ease, Item, MaskLines, Page, parentVariants, Reveal, riseVariants, RuleDraw } from '../components/motion'
+import { Strip } from '../components/ui'
 
 /*
- * The landing page as a datasheet: a sticky title block that is an index, beside a ruled
- * readout column. The specimen stage (the 3D elbow on a blueprint grid) is the photograph;
- * every section after it is a ruled strip of text, one navy band or one editorial chart.
+ * The landing page as a datasheet: a sticky title block whose index is a measuring scale with
+ * five evenly spaced stations, beside a ruled readout column. The specimen stage (a 3D arm on a
+ * blueprint grid, tracked at shoulder, elbow and wrist) is the photograph; every section after it
+ * rises into place as it arrives, and the readouts strip is a live board of the app's own charts.
  */
 
 const SECTIONS = [
-  { id: 'joint', index: '01', label: 'Joint' },
+  { id: 'joint', index: '01', label: 'Live arm' },
   { id: 'method', index: '02', label: 'Method' },
   { id: 'readouts', index: '03', label: 'Readouts' },
   { id: 'household', index: '04', label: 'Household' },
@@ -37,7 +41,7 @@ const SPEC: [string, string[]][] = [
 
 const METHOD = [
   { title: 'Create the household account', text: 'One account for everyone at home. Add a profile for each person who exercises and set a goal angle per movement.' },
-  { title: 'Exercise on camera', text: 'The camera app on a laptop measures every rep like a goniometer, counts the set and files it to the right profile.' },
+  { title: 'Exercise on camera', text: 'The camera app on a laptop tracks shoulder, elbow and wrist, measures every rep like a goniometer and files the set to the right profile.' },
   { title: 'Read the trend', text: 'Arc draws best rep, session mean and the goal on one line, so progress is a number you can watch.' },
 ]
 
@@ -58,6 +62,40 @@ const FAQ = [
 const FINAL = ['Every rep in degrees, not points', 'Three movements, left and right', 'A goal rule on every chart', 'A nudge when range fades late in a set', 'Profiles for everyone at home', 'Private by default']
 
 const pad = (n: number) => String(n).padStart(2, '0')
+
+/** The index as a measuring scale: five stations spaced evenly from top to bottom, a cobalt fill that follows the scroll. */
+function Scale({ active }: { active: string | null }) {
+  const reduce = useReducedMotion()
+  const { scrollYProgress } = useScroll()
+  const smooth = useSpring(scrollYProgress, { stiffness: 140, damping: 26, mass: 0.3 })
+  const activeIndex = SECTIONS.findIndex((s) => s.id === active)
+  return (
+    <nav aria-label="Sections" className="relative my-10 hidden flex-1 lg:flex">
+      <span aria-hidden="true" className="absolute top-1 bottom-1 left-[3.5px] w-px bg-rule-strong" />
+      <motion.span aria-hidden="true" className="absolute top-1 bottom-1 left-[2.5px] w-[3px] origin-top bg-cobalt" style={{ scaleY: reduce ? scrollYProgress : smooth }} />
+      <ol className="relative flex flex-1 flex-col justify-between">
+        {SECTIONS.map((s, i) => {
+          const passed = i <= activeIndex
+          const current = s.id === active
+          return (
+            <li key={s.id}>
+              <a href={`#${s.id}`} aria-current={current ? 'true' : undefined} className="group flex items-center gap-4 py-1 no-underline hover:no-underline">
+                <motion.span
+                  aria-hidden="true"
+                  className={`relative z-10 block h-2 w-2 flex-none border ${passed ? 'border-cobalt bg-cobalt' : 'border-rule-strong bg-paper'}`}
+                  animate={{ scale: current ? 1.5 : 1 }}
+                  transition={{ duration: 0.24, ease }}
+                />
+                <span className="t-meta text-cobalt">{s.index}</span>
+                <span className={`t-label transition-colors ${current ? 'text-navy' : 'text-muted group-hover:text-navy'}`}>{s.label}</span>
+              </a>
+            </li>
+          )
+        })}
+      </ol>
+    </nav>
+  )
+}
 
 function TitleBlock({ active }: { active: string | null }) {
   return (
@@ -80,23 +118,23 @@ function TitleBlock({ active }: { active: string | null }) {
         </div>
       </div>
 
-      <nav aria-label="Sections" className="hidden sm:block lg:mt-10">
-        <ol className="flex flex-wrap gap-x-2 px-4 pb-3 sm:px-6 lg:block lg:p-0">
+      {/* Tablet: the same five stations as equal columns. */}
+      <nav aria-label="Sections" className="hidden border-t border-rule sm:block lg:hidden">
+        <ol className="grid grid-cols-5">
           {SECTIONS.map((s) => (
-            <li key={s.id}>
-              <a href={`#${s.id}`} className="index-link" aria-current={active === s.id ? 'true' : undefined}>
+            <li key={s.id} className="border-r border-rule last:border-r-0">
+              <a href={`#${s.id}`} aria-current={active === s.id ? 'true' : undefined} className="index-link justify-center border-l-0 py-3 aria-[current=true]:shadow-[inset_0_-2px_0_var(--cobalt)]">
                 <span className="text-cobalt">{s.index}</span>
                 {s.label}
               </a>
             </li>
           ))}
         </ol>
-        <div className="ruler h-3 lg:hidden" aria-hidden="true" />
       </nav>
 
-      <div className="ruler-v mt-8 hidden min-h-10 flex-1 lg:block" aria-hidden="true" />
+      <Scale active={active} />
 
-      <div className="mt-8 hidden flex-col gap-2 lg:flex">
+      <div className="hidden flex-col gap-2 lg:flex">
         <Link to="/signup" className="btn btn-block btn-wide">
           Create account
         </Link>
@@ -110,6 +148,15 @@ function TitleBlock({ active }: { active: string | null }) {
 
 export function LandingPage() {
   const active = useScrollSpy(SECTION_IDS)
+  const reduce = useReducedMotion()
+  const sparkline = useMemo(
+    () =>
+      generateDemoSessions('demo', Date.now(), 2026, new Date().getTimezoneOffset())
+        .filter((s) => s.exercise === 'elbow_flexion')
+        .map((s) => s.summary.bestPeakDeg),
+    [],
+  )
+  const rise = (delay: number) => ({ initial: reduce ? false : { opacity: 0, y: 22 }, animate: { opacity: 1, y: 0 }, transition: { duration: 0.6, ease, delay } })
 
   return (
     <Page className="min-h-screen bg-vellum text-ink">
@@ -117,24 +164,21 @@ export function LandingPage() {
         <TitleBlock active={active} />
 
         <main className="min-w-0 max-w-[1280px] px-4 pb-10 sm:px-6 lg:px-8">
-          {/* ---- 01 JOINT: eyebrow, display headline, the specimen stage and its spec ---- */}
+          {/* ---- 01 LIVE ARM: eyebrow, display headline, the specimen stage and its spec ---- */}
           <section id="joint" className="pt-5 sm:pt-6 lg:pt-8" aria-labelledby="headline">
-            <div className="flex items-baseline justify-between gap-4">
+            <motion.div {...rise(0)} className="flex items-baseline justify-between gap-4">
               <span className="t-meta text-ink-2">Range of motion, read out</span>
               <span className="t-meta hidden sm:inline">
                 {HOST} · V 01
               </span>
-            </div>
-            <h1 id="headline" className="t-display mt-5 sm:mt-8">
-              <span className="block">Every rep,</span>
-              <span className="block">in degrees.</span>
-            </h1>
-            <div className="rule-strong mt-6 sm:mt-10" />
+            </motion.div>
+            <MaskLines id="headline" as="h1" trigger="mount" delay={0.1} className="t-display mt-5 sm:mt-8" lines={['Every rep,', 'in degrees.']} />
+            <motion.div aria-hidden="true" className="mt-6 h-px origin-left bg-rule-strong sm:mt-10" initial={reduce ? false : { scaleX: 0 }} animate={{ scaleX: 1 }} transition={{ duration: 0.9, ease, delay: 0.35 }} />
 
             <div className="mt-6 grid gap-8 lg:grid-cols-12 lg:gap-8">
-              <div className="min-w-0 lg:col-span-7">
+              <motion.div {...rise(0.45)} className="min-w-0 lg:col-span-7">
                 <LiveJoint />
-                <p className="t-lead mt-6">A camera app measures every rep like a goniometer. Arc shows the trend, so progress is a number you can watch, not a feeling you have to trust.</p>
+                <p className="t-lead mt-6">A camera app tracks your shoulder, elbow and wrist and measures every rep like a goniometer. Arc shows the trend, so progress is a number you can watch, not a feeling you have to trust.</p>
                 <div className="mt-6 flex flex-col gap-2 sm:hidden">
                   <Link to="/signup" className="btn btn-block btn-lg btn-wide">
                     Create account
@@ -143,15 +187,15 @@ export function LandingPage() {
                     Log in
                   </Link>
                 </div>
-              </div>
+              </motion.div>
 
               <aside className="min-w-0 lg:col-span-5" aria-labelledby="spec-title">
-                <h2 id="spec-title" className="t-label pb-3 text-navy">
+                <motion.h2 {...rise(0.55)} id="spec-title" className="t-label pb-3 text-navy">
                   Spec
-                </h2>
-                <dl className="datasheet">
+                </motion.h2>
+                <motion.dl className="datasheet" variants={{ hidden: {}, show: { transition: { staggerChildren: 0.08, delayChildren: 0.65 } } }} initial={reduce ? 'show' : 'hidden'} animate="show">
                   {SPEC.map(([key, values]) => (
-                    <div key={key} className="grid grid-cols-[104px_minmax(0,1fr)] gap-4 border-b border-rule py-3 sm:grid-cols-[128px_minmax(0,1fr)]">
+                    <motion.div key={key} variants={riseVariants} className="grid grid-cols-[104px_minmax(0,1fr)] gap-4 border-b border-rule py-3 sm:grid-cols-[128px_minmax(0,1fr)]">
                       <dt className="t-label pt-0.5">{key}</dt>
                       <dd className="t-mono m-0 text-ink">
                         {values.map((v) => (
@@ -160,93 +204,99 @@ export function LandingPage() {
                           </span>
                         ))}
                       </dd>
-                    </div>
+                    </motion.div>
                   ))}
-                </dl>
+                </motion.dl>
               </aside>
             </div>
           </section>
 
-          {/* ---- 02 METHOD: the column's one navy band, three steps on a ruler ---- */}
-          <section id="method" className="on-navy mt-12 bg-navy [--rule-strong:rgb(255_255_255/0.55)] sm:mt-16" aria-labelledby="method-title">
-            <div className="px-5 py-10 sm:px-8 sm:py-12">
-              <header className="strip-head">
+          {/* ---- 02 METHOD: the navy band, three steps arriving in sequence ---- */}
+          <section id="method" className="on-navy mt-12 scroll-mt-6 bg-navy [--rule-strong:rgb(255_255_255/0.55)] sm:mt-16" aria-labelledby="method-title">
+            <motion.div className="px-5 py-10 sm:px-8 sm:py-12" variants={parentVariants} initial={reduce ? 'show' : 'hidden'} whileInView="show" viewport={{ once: true, margin: '-80px' }}>
+              <motion.header className="strip-head" variants={riseVariants}>
                 <span className="strip-index text-white">02</span>
                 <h2 id="method-title" className="t-strip text-white">
                   Method
                 </h2>
                 <span className="strip-aside t-meta">Three steps · the camera app does the measuring</span>
-              </header>
-              <div className="ruler mt-6 h-3" aria-hidden="true" />
-              <Reveal>
-                <ol className="mt-5 grid gap-8 sm:grid-cols-3 sm:gap-6">
-                  {METHOD.map((step, i) => (
-                    <Item key={step.title}>
-                      <li className="flex gap-4 sm:block">
-                        <span className="t-meta flex-none text-white sm:block">{pad(i + 1)}</span>
-                        <div className="sm:mt-3">
-                          <h3 className="t-strip text-white">{step.title}</h3>
-                          <p className="t-desc mt-2 max-w-[36ch]">{step.text}</p>
+              </motion.header>
+              <RuleDraw className="mt-6" />
+              <ol className="mt-6 grid gap-8 sm:grid-cols-3 sm:gap-6">
+                {METHOD.map((step, i) => (
+                  <motion.li key={step.title} variants={riseVariants} className="flex gap-4 sm:block">
+                    <span className="flex flex-none items-center gap-3 self-start pt-[7px] sm:mb-3 sm:pt-0">
+                      <span className="t-meta text-white">{pad(i + 1)}</span>
+                      <motion.span aria-hidden="true" className="hidden h-px flex-1 origin-left bg-white/40 sm:block sm:w-16" variants={{ hidden: { scaleX: 0 }, show: { scaleX: 1, transition: { duration: 0.6, ease } } }} />
+                    </span>
+                    <div>
+                      <h3 className="t-strip text-white">{step.title}</h3>
+                      <p className="t-desc mt-2 max-w-[36ch]">{step.text}</p>
+                      {i === 2 && (
+                        <div className="mt-4 max-w-[260px] text-[#8fb0ff]">
+                          <Sparkline values={sparkline} goal={140} className="h-auto w-full" label="A demo trend: best elbow flexion per session over six weeks, rising toward a 140 degree goal" />
+                          <div className="t-meta mt-1 flex justify-between">
+                            <span>Week 1</span>
+                            <span>Week 6</span>
+                          </div>
                         </div>
-                      </li>
-                    </Item>
-                  ))}
-                </ol>
-              </Reveal>
-            </div>
+                      )}
+                    </div>
+                  </motion.li>
+                ))}
+              </ol>
+            </motion.div>
           </section>
 
-          {/* ---- 03 READOUTS: one editorial chart ---- */}
-          <Strip
-            id="readouts"
-            index="03"
-            title="Readouts"
-            className="mt-12 sm:mt-16"
-            aside={
-              <span className="flex items-center gap-3">
-                Elbow flexion · {DEMO_SESSIONS.length} sessions <Tag soft>Demo</Tag>
-              </span>
-            }
-          >
-            <ReadoutChart />
+          {/* ---- 03 READOUTS: the app's own charts on random demo data ---- */}
+          <Strip id="readouts" index="03" title="Readouts" className="mt-12 scroll-mt-6 sm:mt-16" aside="Five views · random demo data">
+            <DemoBoard />
           </Strip>
 
-          {/* ---- 04 HOUSEHOLD: ruled rows of text ---- */}
-          <Strip id="household" index="04" title="Household" aside="One account · a profile each">
-            <ol className="border-t border-rule">
-              {HOUSEHOLD.map((row, i) => (
-                <li key={row.title} className="grid gap-2 border-b border-rule py-5 sm:grid-cols-[220px_minmax(0,1fr)] sm:gap-8">
-                  <div className="flex items-baseline gap-3">
-                    <span className="t-meta text-cobalt">{pad(i + 1)}</span>
-                    <h3 className="t-strip">{row.title}</h3>
-                  </div>
-                  <p className="max-w-[60ch] text-[15px] leading-[1.6] text-ink-2">{row.text}</p>
-                </li>
-              ))}
-            </ol>
+          {/* ---- 04 HOUSEHOLD: ruled rows that slide in ---- */}
+          <Strip id="household" index="04" title="Household" className="scroll-mt-6" aside="One account · a profile each">
+            <Reveal>
+              <ol className="border-t border-rule">
+                {HOUSEHOLD.map((row, i) => (
+                  <Item key={row.title}>
+                    <li className="grid gap-2 border-b border-rule py-5 sm:grid-cols-[220px_minmax(0,1fr)] sm:gap-8">
+                      <div className="flex items-baseline gap-3">
+                        <span className="t-meta text-cobalt">{pad(i + 1)}</span>
+                        <h3 className="t-strip">{row.title}</h3>
+                      </div>
+                      <p className="max-w-[60ch] text-[15px] leading-[1.6] text-ink-2">{row.text}</p>
+                    </li>
+                  </Item>
+                ))}
+              </ol>
+            </Reveal>
           </Strip>
 
           {/* ---- 05 FAQ: the accordion as hairline rows ---- */}
-          <Strip id="faq" index="05" title="FAQ" aside="Short answers · no fine print">
-            <Accordion.Root type="single" collapsible defaultValue={FAQ[0]!.q} className="border-t border-rule">
-              {FAQ.map(({ q, a }, i) => (
-                <Accordion.Item key={q} value={q} className="border-b border-rule">
-                  <Accordion.Header className="m-0">
-                    <Accordion.Trigger className="group flex w-full cursor-pointer items-baseline gap-4 py-4 text-left sm:gap-6">
-                      <span className="t-meta w-9 flex-none text-cobalt">Q {pad(i + 1)}</span>
-                      <span className="min-w-0 flex-1 font-sans text-[16px] font-medium text-ink">{q}</span>
-                      <span className="w-4 flex-none text-center font-mono text-[18px] leading-none text-navy" aria-hidden="true">
-                        <span className="group-data-[state=open]:hidden">+</span>
-                        <span className="hidden group-data-[state=open]:inline">−</span>
-                      </span>
-                    </Accordion.Trigger>
-                  </Accordion.Header>
-                  <Accordion.Content className="overflow-hidden">
-                    <p className="max-w-[64ch] pb-5 pl-[52px] text-[15px] leading-[1.6] text-ink-2 sm:pl-[60px]">{a}</p>
-                  </Accordion.Content>
-                </Accordion.Item>
-              ))}
-            </Accordion.Root>
+          <Strip id="faq" index="05" title="FAQ" className="scroll-mt-6" aside="Short answers · no fine print">
+            <Reveal>
+              <Accordion.Root type="single" collapsible defaultValue={FAQ[0]!.q} className="border-t border-rule">
+                {FAQ.map(({ q, a }, i) => (
+                  <Item key={q}>
+                    <Accordion.Item value={q} className="border-b border-rule">
+                      <Accordion.Header className="m-0">
+                        <Accordion.Trigger className="group flex w-full cursor-pointer items-baseline gap-4 py-4 text-left sm:gap-6">
+                          <span className="t-meta w-9 flex-none text-cobalt">Q {pad(i + 1)}</span>
+                          <span className="min-w-0 flex-1 font-sans text-[16px] font-medium text-ink transition-colors group-hover:text-cobalt">{q}</span>
+                          <span className="w-4 flex-none text-center font-mono text-[18px] leading-none text-navy transition-transform duration-200 group-data-[state=open]:rotate-180" aria-hidden="true">
+                            <span className="group-data-[state=open]:hidden">+</span>
+                            <span className="hidden group-data-[state=open]:inline">−</span>
+                          </span>
+                        </Accordion.Trigger>
+                      </Accordion.Header>
+                      <Accordion.Content className="faq-content overflow-hidden">
+                        <p className="max-w-[64ch] pb-5 pl-[52px] text-[15px] leading-[1.6] text-ink-2 sm:pl-[60px]">{a}</p>
+                      </Accordion.Content>
+                    </Accordion.Item>
+                  </Item>
+                ))}
+              </Accordion.Root>
+            </Reveal>
           </Strip>
 
           {/* ---- Foot band ---- */}
@@ -254,26 +304,32 @@ export function LandingPage() {
             <div className="grid gap-10 px-5 py-12 sm:px-8 sm:py-16 lg:grid-cols-12">
               <div className="lg:col-span-7">
                 <span className="t-meta">Week 01 of many</span>
-                <h2 id="foot-title" className="t-display-sm mt-4 text-white">
-                  Start the first week.
-                </h2>
-                <div className="mt-8 flex flex-wrap gap-3">
-                  <Link to="/signup" className="btn btn-block btn-lg">
-                    Create account
-                  </Link>
-                  <Link to="/login" className="btn btn-lg">
-                    Log in
-                  </Link>
-                </div>
+                <MaskLines id="foot-title" className="t-display-sm mt-4 text-white" lines={['Start the', 'first week.']} />
+                <Reveal className="mt-8 flex flex-wrap gap-3">
+                  <Item>
+                    <Link to="/signup" className="btn btn-block btn-lg">
+                      Create account
+                    </Link>
+                  </Item>
+                  <Item>
+                    <Link to="/login" className="btn btn-lg">
+                      Log in
+                    </Link>
+                  </Item>
+                </Reveal>
               </div>
-              <ul className="t-mono border-t border-white/20 text-white lg:col-span-5">
-                {FINAL.map((t, i) => (
-                  <li key={t} className="flex gap-4 border-b border-white/20 py-3">
-                    <span className="text-rail-muted">{pad(i + 1)}</span>
-                    {t}
-                  </li>
-                ))}
-              </ul>
+              <Reveal className="lg:col-span-5">
+                <ul className="t-mono border-t border-white/20 text-white">
+                  {FINAL.map((t, i) => (
+                    <Item key={t}>
+                      <li className="flex gap-4 border-b border-white/20 py-3">
+                        <span className="text-rail-muted">{pad(i + 1)}</span>
+                        {t}
+                      </li>
+                    </Item>
+                  ))}
+                </ul>
+              </Reveal>
             </div>
           </section>
 

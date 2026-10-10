@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { api } from '../api/client'
 import { IconActivity, IconCalendar, IconFlame, IconTarget } from '../components/icons'
-import { AnimatedNumber, Page } from '../components/motion'
+import { AnimatedNumber, Item, Page, Stagger } from '../components/motion'
 import { PlanEditor } from '../components/PlanEditor'
 import { ProfilePicker } from '../components/ProfilePicker'
 import { ProgressCharts } from '../components/ProgressCharts'
@@ -111,9 +111,11 @@ export function DashboardPage() {
       <section aria-label="Measurement panel" className="panel self-start p-4 sm:p-5 lg:sticky lg:top-8 lg:col-span-5 lg:max-h-[calc(100vh-4rem)] lg:overflow-y-auto">
         <div className="flex items-center justify-between gap-3 border-b border-rule pb-4">
           <ProfilePicker />
-          <Link to="/profiles" className="btn btn-ghost flex-none">
-            Manage →
-          </Link>
+          {!noProfiles && (
+            <Link to="/profiles" className="btn btn-ghost flex-none">
+              Manage →
+            </Link>
+          )}
         </div>
 
         <div className="mt-4">
@@ -160,18 +162,26 @@ export function DashboardPage() {
           </div>
         </div>
 
-        <div>
-          <StatTile
-            label="Best range"
-            icon={<IconTarget />}
-            value={bestAll != null ? <AnimatedNumber value={bestAll} suffix="°" /> : none}
-            hint={bestAll == null ? 'no sessions yet' : goal == null ? 'no goal set' : bestAll >= goal ? `goal of ${deg(goal)} reached` : `${deg(goal - bestAll)} short of the ${deg(goal)} goal`}
-            tone={bestAll == null ? 'default' : goal != null && bestAll >= goal ? 'good' : 'primary'}
-          />
-          <StatTile label="Latest session" icon={<IconActivity />} value={latest ? <AnimatedNumber value={latest.bestPeakDeg} suffix="°" /> : none} hint={latest ? `${formatDate(latest.date)} · ${latest.totalReps} reps` : 'waiting for the camera app'} tone={latest ? 'primary' : 'default'} />
-          <StatTile label="Sessions this week" icon={<IconCalendar />} value={data ? <AnimatedNumber value={thisWeek} /> : none} hint={data ? `${data.sessions.length} total for ${cfg.name.toLowerCase()}` : 'no sessions yet'} tone={thisWeek >= 3 ? 'good' : 'default'} />
-          <StatTile label="Fatigue proxy" icon={<IconFlame />} value={latest ? <AnimatedNumber value={latest.fatigueIndex} decimals={2} /> : none} hint={fatigue ? fatigue.text : 'needs four reps in a set'} tone={fatigue ? fatigue.tone : 'default'} />
-        </div>
+        <Stagger>
+          <Item>
+            <StatTile
+              label="Best range"
+              icon={<IconTarget />}
+              value={bestAll != null ? <AnimatedNumber value={bestAll} suffix="°" /> : none}
+              hint={bestAll == null ? 'no sessions yet' : goal == null ? 'no goal set' : bestAll >= goal ? `goal of ${deg(goal)} reached` : `${deg(goal - bestAll)} short of the ${deg(goal)} goal`}
+              tone={bestAll == null ? 'default' : goal != null && bestAll >= goal ? 'good' : 'primary'}
+            />
+          </Item>
+          <Item>
+            <StatTile label="Latest session" icon={<IconActivity />} value={latest ? <AnimatedNumber value={latest.bestPeakDeg} suffix="°" /> : none} hint={latest ? `${formatDate(latest.date)} · ${latest.totalReps} reps` : 'waiting for the camera app'} tone={latest ? 'primary' : 'default'} />
+          </Item>
+          <Item>
+            <StatTile label="Sessions this week" icon={<IconCalendar />} value={data ? <AnimatedNumber value={thisWeek} /> : none} hint={data ? `${data.sessions.length} total for ${cfg.name.toLowerCase()}` : 'no sessions yet'} tone={thisWeek >= 3 ? 'good' : 'default'} />
+          </Item>
+          <Item>
+            <StatTile label="Fatigue proxy" icon={<IconFlame />} value={latest ? <AnimatedNumber value={latest.fatigueIndex} decimals={2} /> : none} hint={fatigue ? fatigue.text : 'needs four reps in a set'} tone={fatigue ? fatigue.tone : 'default'} />
+          </Item>
+        </Stagger>
 
         {plan && (
           <a href="#plan" className="t-meta mt-4 flex items-center justify-between gap-3 text-ink-2 hover:no-underline">

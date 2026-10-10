@@ -16,6 +16,11 @@ describe('Segmented', () => {
     fireEvent.click(screen.getByRole('tab', { name: 'Beta' }))
     expect(onChange).toHaveBeenCalledWith('b')
   })
+
+  it('keeps the full label as the accessible name when a short label is shown on phones', () => {
+    render(<Segmented options={[{ value: 'reps', label: 'Rep by rep', short: 'Reps' }]} value="reps" onChange={() => {}} label="Chart" />)
+    expect(screen.getByRole('tab', { name: 'Rep by rep' })).toBeInTheDocument()
+  })
 })
 
 describe('StatTile and EmptyState', () => {

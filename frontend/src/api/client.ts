@@ -90,6 +90,6 @@ export const api = {
   progress: (profileId: string, exercise: ExerciseId) =>
     request<ProgressDto>(`/api/profiles/${profileId}/progress?exercise=${exercise}`),
   dev: {
-    seed: () => request<SeedResult>('/api/dev/seed', { method: 'POST' }),
+    seed: () => request<SeedResult>('/api/dev/seed', { method: 'POST', body: { tzOffsetMinutes: new Date().getTimezoneOffset() } }),
   },
 }

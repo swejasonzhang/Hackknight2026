@@ -17,7 +17,7 @@ if (!user) {
   await db.stop()
   process.exit(1)
 }
-const result = await seedDemoData(user._id)
+const result = await seedDemoData(user._id, { tzOffsetMinutes: new Date().getTimezoneOffset() })
 console.log(
   result.created
     ? `Seeded ${result.sessions} demo sessions for ${email} (profile ${result.profileId}) into ${db.label}`

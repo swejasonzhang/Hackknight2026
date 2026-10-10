@@ -1,8 +1,9 @@
+import { motion, useReducedMotion } from 'motion/react'
 import { useId, useState, type FormEvent } from 'react'
 import { Link } from 'react-router-dom'
 import { api } from '../api/client'
 import { IconPlus } from '../components/icons'
-import { Page } from '../components/motion'
+import { ease, Page } from '../components/motion'
 import { Alert, Avatar, EmptyState, Lamp, PageHeader, Skeleton } from '../components/ui'
 import { formatDate } from '../format'
 import { useProfiles } from '../hooks/useProfiles'
@@ -12,7 +13,7 @@ import { useProfiles } from '../hooks/useProfiles'
 const ROW = 'grid grid-cols-[44px_minmax(0,1fr)] gap-x-4 border-b border-rule sm:table-row sm:border-b-0'
 const EDGE = 'border-b-0 sm:border-b' // phone: the row carries the rule; sm+: the ledger's own cell rule
 const CELL = `block ${EDGE} sm:table-cell`
-const STACKED = `${CELL} col-start-2 border-t border-rule sm:border-t-0`
+const STACKED = `${CELL} col-start-2 pt-1 pb-3 sm:pt-[12px] sm:pb-[12px]`
 const NAME = `flex min-h-[68px] items-center ${EDGE} sm:table-cell sm:min-h-0`
 
 /**
@@ -27,6 +28,7 @@ export function ProfilesPage() {
   const [busy, setBusy] = useState(false)
   const [message, setMessage] = useState<{ text: string; tone: 'good' | 'bad' } | null>(null)
   const formId = useId()
+  const reduce = useReducedMotion()
   const ids = { name: `${formId}-name`, email: `${formId}-email` }
 
   const run = async (work: () => Promise<string>) => {
@@ -128,10 +130,16 @@ export function ProfilesPage() {
             </tr>
           )}
 
-          {profiles.map((p) => {
+          {profiles.map((p, index) => {
             const isSelected = p.id === selectedId
             return (
-              <tr key={p.id} className={`${ROW} ${isSelected ? 'shadow-[inset_3px_0_0_var(--cobalt)] sm:shadow-none' : ''}`}>
+              <motion.tr
+                key={p.id}
+                className={`${ROW} ${isSelected ? 'shadow-[inset_3px_0_0_var(--cobalt)] sm:shadow-none' : ''}`}
+                initial={reduce ? false : { opacity: 0, x: -16 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ duration: 0.45, ease, delay: 0.06 * index }}
+              >
                 <td className={`${CELL} pl-3 ${isSelected ? 'sm:shadow-[inset_3px_0_0_var(--cobalt)]' : ''}`}>
                   <Avatar name={p.name} size={44} />
                 </td>
@@ -169,7 +177,7 @@ export function ProfilesPage() {
                     </button>
                   </div>
                 </td>
-              </tr>
+              </motion.tr>
             )
           })}
 

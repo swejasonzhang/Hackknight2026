@@ -18,7 +18,7 @@ const AREA = {
   back: 'lg:col-span-4 lg:col-start-1 lg:row-start-1 lg:pb-5',
   title: 'border-b border-rule-strong pb-5 lg:col-span-8 lg:col-start-5 lg:row-start-1',
   numeral: 'lg:col-span-4 lg:col-start-5 lg:row-start-2 lg:pt-6 lg:pb-8',
-  stage: 'lg:col-span-4 lg:col-start-1 lg:row-span-2 lg:row-start-2 lg:sticky lg:top-6 lg:self-start',
+  stage: 'lg:col-span-4 lg:col-start-1 lg:row-span-3 lg:row-start-1 lg:sticky lg:top-6 lg:self-start',
   readouts: 'lg:col-span-4 lg:col-start-9 lg:row-start-2 lg:border-l lg:border-rule lg:pt-6 lg:pb-8 lg:pl-8',
   strips: 'lg:col-span-8 lg:col-start-5 lg:row-start-3',
 }
@@ -152,11 +152,13 @@ export function SessionDetailPage() {
 
   return (
     <Page className={GRID}>
-      <BackLink />
-
-      {/* Report head: timestamp, DEMO tag, the exercise title with the side after a middle dot. */}
+      {/* Report head: the way back, timestamp, DEMO tag, the exercise title with the side after a middle dot. */}
       <header className={AREA.title}>
         <div className="t-meta flex flex-wrap items-center gap-3">
+          <Link to="/dashboard" className="t-label inline-flex items-center gap-2 text-navy hover:text-cobalt">
+            ← Dashboard
+          </Link>
+          <span aria-hidden="true">/</span>
           <span>{formatDateTime(session.startedAt)}</span>
           {session.demo && <Tag soft>Demo</Tag>}
         </div>

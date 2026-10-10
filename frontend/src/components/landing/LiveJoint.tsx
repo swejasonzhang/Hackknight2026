@@ -1,7 +1,7 @@
 import { EXERCISES } from '@arc/dependencies'
 import { animate, motion, useMotionValue, useMotionValueEvent, useReducedMotion, useTransform } from 'motion/react'
 import { useEffect, useLayoutEffect, useMemo, useState } from 'react'
-import { LazyJointScene, SceneBoundary } from '../three/lazy'
+import { LazyArmScene, SceneBoundary } from '../three/lazy'
 import { Lamp } from '../ui'
 import { createRepCycle } from './repCycle'
 
@@ -88,12 +88,11 @@ export function LiveJoint() {
           }
           onError={() => setFailed(true)}
         >
-          <LazyJointScene
-            exercise="elbow_flexion"
+          <LazyArmScene
             angle={angle}
             goalDeg={GOAL}
             className="h-full w-full"
-            label={`A 3D elbow performing elbow flexion reps toward a ${GOAL} degree goal, read out live in degrees`}
+            label={`A 3D arm performing elbow flexion reps toward a ${GOAL} degree goal, its shoulder, elbow and wrist tracked and the angle read out live in degrees`}
             fallback={<Pending onPending={setPending} />}
           />
         </SceneBoundary>
