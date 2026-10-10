@@ -31,6 +31,8 @@ describe('WelcomePage', () => {
     renderPage()
     expect(await screen.findByText(/I'm Arc, your coach/)).toBeInTheDocument()
     expect(onboarding).toHaveBeenCalledWith({ messages: [] })
+    // The logo always leads back to the landing page.
+    expect(screen.getByRole('link', { name: 'Arc home page' })).toHaveAttribute('href', '/')
   })
 
   it('sends each answer with the whole conversation, and shows Arc the next question', async () => {
@@ -138,7 +140,7 @@ describe('WelcomePage', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Send' }))
     const week = await screen.findByRole('region', { name: 'Your week' })
     expect(within(week).getByText(program.summary)).toBeInTheDocument()
-    expect(within(week).getAllByText('Seated knee extension · left · 3 × 8 · 180 s rest')).toHaveLength(3)
+    expect(within(week).getAllByText('Quads · Seated knee extension · left · 3 × 8 · 180 s rest')).toHaveLength(3)
     expect(within(week).getAllByText('Rest')).toHaveLength(4)
     expect(within(week).getByRole('link', { name: /see it on your dashboard/i })).toHaveAttribute('href', '/dashboard')
     expect(within(week).getByRole('link', { name: 'Start recording' })).toHaveAttribute('href', '/record')
@@ -146,5 +148,10 @@ describe('WelcomePage', () => {
     expect(screen.getByText('All done')).toBeInTheDocument()
     expect(setSelectedId).toHaveBeenCalledWith('p9')
     expect(reload).toHaveBeenCalled()
+
+    // The member can change Arc's week right here.
+    fireEvent.click(within(week).getByRole('button', { name: 'Change it' }))
+    expect(within(week).getByRole('button', { name: 'Save my week' })).toBeInTheDocument()
+    expect(within(week).getByRole('textbox', { name: "Monday's title" })).toHaveValue('Seated knee extension')
   })
 })

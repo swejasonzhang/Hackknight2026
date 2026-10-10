@@ -1,4 +1,4 @@
-import { CreateSessionSchema, EXERCISE_IDS, EXERCISES, type SessionPlan } from '@arc/dependencies'
+import { CreateSessionSchema, EXERCISE_IDS, EXERCISES, LM, type SessionPlan } from '@arc/dependencies'
 import { describe, expect, it } from 'vitest'
 import { readJoint } from './angle'
 import { READY_MS, SessionRecorder } from './recorder'
@@ -165,7 +165,7 @@ describe('SessionRecorder voice commands', () => {
 })
 
 describe('every movement, end to end', () => {
-  it('counts the reps of a person working from rest to the goal, read through the camera path', () => {
+  it('counts the reps of a person working from rest to the goal with good form, read through the camera path', () => {
     for (const exercise of EXERCISE_IDS) {
       for (const side of ['right', 'left'] as const) {
         const { targetDeg, minRepMs } = EXERCISES[exercise]
@@ -174,12 +174,71 @@ describe('every movement, end to end', () => {
         const rec = new SessionRecorder({ exercise, side, plan: { sets: 1, reps: 3, restSeconds: 10, targetDeg } })
         const start = performance.now()
         for (let t = 0; t < READY_MS + 900 + 3 * period + 600; t += FRAME) {
-          const reading = readJoint(tracker.detect(null as never, start + t), exercise, side, 16 / 9)
-          rec.feed({ tracked: reading.tracked, metricDeg: reading.metricDeg, tMs: T0 + t })
+          const pose = tracker.detect(null as never, start + t)
+          const reading = readJoint(pose, exercise, side, 16 / 9)
+          // The whole pose too: a person moving as the figure does keeps every movement's form.
+          rec.feed({ tracked: reading.tracked, metricDeg: reading.metricDeg, tMs: T0 + t, pose, aspect: 16 / 9 })
         }
+        expect(rec.view.lastRejected, `${exercise} ${side} form`).toBeNull()
         expect(rec.view.totalReps, `${exercise} ${side}`).toBe(3)
         expect(rec.view.bestDeg, `${exercise} ${side} best`).toBeGreaterThan(EXERCISES[exercise].enterDeg)
       }
     }
   }, 30_000)
+
+  describe('counting only good form', () => {
+    /** A side-on right arm: the upper arm `upperDeg` forward of straight down, the elbow bent `flex` degrees. */
+    function arm(upperDeg: number, flex: number) {
+      const r = (d: number) => (d * Math.PI) / 180
+      const shoulder = [0.5, 0.3]
+      const elbow = [shoulder[0]! + 0.15 * Math.sin(r(upperDeg)), shoulder[1]! + 0.15 * Math.cos(r(upperDeg))]
+      const wrist = [elbow[0]! + 0.13 * Math.sin(r(upperDeg + flex)), elbow[1]! + 0.13 * Math.cos(r(upperDeg + flex))]
+      const pose = Array.from({ length: 33 }, () => ({ x: 0, y: 0, visibility: 0 }))
+      pose[LM.RIGHT_SHOULDER] = { x: shoulder[0]!, y: shoulder[1]!, visibility: 0.99 }
+      pose[LM.RIGHT_ELBOW] = { x: elbow[0]!, y: elbow[1]!, visibility: 0.99 }
+      pose[LM.RIGHT_WRIST] = { x: wrist[0]!, y: wrist[1]!, visibility: 0.99 }
+      pose[LM.RIGHT_HIP] = { x: 0.5, y: 0.6, visibility: 0.99 }
+      return pose
+    }
+    /** One curl rep per 2 s; `swing` swings the upper arm forward as the elbow bends. */
+    function reps(rec: SessionRecorder, from: number, count: number, swing = 0) {
+      let t = from
+      for (; t < from + count * 2000 + 400; t += FRAME) {
+        const flex = curl(t - from)
+        rec.feed({ tracked: true, metricDeg: flex, tMs: t, pose: arm((swing * flex) / 120, flex) })
+      }
+      return t
+    }
+
+    it('counts a rep with the upper arm still, and refuses one that swings it, saying why', () => {
+      const rec = new SessionRecorder({ exercise: 'elbow_flexion', side: 'right', plan: { ...PLAN, reps: 5 } })
+      let t = run(rec, T0, READY_MS + 100, () => 10)
+      t = reps(rec, t, 2)
+      expect(rec.view.repsInSet).toBe(2)
+      expect(rec.view.lastRejected).toBeNull()
+      t = reps(rec, t, 1, 45)
+      expect(rec.view.repsInSet).toBe(2)
+      expect(rec.view.lastRejected?.fault).toBe('upper_arm_moved')
+      expect(rec.view.rejectedInSet).toBe(1)
+      // The next good rep counts, numbered on from the counted ones.
+      t = reps(rec, t, 1)
+      expect(rec.view.repsInSet).toBe(3)
+      expect(rec.view.lastRep?.index).toBe(3)
+      rec.finish(t)
+      const set = rec.toSessionInput('p1')!.sets[0]!
+      expect(set.reps).toHaveLength(3)
+      expect(set.rejected).toEqual([expect.objectContaining({ fault: 'upper_arm_moved' })])
+      expect(CreateSessionSchema.safeParse(rec.toSessionInput('p1')).success).toBe(true)
+    })
+
+    it('refuses a rep too quick to count', () => {
+      const rec = new SessionRecorder({ exercise: 'elbow_flexion', side: 'right', plan: PLAN })
+      let t = run(rec, T0, READY_MS + 100, () => 10)
+      // A whole rep in 400 ms: under the curl's floor.
+      t = run(rec, t, 500, (x) => curl(x, 120, 400))
+      expect(rec.view.repsInSet).toBe(0)
+      expect(rec.view.lastRejected?.fault).toBe('too_fast')
+    })
+  })
 })
+

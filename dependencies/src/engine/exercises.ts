@@ -13,10 +13,12 @@ const inner = (innerDeg: number) => innerDeg
 const bend = (innerDeg: number) => 180 - innerDeg
 
 /**
- * Every movement Arc tracks: the camera app's catalog (computer-vision/movements.py; landmarks
- * and thresholds from there, eased a little where the browser's smoothing needs room) and the
- * seated knee extension. Each cue says how to face the camera so the measured joint stays in the
- * picture plane, where a webcam angle is most accurate. The metric always rises into the rep.
+ * Every movement Arc tracks: the camera app's catalog (computer-vision/movements.py, whose
+ * landmarks these are) and the seated knee extension. The thresholds and goals here are the only
+ * ones: the camera app counts with them too, from computer-vision/arc_catalog.json, which
+ * cameraCatalog.test.ts keeps in step (`npm run catalog -w dependencies` after a change). Each
+ * cue says how to face the camera so the measured joint stays in the picture plane, where a
+ * webcam angle is most accurate. The metric always rises into the rep.
  */
 export const EXERCISES: Record<ExerciseId, ExerciseConfig> = {
   // ---- upper body ----
@@ -36,7 +38,8 @@ export const EXERCISES: Record<ExerciseId, ExerciseConfig> = {
     exitDeg: 40,
     targetDeg: 140,
     restDeg: 0,
-    maxDeg: 180,
+    // An elbow bends to about 150 degrees: the hand meets the shoulder.
+    maxDeg: 150,
     minRepMs: 800,
   },
   tricep_extension: {
@@ -92,7 +95,8 @@ export const EXERCISES: Record<ExerciseId, ExerciseConfig> = {
     exitDeg: 30,
     targetDeg: 90,
     restDeg: 0,
-    maxDeg: 180,
+    // A lateral raise stops just past shoulder height.
+    maxDeg: 105,
     minRepMs: 1000,
   },
   front_raise: {
@@ -106,11 +110,13 @@ export const EXERCISES: Record<ExerciseId, ExerciseConfig> = {
     joints: sided([LM.LEFT_HIP, LM.LEFT_SHOULDER, LM.LEFT_WRIST], [LM.RIGHT_HIP, LM.RIGHT_SHOULDER, LM.RIGHT_WRIST]),
     metricLabel: 'Shoulder flexion',
     metricFromInnerAngle: inner,
-    enterDeg: 120,
+    // Just above shoulder height, as the cue says; the camera app still extends to 135 (backlog D7).
+    enterDeg: 80,
     exitDeg: 30,
-    targetDeg: 135,
+    targetDeg: 95,
     restDeg: 10,
-    maxDeg: 170,
+    // A front raise stops a little above shoulder height.
+    maxDeg: 110,
     minRepMs: 1000,
   },
   chest_press: {
@@ -363,3 +369,16 @@ export function exercisesFor(muscle: MuscleId): { primary: ExerciseConfig[]; sec
 export function sideLabel(exercise: ExerciseId, side: Side): string {
   return EXERCISES[exercise].sided ? side : 'both sides'
 }
+
+/** The goals a movement can take: from where a rep starts counting to the furthest it goes. */
+export function goalRange(exercise: ExerciseId): { min: number; max: number } {
+  const { enterDeg, maxDeg } = EXERCISES[exercise]
+  return { min: enterDeg, max: maxDeg }
+}
+
+/** Why a goal does not suit a movement, or null when it does. */
+export function goalProblem(exercise: ExerciseId, targetDeg: number): string | null {
+  const { min, max } = goalRange(exercise)
+  return targetDeg >= min && targetDeg <= max ? null : `The ${EXERCISES[exercise].name.toLowerCase()} goal must be from ${min} to ${max} degrees.`
+}
+

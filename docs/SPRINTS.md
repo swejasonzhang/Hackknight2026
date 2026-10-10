@@ -16,25 +16,38 @@ The plan changed mid-sprint: instead of waiting on the camera app, the web app l
 
 Delivered: getarc.health live on Render (D1); recording in the browser with MediaPipe, the shared engine counting reps and sets (C1–C3 in the browser, PR #23); the whole 3D body on every page (PRs #18–#21); the Calibre redesign and folded charts (PRs #13–#17); Arc, the coach, with Gemini words, ElevenLabs voice and hands-free commands (PR #25).
 
-## Sprint 2 (2026-10-10, in review): the member's week, every exercise, every session kept
+## Sprint 2 (done, 2026-10-10): the member's week, every exercise, every session kept
 
 **Goal:** from sign-up to a week of varied training, any of the camera app's exercises, nothing lost.
 
-Delivered: account deletion and name/email rules (PR #27); Arc's chat as its own page and the week on a calendar (PR #28); the camera app's fifteen-exercise catalog under four body-area tabs (PR #29, in review); a different body area each training day and skippable questions (PR #30, in review); every set saved to MongoDB as it finishes and the camera app's uploads, C4 (PR #31, in review); the camera app's white skeleton over the browser camera (PR #32, in review).
+Delivered: account deletion and name/email rules (PR #27); Arc's chat as its own page and the week on a calendar (PR #28); the camera app's fifteen-exercise catalog under four body-area tabs (PR #29); a different body area each training day and skippable questions (PR #30); every set saved to MongoDB as it finishes and the camera app's uploads, C4 (PR #31); the camera app's white skeleton over the browser camera (PR #32).
 
-Demo script: sign up → chat with Arc at `/welcome`, skipping one question, and pick an exercise from the catalog → see the week on the dashboard calendar, a different area each day → pick an area and an exercise → **Start recording**: the white skeleton follows the body, reps count, each set saves as it ends and Arc reads it back → the session report, Arc's read, and the day marked done on the calendar.
+## Sprint 3 (done, 2026-10-10): the coach, the body and the week
 
-## Sprint 3: trust and polish
+**Goal:** Arc coaches through the whole recording, the body shows what each movement works, and the member owns their week.
+
+Delivered: Arc always listening and answering, ElevenLabs for every line (G1, PR #33); the anatomical body with muscles in red and yellow and a form guide beside the camera (G2, PR #34); the member's own week, crossed out a movement at a time with Next (G3, PR #35, which also answers the teammates' observed issues); the household leaderboard and the weight held (G4, PR #36); the landing readouts brought up to date (G5, PR #37); an end-to-end check of the whole journey and a clean-up for the demo.
+
+Demo script (the live site, about three minutes):
+
+1. Landing page: the 3D body curling with its biceps lit, then the readouts board (the Muscles and Household views).
+2. **Create account** → `/welcome`: answer Arc with the quick replies (Build muscle, a back movement from the catalog, Every day), skip height and weight; Arc builds the week → **Change it**: add a lower-back movement to today → **Save my week**.
+3. Dashboard: the calendar's today panel lists the day under each muscle group with **Next**; the figure names the muscles it works.
+4. **Next** → `/record`: the form guide on the right, Weight held, the white skeleton on the body; ask Arc "is my form ok" mid-set; let a set finish and hear Arc's read; **Finish and save**.
+5. The report: the movement crossed out, **Next** to the following one, Arc's read of the session.
+6. Profiles → **Load demo data** → the leaderboard by Arc score, then by Weight.
+
+## Sprint 4: trust and polish
 
 **Goal:** the measurement is believable to a judge, and nothing breaks on stage.
 
 | Owner | Stories |
 |---|---|
-| CV + FS | agree one set of rep thresholds between the camera app and the browser (open question in the shared doc) |
-| FS | D3 CSV export, D4 API-down handling, D5 password reset |
-| AI | set `GEMINI_API_KEY` and `ELEVENLABS_API_KEY` on `getarc-api` and rehearse Arc's lines |
+| AI | D8: set `GEMINI_API_KEY` and `ELEVENLABS_API_KEY` on `getarc-api` and rehearse Arc's lines |
+| CV + FS | D7: one set of rep thresholds between the camera app and the browser (done, ADR-0029); CV tries each movement on camera |
+| FS | D6 faster first load, D4 API-down handling; D3 CSV export and D5 password reset if time allows |
 
-## Sprint 4: pitch
+## Sprint 5: pitch
 
 **Goal:** rehearsed 3-minute demo on the live site with demo history loaded.
 

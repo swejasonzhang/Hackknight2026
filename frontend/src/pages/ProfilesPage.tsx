@@ -259,6 +259,15 @@ export function ProfilesPage() {
           Load demo data
         </button>
       </section>
+
+      {count > 0 && (
+        <p className="t-meta mt-6 normal-case">
+          See how everyone here compares on the{' '}
+          <Link to="/leaderboard" className="text-cobalt">
+            leaderboard →
+          </Link>
+        </p>
+      )}
     </Page>
   )
 }

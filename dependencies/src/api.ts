@@ -5,11 +5,13 @@
 import { z } from 'zod'
 import { EmailSchema, NameSchema } from './fields.ts'
 import type { CatalogGroup } from './engine/exercises.ts'
+import { FORM_FAULTS } from './engine/form.ts'
 import type { ProgramDto } from './program.ts'
-import { EXERCISE_IDS, VOICE_COMMANDS, type ExerciseId, type SessionPlan, type SessionRecord, type Side } from './engine/types.ts'
+import { EXERCISE_IDS, MUSCLE_IDS, VOICE_COMMANDS, type ExerciseId, type SessionPlan, type SessionRecord, type Side } from './engine/types.ts'
 
 export const ExerciseIdSchema = z.enum(EXERCISE_IDS)
 export const SideSchema = z.enum(['left', 'right'])
+export const MuscleIdSchema = z.enum(MUSCLE_IDS)
 
 // ---- accounts ----
 
@@ -94,6 +96,8 @@ export const FatigueEstimateSchema = z.object({
   sampleReps: z.number().int().nonnegative(),
 })
 
+export const RejectedRepSchema = z.object({ at: epochMs, fault: z.enum(FORM_FAULTS) })
+
 export const SetRecordSchema = z.object({
   setNumber: z.number().int().min(1),
   reps: z.array(RepRecordSchema),
@@ -101,6 +105,8 @@ export const SetRecordSchema = z.object({
   startedAt: epochMs,
   endedAt: epochMs,
   endedEarly: z.boolean(),
+  /** Reps not counted for their form, and why. */
+  rejected: z.array(RejectedRepSchema).max(200).optional(),
 })
 
 export const SessionPlanSchema = z.object({
@@ -125,6 +131,8 @@ export const CreateSessionSchema = z.object({
   events: z.array(SessionEventSchema).max(500).optional(),
   /** False while the browser saves a recording set by set; absent or true for a finished session. */
   complete: z.boolean().optional(),
+  /** The weight held, in kilograms (0 for bodyweight); absent when not given. */
+  loadKg: z.number().min(0).max(500).optional(),
 }).refine((s) => s.endedAt >= s.startedAt, { message: 'endedAt must not be before startedAt', path: ['endedAt'] })
 export type CreateSessionInput = z.infer<typeof CreateSessionSchema>
 
@@ -141,9 +149,6 @@ export interface ProfileDto {
 }
 
 // ---- Arc, the coach (Gemini for words, ElevenLabs for voice) ----
-
-/** The coach is always called Arc. */
-export const COACH_NAME = 'Arc'
 
 /** What Arc asks about, in order. The page shows a lamp per topic and quick replies for the current one. */
 export const ONBOARDING_TOPICS = ['goals', 'trainingGoal', 'focus', 'side', 'limitations', 'experience', 'days', 'height', 'weight'] as const
@@ -214,6 +219,8 @@ export const SetFeedbackInputSchema = z.object({
   plan: SessionPlanSchema,
   setNumber: z.number().int().min(1),
   reps: z.array(RepRecordSchema).max(100),
+  /** Reps the set did not count for their form, so Arc can say what to change. */
+  rejected: z.array(RejectedRepSchema).max(100).optional(),
 })
 export type SetFeedbackInput = z.infer<typeof SetFeedbackInputSchema>
 

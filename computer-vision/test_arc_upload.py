@@ -64,6 +64,12 @@ class SessionFromExportTest(unittest.TestCase):
         self.assertEqual(session["sets"][0]["reps"][0]["peakDeg"], 172)
         self.assertEqual(session["plan"]["targetDeg"], 175)
 
+    def test_sends_the_weight_held_when_the_plan_has_one(self):
+        export = {"timestamp": 1000.0, "exercises": [{"reps": [{"set": 1, "min_angle": 40.0, "max_angle": 170.0, "duration": 2.0, "rest_time": 0}]}]}
+        weighted = arc_upload.session_from_export(export, {**PLAN, "loadKg": 10}, "p1", 990.0)
+        self.assertEqual(weighted["loadKg"], 10)
+        self.assertNotIn("loadKg", arc_upload.session_from_export(export, PLAN, "p1", 990.0))
+
     def test_nothing_to_send_without_a_rep(self):
         self.assertIsNone(session_from_export(export([]), PLAN, "p1", STARTED))
         self.assertIsNone(session_from_export({"timestamp": STARTED, "exercises": []}, PLAN, "p1", STARTED))

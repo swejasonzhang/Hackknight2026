@@ -1,5 +1,5 @@
 import { EXERCISE_IDS, EXERCISES, prescriptionFor, type ExerciseId, type PlanDto, type ProgramDto, type ProgressDto } from '@arc/dependencies'
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, type CSSProperties } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { api } from '../api/client'
 import { ExercisePicker } from '../components/ExercisePicker'
@@ -10,9 +10,8 @@ import { AnimatedNumber, Item, Page, Stagger } from '../components/motion'
 import { ProfilePicker } from '../components/ProfilePicker'
 import { FatigueChart, PeakChart, RepChart, WeeklyChart } from '../components/ProgressCharts'
 import { LazyJointScene, LazyProgressScene } from '../components/three/lazy'
-import { restFor } from '../components/three/skeleton'
 import { useRepLoop } from '../components/three/useRepLoop'
-import { Alert, EmptyState, Lamp, Skeleton, StatTile, Strip } from '../components/ui'
+import { Alert, EmptyState, Skeleton, StatTile, Strip } from '../components/ui'
 import { deg, fatigueLabel, formatDate, weekStartIso } from '../format'
 import { useStickyTop } from '../components/useStickyTop'
 import { useProfiles } from '../hooks/useProfiles'
@@ -115,11 +114,14 @@ export function DashboardPage() {
   const bestAll = data && data.sessions.length ? Math.max(...data.sessions.map((s) => s.bestPeakDeg)) : null
   const thisWeek = data?.sessionsPerWeek.find((w) => w.weekStart === weekStartIso(Date.now()))?.count ?? 0
   const fatigue = latest ? fatigueLabel(latest.fatigueIndex) : null
-  // The figure works through the whole range, rep after rep: from rest to the latest best and back.
-  // Only this movement's own data drives it; while another movement's data is still on screen, it rests.
+  // The figure always works through the movement, recorded or not: rep after rep from rest to the
+  // goal, the tick on its arc, and back, never past it. The goal is the plan's or the week's, else
+  // the catalog's. The latest session's best (this movement's own data only) shades the range it
+  // covered, up to the goal.
   const fresh = data && data.exercise === exercise ? data : null
+  const target = fresh?.targetDeg ?? prescription.targetDeg
   const freshBest = fresh?.sessions.at(-1)?.bestPeakDeg ?? null
-  const loop = useRepLoop(exercise, freshBest)
+  const loop = useRepLoop(exercise, target)
   const noSignal = !noProfiles && data != null && data.sessions.length === 0
   const firstLoad = (profilesLoading || loading) && !data
 
@@ -134,7 +136,8 @@ export function DashboardPage() {
   return (
     <Page className="grid grid-cols-1 gap-8 lg:grid-cols-12 lg:gap-8">
       {/* ---------- Measurement panel ---------- */}
-      <section ref={panelRef} aria-label="Measurement panel" className="panel min-w-0 self-start p-4 sm:p-5 lg:sticky lg:col-span-5" style={{ top: panelTop }}>
+      {/* The offset only means something where the panel is sticky (lg); a phone keeps it in the flow. */}
+      <section ref={panelRef} aria-label="Measurement panel" className="panel min-w-0 self-start p-4 sm:p-5 lg:sticky lg:top-(--sticky-top) lg:col-span-5" style={{ '--sticky-top': `${panelTop}px` } as CSSProperties}>
         <div className="flex items-center justify-between gap-3 border-b border-rule pb-4">
           <ProfilePicker />
           {!noProfiles && (
@@ -149,37 +152,29 @@ export function DashboardPage() {
         </div>
 
         <div className="stage mt-4 h-[300px] overflow-hidden sm:h-[340px]">
-          {latest ? (
+          {firstLoad ? (
+            <div className="hatch absolute inset-8" aria-hidden="true" />
+          ) : (
             // The figure starts below the two callouts, so a label never covers the head.
             <div className="absolute inset-x-0 top-11 bottom-0">
               <LazyJointScene
                 exercise={exercise}
-                angle={loop ?? restFor(exercise)}
-                rangeDeg={freshBest ?? undefined}
-                goalDeg={fresh ? (goal ?? undefined) : undefined}
+                angle={loop ?? target}
+                rangeDeg={freshBest != null ? Math.min(freshBest, target) : undefined}
+                goalDeg={target}
                 className="h-full w-full"
-                label={`A 3D figure doing ${cfg.name.toLowerCase()} through its whole range, from rest to the latest session's best rep of ${deg(latest.bestPeakDeg)}`}
+                label={`A 3D figure doing ${cfg.name.toLowerCase()} reps from the start position to the ${target} degree goal${latest ? `, the latest session's best of ${deg(latest.bestPeakDeg)} shaded` : ', not recorded yet'}`}
                 fallback={<div className="hatch absolute inset-8" aria-hidden="true" />}
               />
-            </div>
-          ) : firstLoad ? (
-            <div className="hatch absolute inset-8" aria-hidden="true" />
-          ) : (
-            <div className="absolute inset-0 grid place-items-center" aria-hidden="true">
-              <span className="callout relative flex items-center gap-2">
-                <Lamp /> {noProfiles ? 'No profile' : 'No signal'}
-              </span>
             </div>
           )}
           <span className="callout top-3 left-3" aria-hidden="true">
             {cfg.name}
             {latest ? ` · ${formatDate(latest.date)}` : ''}
           </span>
-          {goal != null && (
-            <span className="callout top-3 right-3" aria-hidden="true">
-              Goal {goal}°
-            </span>
-          )}
+          <span className="callout top-3 right-3" aria-hidden="true">
+            Goal {target}°
+          </span>
         </div>
         <MuscleKey exercise={exercise} className="mt-3" />
 

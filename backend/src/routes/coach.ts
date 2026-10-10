@@ -67,7 +67,7 @@ coachRouter.post('/onboarding', limit, async (req, res) => {
   if (turn.done && turn.intake && turn.program) {
     // Arc saves what it learned: on the profile it was given, or on a new one named after the member.
     const profile: ProfileShape = existing
-      ? (await Profile.findByIdAndUpdate(existing._id, { $set: { intake: turn.intake, notes: turn.intake.goals.slice(0, 500) } }, { new: true }).lean<ProfileShape>())!
+      ? (await Profile.findByIdAndUpdate(existing._id, { $set: { intake: turn.intake, notes: turn.intake.goals.slice(0, 500) } }, { returnDocument: 'after' }).lean<ProfileShape>())!
       : (await Profile.create({ ownerId: userId, name, notes: turn.intake.goals.slice(0, 500), intake: turn.intake, createdAt: now })).toObject()
     // The week, and the active plan Record starts from: the week's first movement.
     await Program.updateMany({ profileId: profile._id, active: true }, { $set: { active: false } })
@@ -85,7 +85,7 @@ coachRouter.post('/sets', limit, async (req, res) => {
   const input = validate(SetFeedbackInputSchema, req.body)
   const profile = await requireProfile(input.profileId, { kind: 'user', userId })
   const name = await memberName(userId)
-  const { text, offline } = await setFeedback({ name, exercise: input.exercise, side: input.side, plan: input.plan, setNumber: input.setNumber, reps: input.reps, intake: profile.intake })
+  const { text, offline } = await setFeedback({ name, exercise: input.exercise, side: input.side, plan: input.plan, setNumber: input.setNumber, reps: input.reps, ...(input.rejected ? { rejected: input.rejected } : {}), intake: profile.intake })
   const message = await CoachMessage.create({ ownerId: userId, profileId: profile._id, kind: 'set', role: 'arc', text, offline, createdAt: Date.now() })
   res.json(toCoachMessageDto(message))
 })

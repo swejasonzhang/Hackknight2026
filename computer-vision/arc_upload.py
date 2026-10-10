@@ -16,43 +16,13 @@ import urllib.request
 from typing import Any, Callable
 from urllib.parse import urlparse
 
-# How each Arc exercise turns the joint angle into its number (dependencies/src/engine/exercises.ts):
-# "bend" movements count 180 minus the smallest angle of the rep, "inner" ones the largest angle.
-METRIC = {
-    "elbow_flexion": "bend",
-    "tricep_extension": "inner",
-    "shoulder_press": "inner",
-    "shoulder_abduction": "inner",
-    "front_raise": "inner",
-    "chest_press": "inner",
-    "pec_fly": "bend",
-    "lat_pulldown": "bend",
-    "bent_over_row": "bend",
-    "deadlift": "inner",
-    "squat": "bend",
-    "lunge": "bend",
-    "seated_knee_extension": "inner",
-    "crunch": "bend",
-    "ab_twist": "inner",
-}
-# Each exercise's default goal angle, as Arc defines it.
-TARGET_DEG = {
-    "elbow_flexion": 140.0,
-    "tricep_extension": 170.0,
-    "shoulder_press": 170.0,
-    "shoulder_abduction": 90.0,
-    "front_raise": 135.0,
-    "chest_press": 170.0,
-    "pec_fly": 160.0,
-    "lat_pulldown": 120.0,
-    "bent_over_row": 115.0,
-    "deadlift": 175.0,
-    "squat": 100.0,
-    "lunge": 90.0,
-    "seated_knee_extension": 175.0,
-    "crunch": 55.0,
-    "ab_twist": 30.0,
-}
+from arc_routine import ARC_CATALOG
+
+# How each Arc exercise turns the joint angle into its number, and its default goal, from Arc's
+# catalog (arc_catalog.json): "bend" movements count 180 minus the smallest angle of the rep,
+# "inner" ones the largest angle.
+METRIC = {exercise: arc["metric"] for exercise, arc in ARC_CATALOG.items()}
+TARGET_DEG = {exercise: float(arc["targetDeg"]) for exercise, arc in ARC_CATALOG.items()}
 DEFAULT_API_URL = "https://api.getarc.health"
 # Zero fatigue in the body; the server always recomputes it from the reps.
 NO_FATIGUE = {"index": 0, "romDecay": 0, "tempoDrift": 0, "romDropDeg": 0, "sampleReps": 0}
@@ -106,6 +76,7 @@ def session_from_export(export: dict, plan: dict, profile_id: str, started_at: f
         for number, reps in sorted(sets.items())
     ]
     last = set_records[-1]["endedAt"]
+    load = {"loadKg": plan["loadKg"]} if plan.get("loadKg") is not None else {}
     return {
         "profileId": profile_id,
         "exercise": exercise,
@@ -115,6 +86,7 @@ def session_from_export(export: dict, plan: dict, profile_id: str, started_at: f
         "plan": {"sets": plan["sets"], "reps": plan["reps"], "restSeconds": plan["restSeconds"], "targetDeg": TARGET_DEG[exercise]},
         "sets": set_records,
         "complete": True,
+        **load,
     }
 
 

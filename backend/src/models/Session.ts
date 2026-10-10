@@ -1,5 +1,6 @@
 import {
   EXERCISE_IDS,
+  FORM_FAULTS,
   VOICE_COMMANDS,
   type CoachSummary,
   type ExerciseId,
@@ -26,6 +27,7 @@ export interface SessionShape {
   events?: SessionEvent[]
   coachSummary?: CoachSummary | null
   complete?: boolean
+  loadKg?: number
 }
 
 const RepSchema = new Schema(
@@ -58,6 +60,8 @@ const SetSchema = new Schema(
     startedAt: { type: Number, required: true },
     endedAt: { type: Number, required: true },
     endedEarly: { type: Boolean, required: true },
+    /** Reps not counted for their form, and why. */
+    rejected: { type: [new Schema({ at: { type: Number, required: true }, fault: { type: String, enum: [...FORM_FAULTS], required: true } }, { _id: false })], default: undefined },
   },
   { _id: false },
 )
@@ -114,6 +118,8 @@ const SessionSchema = new Schema<SessionShape>({
   coachSummary: { type: CoachSummarySchema },
   /** False while a recording is saved set by set; sessions from before this field are complete. */
   complete: { type: Boolean, default: true },
+  /** The weight held, in kilograms; absent when the member did not give one. */
+  loadKg: { type: Number, min: 0, max: 500 },
 })
 SessionSchema.index({ profileId: 1, startedAt: -1 })
 SessionSchema.index({ profileId: 1, exercise: 1, startedAt: 1 })
@@ -149,6 +155,7 @@ export function toSessionDto(s: SessionShape): SessionDto {
       startedAt: set.startedAt,
       endedAt: set.endedAt,
       endedEarly: set.endedEarly,
+      ...(set.rejected?.length ? { rejected: set.rejected.map((r) => ({ at: r.at, fault: r.fault })) } : {}),
     })),
     summary: {
       totalReps: s.summary.totalReps,
@@ -158,6 +165,7 @@ export function toSessionDto(s: SessionShape): SessionDto {
     },
     demo: s.demo,
     complete: s.complete !== false,
+    ...(s.loadKg != null ? { loadKg: s.loadKg } : {}),
     ...(s.events?.length ? { events: s.events.map((e) => ({ at: e.at, command: e.command })) } : {}),
     ...(s.coachSummary ? { coachSummary: { text: s.coachSummary.text, messageId: s.coachSummary.messageId, createdAt: s.coachSummary.createdAt, offline: s.coachSummary.offline } } : {}),
   }
