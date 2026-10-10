@@ -9,6 +9,7 @@ import { AnimatedNumber, Item, Page, Stagger } from '../components/motion'
 import { ProfilePicker } from '../components/ProfilePicker'
 import { FatigueChart, PeakChart, RepChart, WeeklyChart } from '../components/ProgressCharts'
 import { LazyJointScene, LazyProgressScene } from '../components/three/lazy'
+import { restFor } from '../components/three/skeleton'
 import { useRepLoop } from '../components/three/useRepLoop'
 import { Alert, EmptyState, Lamp, Segmented, Skeleton, StatTile, Strip } from '../components/ui'
 import { deg, fatigueLabel, formatDate, weekStartIso } from '../format'
@@ -84,7 +85,10 @@ export function DashboardPage() {
   const thisWeek = data?.sessionsPerWeek.find((w) => w.weekStart === weekStartIso(Date.now()))?.count ?? 0
   const fatigue = latest ? fatigueLabel(latest.fatigueIndex) : null
   // The figure works through the whole range, rep after rep: from rest to the latest best and back.
-  const loop = useRepLoop(exercise, latest ? latest.bestPeakDeg : null)
+  // Only this movement's own data drives it; while another movement's data is still on screen, it rests.
+  const fresh = data && data.exercise === exercise ? data : null
+  const freshBest = fresh?.sessions.at(-1)?.bestPeakDeg ?? null
+  const loop = useRepLoop(exercise, freshBest)
   const noSignal = !noProfiles && data != null && data.sessions.length === 0
   const firstLoad = (profilesLoading || loading) && !data
 
@@ -119,9 +123,9 @@ export function DashboardPage() {
             <div className="absolute inset-x-0 top-11 bottom-0">
               <LazyJointScene
                 exercise={exercise}
-                angle={loop ?? latest.bestPeakDeg}
-                rangeDeg={latest.bestPeakDeg}
-                goalDeg={goal ?? undefined}
+                angle={loop ?? restFor(exercise)}
+                rangeDeg={freshBest ?? undefined}
+                goalDeg={fresh ? (goal ?? undefined) : undefined}
                 className="h-full w-full"
                 label={`A 3D figure doing ${cfg.name.toLowerCase()} through its whole range, from rest to the latest session's best rep of ${deg(latest.bestPeakDeg)}`}
                 fallback={<div className="hatch absolute inset-8" aria-hidden="true" />}
