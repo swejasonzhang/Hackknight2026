@@ -6,7 +6,7 @@ import { useEffect, useMemo, useRef } from 'react'
 import { BoxGeometry, BufferAttribute, BufferGeometry, CircleGeometry, Color, DoubleSide, Group, Matrix4, MeshBasicMaterial, MeshStandardMaterial, Object3D, Quaternion, SphereGeometry, TorusGeometry, Vector3 } from 'three'
 import { HELPER_YELLOW, TARGET_RED } from './colors'
 import { buildShape, facingFor, muscleLoad, PART_SHAPE, SHAPES, type Built, type ShapeName } from './anatomy'
-import { BONES, FRAMING, restFor, skeletonFor, sweepFor, type BoneName, type Skeleton, type V3 } from './skeleton'
+import { BONES, FRAMING, restFor, skeletonFor, sweepFor, type BoneName, type JointName, type Skeleton, type V3 } from './skeleton'
 
 export interface JointSceneProps {
   exercise: ExerciseId
@@ -196,6 +196,19 @@ function useBinder() {
   return { objects, bind }
 }
 
+/**
+ * Skin over the joints where two parts meet, sized to the limbs there: no seam at a knee or an
+ * elbow, and no notch at the top of the shoulder when the arm rises.
+ */
+const JOINT_FILL: [JointName, number][] = [
+  ['rShoulder', 0.16],
+  ['lShoulder', 0.16],
+  ['rElbow', 0.128],
+  ['lElbow', 0.128],
+  ['rKnee', 0.182],
+  ['lKnee', 0.182],
+]
+
 const ARMS = new Set<BoneName>(['rUpperArm', 'lUpperArm', 'rForearm', 'lForearm', 'rHand', 'lHand'])
 const LEGS = new Set<BoneName>(['rThigh', 'lThigh', 'rShin', 'lShin'])
 
@@ -211,7 +224,8 @@ function Body({ exercise, angle, goalDeg, rangeDeg, idle, reduce, muscles, mirro
   const invalidate = useThree((s) => s.invalidate)
   const frame = FRAMING[exercise]
   const rest = useMemo(() => skeletonFor(exercise, restFor(exercise)), [exercise])
-  const ring = 0.075 / frame.scale
+  // The tracker's rings stay small so the body, not the instrument, reads first.
+  const ring = 0.05 / frame.scale
   const facing = facingFor(exercise)
 
   useEffect(() => () => {
@@ -268,6 +282,8 @@ function Body({ exercise, angle, goalDeg, rangeDeg, idle, reduce, muscles, mirro
       }
     }
 
+    for (const [name] of JOINT_FILL) o[`fill-${name}`]?.position.set(j[name][0], j[name][1], j[name][2])
+
     const ov = s.overlay
     const z = ov.z
     o['ring-base']?.position.set(ov.base[0], ov.base[1], z + 0.01)
@@ -311,17 +327,19 @@ function Body({ exercise, angle, goalDeg, rangeDeg, idle, reduce, muscles, mirro
     if (sway.current) sway.current.rotation.y = (mirrored ? -1 : 1) * (facing + (idle ? Math.sin(state.clock.elapsedTime * 0.45) * 0.34 : 0))
   })
 
-  // A hand: palm and fingers along +Y from the wrist, the palm facing +Z, the thumb on the outer side.
+  // A hand closed in a grip, as it holds a weight: about 10 cm from the wrist, the back of the hand
+  // along +Y, the fingers curled toward the palm (+Z), the thumb wrapped across them from the outer side.
   const hand = (name: 'rHand' | 'lHand') => (
     <group key={name} ref={bind(name)}>
-      <RoundedBox args={[0.27, 0.34, 0.1]} radius={0.045} smoothness={4} position={[0, 0.17, 0]} material={p.skin} />
-      {[-0.095, -0.032, 0.032, 0.095].map((x, i) => (
-        <mesh key={x} position={[x, 0.45 - Math.abs(i - 1.5) * 0.025, 0.012]} rotation={[0.22, 0, 0]} material={p.skin}>
-          <capsuleGeometry args={[0.036, 0.19 - Math.abs(i - 1.5) * 0.03, 6, 12]} />
+      <RoundedBox args={[0.27, 0.24, 0.13]} radius={0.05} smoothness={4} position={[0, 0.12, 0]} material={p.skin} />
+      <RoundedBox args={[0.26, 0.12, 0.17]} radius={0.055} smoothness={4} position={[0, 0.27, 0.03]} material={p.skin} />
+      {[-0.096, -0.032, 0.032, 0.096].map((x) => (
+        <mesh key={x} position={[x, 0.28, 0.07]} rotation={[Math.PI / 2, 0, 0]} material={p.skin}>
+          <capsuleGeometry args={[0.036, 0.07, 6, 12]} />
         </mesh>
       ))}
-      <mesh position={[0.155, 0.17, 0.035]} rotation={[0.35, 0, -0.6]} material={p.skin}>
-        <capsuleGeometry args={[0.042, 0.15, 6, 12]} />
+      <mesh position={[0.07, 0.21, 0.1]} rotation={[0, 0, 1.25]} material={p.skin}>
+        <capsuleGeometry args={[0.04, 0.12, 6, 12]} />
       </mesh>
     </group>
   )
@@ -346,6 +364,10 @@ function Body({ exercise, angle, goalDeg, rangeDeg, idle, reduce, muscles, mirro
           return <mesh key={bone.name} ref={bind(bone.name)} geometry={surfaces[bone.name]} material={p.body} />
         })}
 
+        {JOINT_FILL.map(([name, r]) => (
+          <mesh key={name} ref={bind(`fill-${name}`)} scale={r} geometry={p.sphere} material={p.skin} />
+        ))}
+
         {/* The stool: always built, shown only for the seated exercise. */}
         <group visible={rest.seat != null}>
           <mesh position={[(SEAT_DIMS.x[0] + SEAT_DIMS.x[1]) / 2, SEAT_DIMS.top - 0.06, 0]} scale={[SEAT_DIMS.x[1] - SEAT_DIMS.x[0], 0.12, SEAT_DIMS.z[1] - SEAT_DIMS.z[0]]} geometry={p.box} material={p.seat} />
@@ -363,10 +385,10 @@ function Body({ exercise, angle, goalDeg, rangeDeg, idle, reduce, muscles, mirro
 
         {/* The tracker's view on top of the body: landmark rings, the tracked segments, the arc. */}
         <group ref={bind('line-proximal')}>
-          <Line points={[[0, 0, 0], [0, 1, 0]]} color={COBALT} lineWidth={2.5} transparent opacity={0.9} />
+          <Line points={[[0, 0, 0], [0, 1, 0]]} color={COBALT} lineWidth={1.75} transparent opacity={0.75} />
         </group>
         <group ref={bind('line-distal')}>
-          <Line points={[[0, 0, 0], [0, 1, 0]]} color={COBALT} lineWidth={2.5} transparent opacity={0.9} />
+          <Line points={[[0, 0, 0], [0, 1, 0]]} color={COBALT} lineWidth={1.75} transparent opacity={0.75} />
         </group>
         {(['base', 'mid', 'end'] as const).map((key, i) => (
           <group key={key} ref={bind(`ring-${key}`)} scale={ring * [1.1, 1, 0.85][i]!}>

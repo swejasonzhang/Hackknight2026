@@ -7,8 +7,6 @@ import { useEffect, useRef, useState, type ReactNode } from 'react'
  * Everything collapses to the final state under prefers-reduced-motion.
  */
 export const ease: [number, number, number, number] = [0.2, 0, 0, 1]
-export const DURATION = 0.24
-
 /** Route-level wrapper: a short settle on mount. */
 export function Page({ children, className = '' }: { children: ReactNode; className?: string }) {
   const reduce = useReducedMotion()
@@ -87,11 +85,6 @@ export function MaskLines({ lines, className = '', as: Tag = 'h2', trigger = 'vi
   )
 }
 
-/** Kept for API compatibility: on this system a hover does not lift; it is a plain container. */
-export function Lift({ children, className = '' }: { children: ReactNode; className?: string }) {
-  return <div className={className}>{children}</div>
-}
-
 /** A number that counts up when it first scrolls into view, then counts from its last value on every change. */
 export function AnimatedNumber({ value, decimals = 0, suffix = '', duration = 0.7 }: { value: number; decimals?: number; suffix?: string; duration?: number }) {
   const reduce = useReducedMotion()
@@ -122,9 +115,4 @@ export function AnimatedNumber({ value, decimals = 0, suffix = '', duration = 0.
       {suffix}
     </span>
   )
-}
-
-/** Kept for API compatibility: nothing floats on this system. */
-export function Float({ children, className = '' }: { children: ReactNode; className?: string; delay?: number }) {
-  return <div className={className}>{children}</div>
 }

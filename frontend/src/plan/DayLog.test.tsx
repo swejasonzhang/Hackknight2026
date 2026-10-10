@@ -1,4 +1,4 @@
-import type { SessionDto } from '@arc/dependencies'
+import type { ProgramDto, SessionDto } from '@arc/dependencies'
 import { fireEvent, render, screen, within } from '@testing-library/react'
 import { useState } from 'react'
 import { MemoryRouter } from 'react-router-dom'
@@ -30,7 +30,7 @@ const SESSIONS = [
   session('d', at(10, 9, 18), 150, 'shoulder_abduction'),
 ]
 
-function Harness({ start, onChange = () => {} }: { start: DayKey; onChange?: (d: DayKey) => void }) {
+function Harness({ start, onChange = () => {}, program }: { start: DayKey; onChange?: (d: DayKey) => void; program?: ProgramDto }) {
   const [day, setDay] = useState(start)
   return (
     <MemoryRouter>
@@ -38,6 +38,7 @@ function Harness({ start, onChange = () => {} }: { start: DayKey; onChange?: (d:
         sessions={SESSIONS}
         day={day}
         today="2026-10-10"
+        program={program}
         onDayChange={(d) => {
           onChange(d)
           setDay(d)
@@ -88,5 +89,37 @@ describe('DayLog', () => {
     expect(within(week).getByRole('button', { name: /October 11/ })).toBeDisabled()
     fireEvent.click(within(week).getByRole('button', { name: /October 6.*1 workout/ }))
     expect(screen.getByRole('heading', { level: 3, name: /October 6/ })).toBeInTheDocument()
+  })
+
+  describe('with a week in force', () => {
+    const item = (exercise: SessionDto['exercise'], muscle?: 'biceps' | 'side_delts' | 'triceps') => ({ exercise, side: 'right' as const, sets: 3, reps: 8, restSeconds: 45, targetDeg: 140, ...(muscle ? { muscle } : {}) })
+    // Fridays and Saturdays: curl, lateral raise and tricep extension, set on Thursday 8 October.
+    const items = [item('elbow_flexion'), item('shoulder_abduction'), item('tricep_extension')]
+    const PROGRAM = { id: 'w1', profileId: 'p1', active: true, source: 'member', createdAt: at(10, 8, 9), summary: 'Arms', days: [5, 6].map((weekday) => ({ weekday, title: 'Upper body · Biceps, Side shoulders, Triceps', items })) } as ProgramDto
+
+    it("shows today's plan under each muscle group, ready to record, the next one first", () => {
+      render(<Harness start="2026-10-10" program={PROGRAM} />)
+      const planned = screen.getByRole('region', { name: /planned for saturday, october 10/i })
+      expect(planned).toHaveTextContent('Planned · Upper body · Biceps, Side shoulders, Triceps')
+      expect(planned).toHaveTextContent('0 of 3 done')
+      for (const name of ['Biceps', 'Side shoulders', 'Triceps']) expect(within(planned).getByRole('region', { name })).toBeInTheDocument()
+      expect(within(planned).getByRole('link', { name: 'Next: Bicep curl' })).toHaveAttribute('href', '/record?exercise=elbow_flexion')
+      expect(within(planned).getByRole('link', { name: 'Record tricep extension' })).toHaveAttribute('href', '/record?exercise=tricep_extension')
+      // A planned day is not a rest day.
+      expect(screen.queryByText('Rest day')).not.toBeInTheDocument()
+    })
+
+    it('crosses out what got done on a past day, and says what was not recorded', () => {
+      render(<Harness start="2026-10-09" program={PROGRAM} />)
+      const planned = screen.getByRole('region', { name: /planned for friday, october 9/i })
+      expect(planned).toHaveTextContent('2 of 3 done')
+      expect(within(planned).getByText('Bicep curl')).toHaveClass('line-through')
+      expect(within(planned).getByText('Lateral raise')).toHaveClass('line-through')
+      expect(within(planned).getAllByRole('link', { name: 'Open →' }).map((a) => a.getAttribute('href'))).toEqual(['/sessions/c', '/sessions/d'])
+      expect(within(planned).getByText('Not recorded')).toBeInTheDocument()
+      expect(within(planned).queryByRole('link', { name: /^next:/i })).not.toBeInTheDocument()
+      // The workouts themselves still follow.
+      expect(screen.getByRole('article', { name: /Bicep curl/ })).toBeInTheDocument()
+    })
   })
 })

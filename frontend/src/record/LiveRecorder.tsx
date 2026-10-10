@@ -1,11 +1,11 @@
-import { EXERCISE_LIST, EXERCISES, sideLabel, type ExerciseId, type SessionPlan, type Side, type VoiceCommand } from '@arc/dependencies'
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { EXERCISE_LIST, EXERCISES, FAULT_LINE, sideLabel, type ExerciseId, type RepPhase, type SessionPlan, type Side, type VoiceCommand } from '@arc/dependencies'
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { api } from '../api/client'
 import { Lamp, StatTile } from '../components/ui'
 import { deg } from '../format'
-import { readJoint, type JointReading, type Landmark } from './angle'
-import { visibleJoints, visibleSegments } from './overlay'
+import { readJoint, type JointReading } from './angle'
+import { guideFor } from './guide'
 import type { PoseTracker } from './pose'
 import { SessionSaver } from './saver'
 import { SessionRecorder, type RecorderView } from './recorder'
@@ -15,11 +15,14 @@ import { createSpeaker, type Speaker, type SpokenLine } from '../voice/speaker'
 import { elevenLabsVoice } from '../voice/status'
 import { cueFor, shouldCue } from './cues'
 import { FormGuide } from './FormGuide'
+import { LoadField } from './LoadField'
 
 export interface RecordConfig {
   exercise: ExerciseId
   side: Side
   plan: SessionPlan
+  /** The weight held last time for this movement, the field's starting value. */
+  loadKg?: number | null
 }
 
 type Status = { kind: 'camera' } | { kind: 'model' } | { kind: 'live' } | { kind: 'saving' } | { kind: 'empty' } | { kind: 'error'; message: string }
@@ -74,7 +77,14 @@ function fit(stageW: number, stageH: number, videoAspect: number) {
   return { x: (stageW - w) / 2, y: (stageH - h) / 2, w, h }
 }
 
-function draw(canvas: HTMLCanvasElement, aspect: number, landmarks: Landmark[] | null, reading: JointReading) {
+/**
+ * The camera view's one overlay: a movement indicator at the working joint, with no skeleton. An arc
+ * from the moving limb to where it should go now (the goal on the way up, the start on the way
+ * down) ends in an arrow; the goal is a tick on it, and the arc turns green once the rep reaches it.
+ * A label says what to do and the angle now. The canvas is mirrored with the video, so the label's
+ * text is mirrored back to read the right way round.
+ */
+function draw(canvas: HTMLCanvasElement, aspect: number, reading: JointReading, motion: { exercise: ExerciseId; repPhase: RepPhase; metricDeg: number | null; goalDeg: number; live: boolean }) {
   const dpr = window.devicePixelRatio || 1
   const { clientWidth: cw, clientHeight: ch } = canvas
   if (canvas.width !== Math.round(cw * dpr) || canvas.height !== Math.round(ch * dpr)) {
@@ -85,62 +95,62 @@ function draw(canvas: HTMLCanvasElement, aspect: number, landmarks: Landmark[] |
   if (!ctx) return
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
   ctx.clearRect(0, 0, cw, ch)
-  if (!landmarks) return
+  if (!reading.tracked || !reading.points || motion.metricDeg == null) return
   const box = fit(cw, ch, aspect)
-  const px = (p: { x: number; y: number }) => [box.x + p.x * box.w, box.y + p.y * box.h] as const
+  const pts = reading.points.map(([x, y]) => [box.x + x * box.w, box.y + y * box.h] as const) as unknown as [readonly [number, number], readonly [number, number], readonly [number, number]]
+  const g = guideFor(motion.exercise, motion.repPhase, motion.metricDeg, motion.goalDeg, pts)
+  const colour = g.atGoal ? '#1f9d55' : '#0b3dff'
+  const [cx, cy] = g.arc?.centre ?? [(pts[0][0] + pts[2][0]) / 2, (pts[0][1] + pts[2][1]) / 2]
   ctx.lineCap = 'round'
-  // The whole body in white, head to feet, as the camera app draws it; a soft dark edge keeps it
-  // readable against a bright room.
-  ctx.shadowColor = 'rgba(11,27,58,0.55)'
-  ctx.shadowBlur = 3
-  ctx.strokeStyle = 'rgba(255,255,255,0.92)'
-  ctx.lineWidth = 3
-  for (const [p, q] of visibleSegments(landmarks)) {
+  ctx.shadowColor = 'rgba(11,27,58,0.45)'
+  ctx.shadowBlur = 4
+  if (g.arc && motion.live) {
+    const { radius: r, from, to, goalAt } = g.arc
+    // The way to go, ending in an arrowhead.
+    ctx.strokeStyle = colour
+    ctx.lineWidth = 6
     ctx.beginPath()
-    ctx.moveTo(...px(p))
-    ctx.lineTo(...px(q))
+    ctx.arc(cx, cy, r, from, to, to < from)
+    ctx.stroke()
+    const dir = to < from ? -1 : 1
+    const tip: [number, number] = [cx + r * Math.cos(to), cy + r * Math.sin(to)]
+    const tangent = to + (dir * Math.PI) / 2
+    ctx.fillStyle = colour
+    ctx.beginPath()
+    ctx.moveTo(tip[0] + 14 * Math.cos(tangent), tip[1] + 14 * Math.sin(tangent))
+    ctx.lineTo(tip[0] + 9 * Math.cos(tangent + 2.4), tip[1] + 9 * Math.sin(tangent + 2.4))
+    ctx.lineTo(tip[0] + 9 * Math.cos(tangent - 2.4), tip[1] + 9 * Math.sin(tangent - 2.4))
+    ctx.closePath()
+    ctx.fill()
+    // The goal: a tick across the arc.
+    ctx.strokeStyle = '#f0b323'
+    ctx.lineWidth = 4
+    ctx.beginPath()
+    ctx.moveTo(cx + (r - 12) * Math.cos(goalAt), cy + (r - 12) * Math.sin(goalAt))
+    ctx.lineTo(cx + (r + 12) * Math.cos(goalAt), cy + (r + 12) * Math.sin(goalAt))
     ctx.stroke()
   }
-  ctx.fillStyle = '#ffffff'
-  for (const p of visibleJoints(landmarks)) {
-    ctx.beginPath()
-    ctx.arc(...px(p), 3.5, 0, 2 * Math.PI)
-    ctx.fill()
-  }
+  // The working joint.
   ctx.shadowBlur = 0
-  ctx.shadowColor = 'transparent'
-  // The measured joint on top, in cobalt, with its angle.
-  if (!reading.tracked || !reading.points) return
-  const [base, mid, end] = reading.points.map(([x, y]) => px({ x, y }))
-  ctx.strokeStyle = '#0b3dff'
-  ctx.lineWidth = 5
+  ctx.fillStyle = colour
   ctx.beginPath()
-  ctx.moveTo(...base!)
-  ctx.lineTo(...mid!)
-  ctx.lineTo(...end!)
+  ctx.arc(cx, cy, 7, 0, 2 * Math.PI)
+  ctx.fill()
+  ctx.lineWidth = 2.5
+  ctx.strokeStyle = '#ffffff'
   ctx.stroke()
-  // The angle at the joint, as a goniometer arc.
-  const a0 = Math.atan2(base![1] - mid![1], base![0] - mid![0])
-  const a1 = Math.atan2(end![1] - mid![1], end![0] - mid![0])
-  let sweep = a1 - a0
-  while (sweep > Math.PI) sweep -= 2 * Math.PI
-  while (sweep < -Math.PI) sweep += 2 * Math.PI
-  ctx.lineWidth = 4
-  ctx.strokeStyle = 'rgba(11,61,255,0.85)'
-  ctx.beginPath()
-  ctx.arc(mid![0], mid![1], 34, a0, a0 + sweep, sweep < 0)
-  ctx.stroke()
-  for (const [x, y] of [base!, mid!, end!]) {
-    ctx.fillStyle = '#0b1b3a'
-    ctx.beginPath()
-    ctx.arc(x, y, 5, 0, 2 * Math.PI)
-    ctx.fill()
-    ctx.strokeStyle = '#0b3dff'
-    ctx.lineWidth = 3
-    ctx.beginPath()
-    ctx.arc(x, y, 12, 0, 2 * Math.PI)
-    ctx.stroke()
-  }
+  // What to do and the angle now, readable through the mirror.
+  const text = `${motion.live ? `${g.label.toUpperCase()} · ` : ''}${Math.round(motion.metricDeg)}°`
+  ctx.save()
+  ctx.translate(cx, cy)
+  ctx.scale(-1, 1)
+  ctx.font = '600 13px "IBM Plex Mono", ui-monospace, monospace'
+  const w = ctx.measureText(text).width + 16
+  ctx.fillStyle = 'rgba(11,27,58,0.88)'
+  ctx.fillRect(14, -32, w, 24)
+  ctx.fillStyle = '#ffffff'
+  ctx.fillText(text, 22, -15)
+  ctx.restore()
 }
 
 /**
@@ -150,7 +160,7 @@ function draw(canvas: HTMLCanvasElement, aspect: number, landmarks: Landmark[] |
  * last set (or "Finish and save") marks it complete and opens its report. Over the video, the
  * whole white skeleton and the measured joint. The video stays in the browser.
  */
-export function LiveRecorder({ profileId, config, simulate = false }: { profileId: string; config: RecordConfig; simulate?: boolean }) {
+export function LiveRecorder({ profileId, config, simulate = false, below }: { profileId: string; config: RecordConfig; simulate?: boolean; below?: ReactNode }) {
   const navigate = useNavigate()
   const videoRef = useRef<HTMLVideoElement>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
@@ -263,10 +273,14 @@ export function LiveRecorder({ profileId, config, simulate = false }: { profileI
     }
   }, [runCommand])
 
+  // The weight held goes out with every save of the session.
+  const loadRef = useRef<number | null>(config.loadKg ?? null)
+  const withLoad = useCallback(<T extends object>(input: T | null): (T & { loadKg?: number }) | null => (input && loadRef.current != null ? { ...input, loadKg: loadRef.current } : input), [])
+
   const save = useCallback(async () => {
     if (savingRef.current) return
     savingRef.current = true
-    const input = recorderRef.current?.toSessionInput(profileId, true)
+    const input = withLoad(recorderRef.current?.toSessionInput(profileId, true) ?? null)
     if (!input || !saverRef.current) {
       setStatus({ kind: 'empty' })
       return
@@ -280,7 +294,7 @@ export function LiveRecorder({ profileId, config, simulate = false }: { profileI
       savingRef.current = false
       setStatus({ kind: 'error', message: err instanceof Error ? `The session could not be saved: ${err.message}` : 'The session could not be saved.' })
     }
-  }, [navigate, profileId])
+  }, [navigate, profileId, withLoad])
 
   useEffect(() => {
     let cancelled = false
@@ -341,11 +355,12 @@ export function LiveRecorder({ profileId, config, simulate = false }: { profileI
         const videoAspect = !simulate && video?.videoWidth ? video.videoWidth / video.videoHeight : 16 / 9
         const landmarks = tracker.detect(video!, now)
         const reading = readJoint(landmarks, config.exercise, config.side, videoAspect)
-        const next = recorder.feed({ tracked: reading.tracked, metricDeg: reading.metricDeg, tMs: performance.timeOrigin + now })
-        if (canvasRef.current) draw(canvasRef.current, videoAspect, landmarks, reading)
+        const next = recorder.feed({ tracked: reading.tracked, metricDeg: reading.metricDeg, tMs: performance.timeOrigin + now, pose: landmarks, aspect: videoAspect })
+        if (canvasRef.current) draw(canvasRef.current, videoAspect, reading, { exercise: config.exercise, repPhase: next.repPhase, metricDeg: next.metricDeg, goalDeg: config.plan.targetDeg, live: next.phase === 'active' && !next.paused })
         // Re-render only when something on screen changes.
         const key = `${next.phase}|${next.setNumber}|${next.repsInSet}|${next.totalReps}|${Math.round(next.metricDeg ?? -1)}|${Math.ceil(next.restLeftMs / 1000)}|${next.tracked}|${Math.round(next.bestDeg ?? -1)}`
         const previousRep = viewRef.current?.lastRep
+        const previousRejected = viewRef.current?.lastRejected
         viewRef.current = next
         if (key !== lastKey) {
           lastKey = key
@@ -360,13 +375,18 @@ export function LiveRecorder({ profileId, config, simulate = false }: { profileI
             say({ text: cue })
           }
         }
+        // A rep that broke the form did not count: Arc says so at once, and what to change.
+        if (next.lastRejected && next.lastRejected !== previousRejected) {
+          lastCueAtRef.current = performance.now()
+          if (!(speakerRef.current?.speaking ?? false)) say({ text: FAULT_LINE[next.lastRejected.fault] })
+        }
         // A set just ended and the rest began: Arc reads it back (Gemini words, ElevenLabs voice).
         const finished = recorder.completedSets
         if (finished.length > setsRead) {
           setsRead = finished.length
           const set = finished.at(-1)!
           // Into MongoDB now, not only at the end.
-          const soFar = recorder.toSessionInput(profileId, false)
+          const soFar = withLoad(recorder.toSessionInput(profileId, false))
           const count = finished.length
           if (soFar && next.phase !== 'done')
             saverRef.current
@@ -375,7 +395,7 @@ export function LiveRecorder({ profileId, config, simulate = false }: { profileI
               .catch(() => {})
           if (next.phase === 'rest') {
             api.coach
-              .setFeedback({ profileId, exercise: config.exercise, side: config.side, plan: config.plan, setNumber: set.setNumber, reps: set.reps })
+              .setFeedback({ profileId, exercise: config.exercise, side: config.side, plan: config.plan, setNumber: set.setNumber, reps: set.reps, ...(set.rejected ? { rejected: set.rejected } : {}) })
               .then((m) => !cancelled && say({ id: m.id, text: m.text }))
               .catch(() => {})
           }
@@ -396,7 +416,7 @@ export function LiveRecorder({ profileId, config, simulate = false }: { profileI
       tracker?.close()
     }
     // A new attempt (Try again) restarts everything.
-  }, [config, simulate, save, attempt, profileId, say])
+  }, [config, simulate, save, attempt, profileId, say, withLoad])
 
   // Listen while live, when hands-free is on.
   useEffect(() => {
@@ -457,6 +477,15 @@ export function LiveRecorder({ profileId, config, simulate = false }: { profileI
             <Lamp tone={live && view?.tracked ? 'good' : 'default'} blink={!live || phase === 'waiting'} /> {statusLine}
           </span>
 
+          {/* On a phone the readings sit below the fold: the count rides on the camera instead. */}
+          {live && (phase === 'active' || phase === 'rest') && (
+            <div className="callout bottom-3 left-3 z-10 flex items-center gap-3 lg:hidden" aria-hidden="true">
+              <span>Set {view?.setNumber ?? 1}/{config.plan.sets}</span>
+              <span>Rep {view?.repsInSet ?? 0}/{config.plan.reps}</span>
+              {view?.metricDeg != null && view.tracked && <span className="text-cobalt">{deg(view.metricDeg)}</span>}
+            </div>
+          )}
+
           {live && phase === 'waiting' && (
             <div className="absolute inset-x-3 bottom-3 border border-white/30 bg-navy/85 p-4 text-white sm:inset-x-auto sm:left-3 sm:max-w-[420px]">
               <div className="t-label text-white">Get into view</div>
@@ -483,6 +512,7 @@ export function LiveRecorder({ profileId, config, simulate = false }: { profileI
           The video stays on this device. Each set's angles are saved to your account as the set finishes
           {savedSets > 0 ? ` · saved through set ${savedSets}` : ''}.
         </p>
+        {below}
       </div>
 
       <div className="flex min-w-0 flex-col gap-4">
@@ -497,9 +527,20 @@ export function LiveRecorder({ profileId, config, simulate = false }: { profileI
           </div>
           <div className="mt-4">
             <StatTile label="Set" value={`${view?.setNumber ?? 1} / ${config.plan.sets}`} tone={phase === 'active' ? 'primary' : 'default'} />
-            <StatTile label="Rep" value={`${view?.repsInSet ?? 0} / ${config.plan.reps}`} hint={`${view?.totalReps ?? 0} counted in all`} tone={phase === 'active' ? 'primary' : 'default'} />
+            <StatTile
+              label="Rep"
+              value={`${view?.repsInSet ?? 0} / ${config.plan.reps}`}
+              hint={view?.rejectedInSet ? `${view.totalReps} counted in all · ${view.rejectedInSet} not counted this set` : `${view?.totalReps ?? 0} counted in all, good form only`}
+              tone={phase === 'active' ? 'primary' : 'default'}
+            />
+            {view?.lastRejected && phase === 'active' && (
+              <p className="t-mono flex items-start gap-2 border-b border-rule py-2 text-[12.5px] text-bad" role="status">
+                <Lamp tone="bad" /> {FAULT_LINE[view.lastRejected.fault]}
+              </p>
+            )}
             <StatTile label="Best rep" value={view?.bestDeg != null ? deg(view.bestDeg) : '–'} hint={`goal ${config.plan.targetDeg}°`} tone={view?.bestDeg != null && view.bestDeg >= config.plan.targetDeg ? 'good' : 'default'} />
           </div>
+          <LoadField initialKg={config.loadKg} onChange={(kg) => (loadRef.current = kg)} />
 
           {status.kind === 'error' && (
             <div role="alert" className="t-mono mt-4 flex items-start gap-2 text-bad">

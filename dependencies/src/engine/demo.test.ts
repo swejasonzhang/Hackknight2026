@@ -72,4 +72,15 @@ describe('generateDemoSessions', () => {
       }
     }
   })
+
+  it('holds a weight that rises week by week, and none for bodyweight movements', () => {
+    const sessions = generateDemoSessions('p1', NOW, 7)
+    for (const s of sessions) {
+      expect(s.loadKg, s.exercise).toBeGreaterThanOrEqual(0)
+      expect((s.loadKg! * 2) % 1, s.exercise).toBe(0)
+    }
+    for (const bodyweight of ['lunge', 'seated_knee_extension', 'crunch'] as const) expect(sessions.filter((s) => s.exercise === bodyweight).every((s) => s.loadKg === 0)).toBe(true)
+    const curls = sessions.filter((s) => s.exercise === 'elbow_flexion').sort((a, b) => a.startedAt - b.startedAt)
+    expect(curls.at(-1)!.loadKg!).toBeGreaterThan(curls[0]!.loadKg!)
+  })
 })

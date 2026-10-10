@@ -1,5 +1,7 @@
 import {
   BODY_AREAS,
+  FAULT_FIX,
+  FAULT_WORDS,
   catalogByArea,
   clampToRanges,
   CoachIntakeSchema,
@@ -25,6 +27,9 @@ import {
   type OnboardingTopic,
   type PlanInput,
   type ProgramDay,
+  type FormFault,
+  type ProgramItem,
+  type RejectedRep,
   type ProgramInput,
   type ProgramSource,
   type RepRecord,
@@ -278,7 +283,7 @@ export async function onboardingTurn(messages: ChatTurn[], name: string, finish 
 
 const PROGRAM_SYSTEM = `${PERSONA}
 
-Build the member's training week as JSON. Use exactly the training days you are given (weekday numbers, 0 is Sunday). Give each training day one body area (upper body, back, legs or core) with one to three movements from that area of the catalog, and never the same area on two training days in a row; with three or more training days, use at least three areas. The first training day opens with their focus movement on their side; the rest of the week works the other areas, so no muscle group is trained every day. Keep sets, reps and rest inside the ranges for their goal: lower in the range for someone new, higher for someone who trains regularly. Give someone new one movement a day; add variety for everyone else. Respect their limits: leave out a movement that would load an injured area. Give each day a short title of at most five words. Write summary as two or three short spoken sentences to the member about their week.`
+Build the member's training week as JSON. Use exactly the training days you are given (weekday numbers, 0 is Sunday). Give each training day one body area (upper body, back, legs or core) with two to four movements from that area of the catalog, several for the area's muscle groups, and never the same area on two training days in a row; with three or more training days, use at least three areas. The first training day opens with their focus movement on their side; the rest of the week works the other areas, so no muscle group is trained every day. Keep sets, reps and rest inside the ranges for their goal: lower in the range for someone new, higher for someone who trains regularly. Give someone new two movements a day and everyone else three or four. Respect their limits: leave out a movement that would load an injured area. Give each day a short title of at most five words. Write summary as two or three short spoken sentences to the member about their week.`
 
 const PROGRAM_SCHEMA = {
   type: 'OBJECT',
@@ -333,8 +338,8 @@ export function programFromGemini(raw: unknown, intake: CoachIntake): ProgramInp
     if (typeof day?.weekday !== 'number' || byWeekday.has(day.weekday) || !Array.isArray(day.items)) continue
     const items = (day.items as RawItem[])
       .filter((i) => typeof i?.exercise === 'string' && i.exercise in EXERCISES)
-      .slice(0, 3)
-      .map((i): PlanInput => {
+      .slice(0, 4)
+      .map((i): ProgramItem => {
         const exercise = i.exercise as ExerciseId
         const n = (v: unknown, d: number) => (typeof v === 'number' && Number.isFinite(v) ? v : d)
         return {
@@ -342,6 +347,7 @@ export function programFromGemini(raw: unknown, intake: CoachIntake): ProgramInp
           side: i.side === 'left' || i.side === 'right' ? i.side : intake.side,
           ...clampToRanges({ sets: n(i.sets, 3), reps: n(i.reps, 10), restSeconds: n(i.restSeconds, 90) }, goal),
           targetDeg: EXERCISES[exercise].targetDeg,
+          muscle: EXERCISES[exercise].muscles.primary[0]!,
         }
       })
     if (!items.length) continue
@@ -392,7 +398,21 @@ export interface SetFeedbackContext {
   plan: SessionPlan
   setNumber: number
   reps: RepRecord[]
+  /** Reps the set did not count for their form. */
+  rejected?: RejectedRep[]
   intake?: CoachIntake | null
+}
+
+/** The reps a set refused for form: how many, in words, and the most common fault. */
+function refused(rejected: RejectedRep[] = []): { count: number; words: string; top: FormFault | null } {
+  const counts = new Map<FormFault, number>()
+  for (const r of rejected) counts.set(r.fault, (counts.get(r.fault) ?? 0) + 1)
+  const sorted = [...counts.entries()].sort((a, b) => b[1] - a[1])
+  return {
+    count: rejected.length,
+    words: sorted.map(([f, n]) => (n > 1 ? `${FAULT_WORDS[f]} (${n})` : FAULT_WORDS[f])).join(', '),
+    top: sorted[0]?.[0] ?? null,
+  }
 }
 
 /** "2.4". */
@@ -415,6 +435,8 @@ function setFeedbackTemplate(c: SetFeedbackContext): string {
   const mean = durations.reduce((a, b) => a + b, 0) / Math.max(1, durations.length)
   const parts = [`Set ${c.setNumber} done: ${plural(c.reps.length, 'rep')}, best ${best} degrees, lowest ${low}.`]
   parts.push(reached === c.reps.length ? `Every rep reached your ${target} degree goal.` : `${reached} of ${c.reps.length} reps reached your ${target} degree goal.`)
+  const off = refused(c.rejected)
+  if (off.count) parts.push(`${plural(off.count, 'rep')} did not count for form: ${off.words}.`)
   parts.push(
     fatigue.index >= 0.25
       ? `Your range dropped from ${first} to ${last} degrees by the end.`
@@ -425,8 +447,10 @@ function setFeedbackTemplate(c: SetFeedbackContext): string {
   const slowing = durations.length >= 2 && durations.at(-1)! > durations[0]! * 1.15
   parts.push(`Reps took ${seconds(mean)} seconds on average${slowing ? `, slowing to ${seconds(durations.at(-1)!)} by the end` : ''}.`)
   const more = c.setNumber < c.plan.sets
-  const step =
-    fatigue.index >= 0.25
+  // A fault that cost reps comes first: counted reps need good form.
+  const step = off.top
+    ? FAULT_FIX[off.top]
+    : fatigue.index >= 0.25
       ? `take the full ${c.plan.restSeconds} seconds and lower each rep slowly`
       : reached === c.reps.length
         ? 'try one more rep, or a slower lowering'
@@ -444,12 +468,13 @@ export async function setFeedback(c: SetFeedbackContext): Promise<{ text: string
   const context = [
     `Member: ${firstName(c.name)}${c.intake ? `; goals: ${c.intake.goals}; limits: ${c.intake.limitations}` : ''}`,
     `Exercise: ${EXERCISES[c.exercise].name}, ${c.side} side; goal ${c.plan.targetDeg} degrees`,
-    `Set ${c.setNumber} of ${c.plan.sets} just ended: ${c.reps.length} of ${c.plan.reps} reps; peaks in order: ${c.reps.map((r) => Math.round(r.peakDeg)).join(', ')} degrees; fatigue score ${Math.round(fatigue.index * 100)} out of 100`,
+    `Set ${c.setNumber} of ${c.plan.sets} just ended: ${c.reps.length} of ${c.plan.reps} reps counted; peaks in order: ${c.reps.map((r) => Math.round(r.peakDeg)).join(', ')} degrees; fatigue score ${Math.round(fatigue.index * 100)} out of 100`,
+    refused(c.rejected).count ? `Reps not counted because of form: ${refused(c.rejected).words}` : 'Every rep was counted: the form held.',
     c.setNumber < c.plan.sets ? `Next: ${c.plan.restSeconds} seconds of rest, then set ${c.setNumber + 1} starts by itself.` : 'This was the last set.',
   ].join('\n')
   try {
     const text = await generate({
-      system: `${PERSONA}\n\nThe member just finished a set and is resting. In one or two short spoken sentences: say the set number, the reps and the best angle, how the range held, and one cue for the next set (or, after the last set, that the session is done). If the fatigue score is above 40, suggest taking the whole rest.`,
+      system: `${PERSONA}\n\nThe member just finished a set and is resting. In one or two short spoken sentences: say the set number, the reps counted and the best angle, how the range held, and one cue for the next set (or, after the last set, that the session is done). Only reps with good form are counted: if some were not counted, say how many and the one thing to change. If the fatigue score is above 40, suggest taking the whole rest.`,
       turns: [{ role: 'user', text: context }],
       maxOutputTokens: 160,
     })

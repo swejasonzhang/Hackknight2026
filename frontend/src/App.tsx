@@ -7,6 +7,7 @@ import { AccountPage } from './pages/AccountPage'
 import { BodyGallery } from './pages/dev/BodyGallery'
 import { DashboardPage } from './pages/DashboardPage'
 import { LandingPage } from './pages/LandingPage'
+import { LeaderboardPage } from './pages/LeaderboardPage'
 import { LoginPage } from './pages/LoginPage'
 import { PlanPage } from './pages/PlanPage'
 import { ProfilesPage } from './pages/ProfilesPage'
@@ -22,11 +23,12 @@ import { ProfilesProvider } from './profiles/ProfilesContext'
  *                   user's buttons lead back into the app
  *   /signup, /login account pages
  *   /dashboard      progress for the selected profile, every chart folded behind a plus
- *   /plan           the plan beside the log, one day at a time (?day=YYYY-MM-DD)
+ *   /plan           the week to arrange by hand beside the log, one day at a time (?day=YYYY-MM-DD)
  *   /record         record a session in the browser: webcam, pose tracking, reps, save
  *   /welcome        a full page between sign-up and the dashboard: the chat with Arc, then the week
  *                   it built (skippable; ?profile=<id> for an existing profile)
  *   /profiles       household profiles
+ *   /leaderboard    everyone on the account ranked on their training
  *   /sessions/:id   one session, set by set
  *   /account        who is signed in, log out, and deleting the account
  *   /dev/bodies     development only: every movement's figure and the muscles it works
@@ -74,6 +76,7 @@ export default function App() {
           <Route path="/plan" element={<PlanPage />} />
           <Route path="/record" element={<RecordPage />} />
           <Route path="/profiles" element={<ProfilesPage />} />
+          <Route path="/leaderboard" element={<LeaderboardPage />} />
           <Route path="/sessions/:id" element={<SessionDetailPage />} />
           <Route path="/account" element={<AccountPage />} />
         </Route>

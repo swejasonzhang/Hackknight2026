@@ -1,3 +1,5 @@
+import type { RejectedRep } from './form.ts'
+
 /**
  * Domain types shared by the server and the browser (recorder, dashboard, Arc's pages); the
  * Python camera app maps its own catalog onto the same exercise ids.
@@ -121,7 +123,7 @@ export interface ExerciseConfig {
   exitDeg: number
   /** Default goal for the metric, drawn on the dashboard. */
   targetDeg: number
-  /** The metric in the start position, and the furthest the 3D figure shows. */
+  /** The metric in the start position, and the furthest the movement goes (the figure, and any goal, stop there). */
   restDeg: number
   maxDeg: number
   /** Reps shorter than this are treated as jitter and ignored. */
@@ -164,6 +166,8 @@ export interface SetRecord {
   endedAt: number
   /** True when the set ended before the planned rep count (fatigue stop or manual). */
   endedEarly: boolean
+  /** Reps that were not counted for their form, and why (absent from older sessions and the camera app). */
+  rejected?: RejectedRep[]
 }
 
 export interface SessionPlan {
@@ -201,6 +205,8 @@ export interface SessionRecord {
   complete?: boolean
   /** Voice commands the member gave while recording, in order. */
   events?: SessionEvent[]
+  /** The weight held, in kilograms (0 for bodyweight); absent when it was not given. */
+  loadKg?: number
   /** Arc's plain-English read of the session (Gemini, or a template when Gemini is off). */
   coachSummary?: CoachSummary | null
 }

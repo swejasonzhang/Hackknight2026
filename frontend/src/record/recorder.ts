@@ -1,4 +1,4 @@
-import { estimateFatigue, EXERCISES, OneEuroFilter, RepCounter, type CreateSessionInput, type ExerciseId, type RepPhase, type RepRecord, type SessionEvent, type SessionPlan, type SetRecord, type Side, type VoiceCommand } from '@arc/dependencies'
+import { estimateFatigue, EXERCISES, FormWatch, OneEuroFilter, RepCounter, type CreateSessionInput, type ExerciseId, type FormFault, type PosePoint, type RejectedRep, type RepPhase, type RepRecord, type SessionEvent, type SessionPlan, type SetRecord, type Side, type VoiceCommand } from '@arc/dependencies'
 
 /** How long the joint must stay in view before the first set starts. */
 export const READY_MS = 600
@@ -10,6 +10,10 @@ export interface RecorderSample {
   metricDeg: number
   /** Milliseconds since the epoch (the page passes performance.timeOrigin + performance.now()). */
   tMs: number
+  /** The whole pose, for the movement's form checks; without it only depth and tempo are judged. */
+  pose?: readonly PosePoint[] | null
+  /** Video width over height, so the form checks measure angles on the real picture. */
+  aspect?: number
 }
 
 export interface RecorderView {
@@ -28,6 +32,10 @@ export interface RecorderView {
   repPhase: RepPhase
   bestDeg: number | null
   lastRep: RepRecord | null
+  /** The latest rep that did not count for its form, and why. */
+  lastRejected: RejectedRep | null
+  /** Reps of this set that did not count. */
+  rejectedInSet: number
 }
 
 interface Config {
@@ -61,6 +69,11 @@ export class SessionRecorder {
   private tracked = false
   private best: number | null = null
   private lastRep: RepRecord | null = null
+  private form: FormWatch
+  private repFault: FormFault | null = null
+  private rejected: RejectedRep[] = []
+  private lastRejected: RejectedRep | null = null
+  private aspect = 1
   private lastT = 0
   private paused = false
   private pausedRestLeft: number | null = null
@@ -69,6 +82,7 @@ export class SessionRecorder {
   constructor(cfg: Config) {
     this.cfg = cfg
     this.counter = this.newCounter()
+    this.form = new FormWatch(cfg.exercise, cfg.side)
   }
 
   private newCounter(): RepCounter {
@@ -80,15 +94,19 @@ export class SessionRecorder {
     this.phase = 'active'
     this.setStartedAt = tMs
     this.reps = []
+    this.rejected = []
+    this.repFault = null
     this.counter = this.newCounter()
+    this.form = new FormWatch(this.cfg.exercise, this.cfg.side, this.aspect)
     this.filter = new OneEuroFilter()
     this.startedAt ??= tMs
   }
 
   private closeSet(tMs: number, endedEarly: boolean): void {
     if (this.reps.length === 0) return
-    this.sets.push({ setNumber: this.setNumber, reps: this.reps, fatigue: estimateFatigue(this.reps), startedAt: this.setStartedAt, endedAt: tMs, endedEarly })
+    this.sets.push({ setNumber: this.setNumber, reps: this.reps, fatigue: estimateFatigue(this.reps), startedAt: this.setStartedAt, endedAt: tMs, endedEarly, ...(this.rejected.length ? { rejected: this.rejected } : {}) })
     this.reps = []
+    this.rejected = []
   }
 
   /** The set is over (its reps are in, or it was cut short): rest, or done after the last one. */
@@ -159,11 +177,12 @@ export class SessionRecorder {
     this.filter = new OneEuroFilter()
   }
 
-  feed({ tracked, metricDeg, tMs: rawT }: RecorderSample): RecorderView {
+  feed({ tracked, metricDeg, tMs: rawT, pose, aspect }: RecorderSample): RecorderView {
     // The browser clock has fractions of a millisecond; sessions store whole milliseconds.
     const tMs = Math.round(rawT)
     this.lastT = tMs
     this.tracked = tracked
+    if (aspect) this.aspect = aspect
     if (this.paused) return this.view
     if (tracked) this.smoothed = this.filter.filter(metricDeg, tMs)
 
@@ -175,8 +194,29 @@ export class SessionRecorder {
         break
       case 'active': {
         if (!tracked || this.smoothed == null) break
-        const rep = this.counter.update(this.smoothed, tMs)
-        if (!rep) break
+        const before = this.counter.snapshot.phase
+        const counted = this.counter.update(this.smoothed, tMs)
+        const after = this.counter.snapshot.phase
+        // Form is watched from the moment a rep leaves the rest zone until it is back.
+        if (pose) {
+          if (before === 'rest' && after !== 'rest') this.form.start(pose)
+          else if (before !== 'rest') this.repFault = this.form.check(pose) ?? this.repFault
+        }
+        if (before !== 'rest' && after === 'rest') {
+          // Back at rest: a rep that reached the top ends here, counted only with good form and a
+          // controlled tempo (the counter refuses one that was too quick).
+          const reachedTop = before === 'peak' || before === 'returning'
+          const fault = reachedTop ? (counted ? this.repFault : 'too_fast') : null
+          this.repFault = null
+          this.form.reset()
+          if (fault) {
+            this.lastRejected = { at: tMs, fault }
+            this.rejected.push(this.lastRejected)
+            break
+          }
+        }
+        if (!counted) break
+        const rep = { ...counted, index: this.reps.length + 1 }
         this.reps.push(rep)
         this.lastRep = rep
         this.best = Math.max(this.best ?? -Infinity, rep.peakDeg)
@@ -220,6 +260,8 @@ export class SessionRecorder {
       repPhase: this.counter.snapshot.phase,
       bestDeg: this.best,
       lastRep: this.lastRep,
+      lastRejected: this.lastRejected,
+      rejectedInSet: this.phase === 'active' ? this.rejected.length : (this.sets.at(-1)?.rejected?.length ?? 0),
     }
   }
 

@@ -22,25 +22,6 @@ export function Tag({ children, soft = false, className = '' }: { children: Reac
   return <span className={`tag ${soft ? 'tag-soft' : ''} ${className}`.trim()}>{children}</span>
 }
 
-/** A paper panel with corner registration marks. With a title it opens with a strip head. */
-export function Card({ children, className = '', title, subtitle, actions, index }: { children: ReactNode; className?: string; title?: ReactNode; subtitle?: ReactNode; actions?: ReactNode; index?: string }) {
-  return (
-    <section className={`panel p-5 sm:p-6 ${className}`.trim()}>
-      {(title || actions) && (
-        <header className="strip-head">
-          {index && <span className="strip-index">{index}</span>}
-          <div className="min-w-0">
-            {title && <h2 className="t-strip">{title}</h2>}
-            {subtitle && <p className="t-desc mt-1">{subtitle}</p>}
-          </div>
-          {actions && <div className="strip-aside flex items-center gap-2">{actions}</div>}
-        </header>
-      )}
-      {children}
-    </section>
-  )
-}
-
 /**
  * A numbered, ruled section: as it scrolls into view its navy rule draws across, the index and
  * title rise, then the content follows.
