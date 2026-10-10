@@ -1,4 +1,4 @@
-import { catalogByArea, OnboardingInputSchema, SetFeedbackInputSchema, type CoachStatus, type OnboardingReply } from '@arc/dependencies'
+import { AskInputSchema, catalogByArea, OnboardingInputSchema, SetFeedbackInputSchema, SpeakInputSchema, type CoachStatus, type OnboardingReply } from '@arc/dependencies'
 import { Router, type RequestHandler } from 'express'
 import mongoose from 'mongoose'
 import { requireUser } from '../auth.ts'
@@ -9,10 +9,10 @@ import { Program, toProgramDto } from '../models/Program.ts'
 import { Profile, type ProfileShape } from '../models/Profile.ts'
 import { Session, toSessionDto, type SessionShape } from '../models/Session.ts'
 import { User } from '../models/User.ts'
-import { onboardingTurn, planFromProgram, sessionSummary, setFeedback } from '../services/arc.ts'
+import { askArc, onboardingTurn, planFromProgram, sessionSummary, setFeedback } from '../services/arc.ts'
 import { geminiConfigured } from '../services/gemini.ts'
 import { requireProfile } from '../services/profiles.ts'
-import { speak, voiceConfigured } from '../services/voice.ts'
+import { speak, speakCached, voiceConfigured } from '../services/voice.ts'
 
 /**
  * Mounted at /api/coach (behind `authenticate`), for signed-in members only: Arc's onboarding
@@ -114,6 +114,33 @@ coachRouter.post('/sessions/:id/summary', limit, async (req, res) => {
   const message = await CoachMessage.create({ ownerId: userId, profileId: profile._id, sessionId: session._id, kind: 'session', role: 'arc', text, offline, createdAt: now })
   await Session.updateOne({ _id: session._id }, { $set: { coachSummary: { text, messageId: message._id.toString(), createdAt: now, offline } } })
   res.json(toCoachMessageDto(message))
+})
+
+/** The member speaks to Arc mid-workout: a question, a feeling, feedback. Both lines are kept. */
+coachRouter.post('/ask', limit, async (req, res) => {
+  const userId = requireUser(req)
+  const input = validate(AskInputSchema, req.body)
+  const profile = await requireProfile(input.profileId, { kind: 'user', userId })
+  const name = await memberName(userId)
+  const { text, offline } = await askArc({ name, exercise: input.exercise, side: input.side, text: input.text, live: input.live, intake: profile.intake })
+  const now = Date.now()
+  await CoachMessage.create({ ownerId: userId, profileId: profile._id, kind: 'ask', role: 'user', text: input.text, offline, createdAt: now - 1 })
+  const message = await CoachMessage.create({ ownerId: userId, profileId: profile._id, kind: 'ask', role: 'arc', text, offline, createdAt: now })
+  res.json(toCoachMessageDto(message))
+})
+
+/** Arc's voice for a short line that is not stored (acknowledgements, cues during a set), cached by text. */
+coachRouter.post('/speak', limit, async (req, res) => {
+  requireUser(req)
+  const { text } = validate(SpeakInputSchema, req.body)
+  if (!voiceConfigured()) throw new HttpError(503, "Arc's voice is not configured")
+  let audio: ArrayBuffer
+  try {
+    audio = await speakCached(text)
+  } catch {
+    throw new HttpError(502, "Arc's voice is unavailable right now")
+  }
+  res.set('cache-control', 'private, max-age=86400').type('audio/mpeg').send(Buffer.from(audio))
 })
 
 coachRouter.get('/messages/:id/audio', async (req, res) => {

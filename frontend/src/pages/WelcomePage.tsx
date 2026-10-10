@@ -1,4 +1,4 @@
-import { catalogByArea, EXERCISES, ONBOARDING_TOPICS, WEEKDAY_NAMES, type CatalogGroup, type ChatTurn, type CoachStatus, type OnboardingReply, type OnboardingTopic, type ProgramDto } from '@arc/dependencies'
+import { catalogByArea, EXERCISES, ONBOARDING_TOPICS, WEEKDAY_NAMES, type CatalogGroup, type ChatTurn, type OnboardingReply, type OnboardingTopic, type ProgramDto } from '@arc/dependencies'
 import { motion, useReducedMotion } from 'motion/react'
 import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
@@ -8,6 +8,7 @@ import { Alert, Lamp } from '../components/ui'
 import { useProfiles } from '../hooks/useProfiles'
 import { createListener, type ListenerState } from '../voice/listener'
 import { createSpeaker } from '../voice/speaker'
+import { elevenLabsVoice } from '../voice/status'
 
 /** What Arc is finding out, in the order it asks. */
 export const TOPIC_LABELS: Record<OnboardingTopic, string> = {
@@ -61,13 +62,12 @@ export function WelcomePage() {
   const [done, setDone] = useState<OnboardingReply | null>(null)
   const [voiceOn, setVoiceOn] = useState(true)
   const [mic, setMic] = useState<ListenerState>('off')
-  const status = useRef<CoachStatus | null>(null)
   const listEnd = useRef<HTMLDivElement>(null)
   const input = useRef<HTMLInputElement>(null)
   const voiceOnRef = useRef(voiceOn)
   voiceOnRef.current = voiceOn
 
-  const speaker = useMemo(() => createSpeaker({ elevenLabs: () => status.current?.voice ?? false, onSpeaking: (s) => listener.mute(s) }), []) // eslint-disable-line react-hooks/exhaustive-deps
+  const speaker = useMemo(() => createSpeaker({ voice: elevenLabsVoice(), onSpeaking: (s) => listener.mute(s) }), []) // eslint-disable-line react-hooks/exhaustive-deps
   const sendRef = useRef<(text: string) => void>(() => {})
   const listener = useMemo(() => createListener((text) => sendRef.current(text), setMic), [])
 
@@ -105,10 +105,6 @@ export function WelcomePage() {
   sendRef.current = send
 
   useEffect(() => {
-    api.coach
-      .status()
-      .then((s) => (status.current = s))
-      .catch(() => {})
     void turn([])
     return () => {
       speaker.stop()

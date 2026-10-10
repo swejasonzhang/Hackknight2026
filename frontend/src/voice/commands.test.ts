@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { parseCommand } from './commands'
+import { isForArc, parseCommand } from './commands'
 
 describe('parseCommand', () => {
   it.each([
@@ -44,5 +44,17 @@ describe('parseCommand', () => {
 
   it('lets stop win when a phrase holds more than one command', () => {
     expect(parseCommand('stop and rest')).toBe('stop')
+  })
+})
+
+describe('isForArc: what Arc answers when it is not a command', () => {
+  it('takes questions, anything addressed to Arc, and how the member feels', () => {
+    for (const said of ['how am I doing', 'is my form ok', 'Arc, can we make this harder', 'my elbow hurts', 'this feels really heavy', 'that was too easy', 'what should I do next']) {
+      expect(isForArc(said), said).toBe(true)
+    }
+  })
+
+  it('lets talk that is not for Arc go by', () => {
+    for (const said of ['yeah', 'okay so anyway the game starts at eight', 'mm hmm', '']) expect(isForArc(said), said).toBe(false)
   })
 })

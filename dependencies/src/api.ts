@@ -217,7 +217,35 @@ export const SetFeedbackInputSchema = z.object({
 })
 export type SetFeedbackInput = z.infer<typeof SetFeedbackInputSchema>
 
-export type CoachMessageKind = 'onboarding' | 'set' | 'session'
+export type CoachMessageKind = 'onboarding' | 'set' | 'session' | 'ask'
+
+/** A short line for Arc to say aloud (acknowledgements, cues during a set). */
+export const SpeakInputSchema = z.object({ text: z.string().trim().min(1).max(240) })
+export type SpeakInput = z.infer<typeof SpeakInputSchema>
+
+/** Where the member is in the workout when they speak to Arc. */
+export const LiveContextSchema = z.object({
+  setNumber: z.number().int().min(1).max(20),
+  setsPlanned: z.number().int().min(1).max(20),
+  repsInSet: z.number().int().min(0).max(100),
+  repsPlanned: z.number().int().min(1).max(100),
+  totalReps: z.number().int().min(0).max(1000),
+  recentPeaks: z.array(z.number().min(-360).max(360)).max(12),
+  bestDeg: z.number().min(-360).max(360).nullable(),
+  targetDeg: z.number().min(0).max(180),
+  phase: z.enum(['waiting', 'active', 'rest', 'done']),
+})
+export type LiveContext = z.infer<typeof LiveContextSchema>
+
+/** Something the member said to Arc while recording: a question, a feeling, feedback. */
+export const AskInputSchema = z.object({
+  profileId: z.string().min(1),
+  exercise: ExerciseIdSchema,
+  side: SideSchema,
+  text: z.string().trim().min(1).max(500),
+  live: LiveContextSchema,
+})
+export type AskInput = z.infer<typeof AskInputSchema>
 export interface CoachMessageDto {
   id: string
   kind: CoachMessageKind

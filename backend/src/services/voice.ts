@@ -9,6 +9,33 @@ export function voiceConfigured(): boolean {
   return Boolean(process.env.ELEVENLABS_API_KEY)
 }
 
+/**
+ * Arc's short lines repeat ("Paused.", "Go a little deeper."), so their audio is kept in memory,
+ * newest last, up to this many; a repeat costs no ElevenLabs call.
+ */
+const CACHE_SIZE = 200
+const cache = new Map<string, ArrayBuffer>()
+
+/** Forget the cached audio (tests). */
+export function resetSpeechCache(): void {
+  cache.clear()
+}
+
+/** `speak`, with repeats of the same line in the same voice served from memory. */
+export async function speakCached(text: string): Promise<ArrayBuffer> {
+  const key = `${process.env.ELEVENLABS_VOICE_ID || DEFAULT_VOICE_ID}\u0000${text}`
+  const hit = cache.get(key)
+  if (hit) {
+    cache.delete(key)
+    cache.set(key, hit)
+    return hit
+  }
+  const audio = await speak(text)
+  cache.set(key, audio)
+  if (cache.size > CACHE_SIZE) cache.delete(cache.keys().next().value!)
+  return audio
+}
+
 export async function speak(text: string): Promise<ArrayBuffer> {
   const key = process.env.ELEVENLABS_API_KEY
   if (!key) throw new Error('ELEVENLABS_API_KEY is not set')
