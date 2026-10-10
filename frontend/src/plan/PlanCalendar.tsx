@@ -1,4 +1,4 @@
-import { EXERCISES, programDayOn, WEEKDAY_NAMES, type ProgramDto, type SessionDto } from '@arc/dependencies'
+import { EXERCISES, programDayOn, WEEKDAY_NAMES, type ExerciseId, type ProgramDto, type SessionDto } from '@arc/dependencies'
 import { useEffect, useId, useMemo, useRef, useState, type KeyboardEvent } from 'react'
 import { Link } from 'react-router-dom'
 import { api, ApiRequestError } from '../api/client'
@@ -25,8 +25,9 @@ type Status = 'done' | 'missed' | 'planned' | 'rest'
  * The member's week on a month calendar (ADR-0020): Arc's training days from the program, each
  * marked done (a session that day), not recorded (a past training day with none) or planned, and
  * today ringed. The selected day's workout sits beside the grid; arrow keys move the selection.
+ * Days that hold the movement picked on the dashboard (`exercise`) show it in cobalt.
  */
-export function PlanCalendar({ profileId, now = Date.now() }: { profileId: string; now?: number }) {
+export function PlanCalendar({ profileId, exercise, now = Date.now() }: { profileId: string; exercise?: ExerciseId; now?: number }) {
   const today = dayKey(now)
   const [program, setProgram] = useState<ProgramDto | null | undefined>(undefined)
   const [sessions, setSessions] = useState<SessionDto[]>([])
@@ -143,6 +144,7 @@ export function PlanCalendar({ profileId, now = Date.now() }: { profileId: strin
     const parts = [longDate(key)]
     if (key === today) parts.push('today')
     parts.push(plan ? `training day: ${plan.title}` : 'rest day')
+    if (exercise && plan?.items.some((i) => i.exercise === exercise)) parts.push(`includes ${EXERCISES[exercise].name.toLowerCase()}`)
     if (status === 'done') parts.push(`done, ${byDay.get(key)!.length} ${byDay.get(key)!.length === 1 ? 'session' : 'sessions'}`)
     if (status === 'missed') parts.push('not recorded')
     if (status === 'planned') parts.push('planned')
@@ -194,6 +196,7 @@ export function PlanCalendar({ profileId, now = Date.now() }: { profileId: strin
                     const plan = planOn(key)
                     const status = statusOf(key)
                     const inMonth = key.slice(0, 7) === month.slice(0, 7)
+                    const holds = !!exercise && !!plan?.items.some((i) => i.exercise === exercise)
                     return (
                       <td key={key} role="gridcell" aria-selected={key === selected}>
                         <button
@@ -207,6 +210,7 @@ export function PlanCalendar({ profileId, now = Date.now() }: { profileId: strin
                           data-status={status}
                           data-out={inMonth ? undefined : 'true'}
                           data-today={key === today ? 'true' : undefined}
+                          data-holds={holds ? 'true' : undefined}
                           aria-label={label(key)}
                           aria-controls={detailsId}
                           onClick={() => select(key)}
@@ -217,7 +221,7 @@ export function PlanCalendar({ profileId, now = Date.now() }: { profileId: strin
                           </span>
                           {plan && (
                             <span className="cal-title" aria-hidden="true">
-                              {EXERCISES[plan.items[0]!.exercise].short}
+                              {EXERCISES[holds ? exercise! : plan.items[0]!.exercise].short}
                               {plan.items.length > 1 ? ` +${plan.items.length - 1}` : ''}
                             </span>
                           )}
@@ -241,6 +245,11 @@ export function PlanCalendar({ profileId, now = Date.now() }: { profileId: strin
             <span className="flex items-center gap-2">
               <span className="lamp" /> Not recorded
             </span>
+            {exercise && (
+              <span className="flex items-center gap-2 text-cobalt">
+                <span className="cal-key" /> Days with {EXERCISES[exercise].name.toLowerCase()}
+              </span>
+            )}
           </div>
         </div>
 

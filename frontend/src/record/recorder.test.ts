@@ -1,6 +1,9 @@
-import { CreateSessionSchema, type SessionPlan } from '@arc/dependencies'
+import { CreateSessionSchema, EXERCISE_IDS, EXERCISES, type SessionPlan } from '@arc/dependencies'
 import { describe, expect, it } from 'vitest'
+import { readJoint } from './angle'
 import { READY_MS, SessionRecorder } from './recorder'
+import { simulatedPeak } from './LiveRecorder'
+import { createSimulatedTracker } from './simulated'
 
 const T0 = Date.UTC(2026, 9, 10, 14, 0)
 const FRAME = 33
@@ -159,4 +162,24 @@ describe('SessionRecorder voice commands', () => {
     expect(input.events!.map((e) => e.command)).toEqual(['status', 'stop'])
     expect(CreateSessionSchema.safeParse(input).success).toBe(true)
   })
+})
+
+describe('every movement, end to end', () => {
+  it('counts the reps of a person working from rest to the goal, read through the camera path', () => {
+    for (const exercise of EXERCISE_IDS) {
+      for (const side of ['right', 'left'] as const) {
+        const { targetDeg, minRepMs } = EXERCISES[exercise]
+        const period = Math.max(2600, minRepMs * 2)
+        const tracker = createSimulatedTracker(exercise, side, simulatedPeak({ exercise, plan: { sets: 1, reps: 3, restSeconds: 10, targetDeg } }), period)
+        const rec = new SessionRecorder({ exercise, side, plan: { sets: 1, reps: 3, restSeconds: 10, targetDeg } })
+        const start = performance.now()
+        for (let t = 0; t < READY_MS + 900 + 3 * period + 600; t += FRAME) {
+          const reading = readJoint(tracker.detect(null as never, start + t), exercise, side, 16 / 9)
+          rec.feed({ tracked: reading.tracked, metricDeg: reading.metricDeg, tMs: T0 + t })
+        }
+        expect(rec.view.totalReps, `${exercise} ${side}`).toBe(3)
+        expect(rec.view.bestDeg, `${exercise} ${side} best`).toBeGreaterThan(EXERCISES[exercise].enterDeg)
+      }
+    }
+  }, 30_000)
 })

@@ -1,4 +1,4 @@
-import { EXERCISE_LIST, generateDemoSessions } from '@arc/dependencies'
+import { BODY_AREAS, EXERCISE_LIST, exercisesIn, generateDemoSessions } from '@arc/dependencies'
 import * as Accordion from '@radix-ui/react-accordion'
 import { motion, useReducedMotion, useScroll, useSpring } from 'motion/react'
 import { useMemo } from 'react'
@@ -32,8 +32,8 @@ const SECTION_IDS: readonly string[] = SECTIONS.map((s) => s.id)
 const HOST = new URL(SITE_URL).host
 
 const SPEC: [string, string[]][] = [
-  ['Movements', EXERCISE_LIST.map((e) => e.name.toLowerCase())],
-  ['Goals', [EXERCISE_LIST.map((e) => `${e.targetDeg}°`).join(' · ')]],
+  ['Movements', [`${EXERCISE_LIST.length} of them`, BODY_AREAS.map((a) => a.name.toLowerCase()).join(' · ')]],
+  ['Goals', ['an angle for each', 'from you or Arc']],
   ['Input', ['any webcam', 'right in the browser']],
   ['Output', ['peak per rep', 'set and session']],
   ['Account', ['one per household', 'a profile each']],
@@ -56,11 +56,14 @@ const HOUSEHOLD = [
 const FAQ = [
   { q: 'What do I need?', a: 'A laptop, desktop or phone with a camera and a modern browser. Nothing to install: Arc tracks the movement in the browser, and you can check progress from any device.' },
   { q: 'Who is it for?', a: 'Anyone at home who wants to see their range of motion improve, at any age. One account per household, a profile per person. It is a personal tool, not a clinical one.' },
-  { q: 'Which movements does it measure?', a: `${EXERCISE_LIST.map((e) => e.name).join(', ')} today, on the left or right side, always in degrees.` },
+  {
+    q: 'Which movements does it measure?',
+    a: `${EXERCISE_LIST.length} in four areas, the same as the camera app: ${BODY_AREAS.map((a) => `${a.name.toLowerCase()} (${exercisesIn(a.id).map((e) => e.name.toLowerCase()).join(', ')})`).join('; ')}. One-sided movements on the left or right, always in degrees.`,
+  },
   { q: 'Is my data private?', a: 'Your sessions belong to your account and nobody else sees them. The video never leaves your device: only the angle of each rep is saved, and nothing is shared with anyone.' },
 ]
 
-const FINAL = ['Every rep in degrees, not points', 'Three movements, left and right', 'A goal rule on every chart', 'A nudge when range fades late in a set', 'Profiles for everyone at home', 'Private by default']
+const FINAL = ['Every rep in degrees, not points', 'Fifteen movements in four areas', 'A goal rule on every chart', 'A nudge when range fades late in a set', 'Profiles for everyone at home', 'Private by default']
 
 const pad = (n: number) => String(n).padStart(2, '0')
 

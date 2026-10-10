@@ -24,7 +24,7 @@ const HOURS = [7, 8, 12, 17, 18, 19, 20]
 
 /**
  * Six weeks of believable practice for every exercise, different for every seed: each exercise
- * starts 32 to 52 degrees short of its goal and gains 3.5 to 7 degrees a week; two or three
+ * starts a quarter to two fifths of its range short of its goal and closes most of that gap; two or three
  * sessions a week on random days (Monday to Saturday) and times; reps fade within a set less as
  * the weeks go by; about one session in eight is an off day with lower range, more fatigue and
  * sometimes a last set ended early. The same seed always gives the same data.
@@ -47,8 +47,11 @@ export function generateDemoSessions(profileId: string, now = Date.now(), seed =
 
   for (const exercise of EXERCISE_IDS) {
     const cfg = EXERCISES[exercise]
-    const gap = between(32, 52)
-    const gain = between(3.5, 7)
+    // Start a quarter to two fifths of the movement's range short of the goal, and close most of
+    // that gap over the six weeks: 32 to 52 degrees for a curl, a few degrees for a twist.
+    const range = cfg.targetDeg - cfg.restDeg
+    const gap = range * between(0.25, 0.4)
+    const gain = (gap / WEEKS) * between(0.6, 1.1)
     const steadiness = between(0.7, 1.3)
     for (let week = 0; week < WEEKS; week++) {
       const weekMonday = thisMonday - (WEEKS - 1 - week) * 7 * DAY
@@ -58,7 +61,7 @@ export function generateDemoSessions(profileId: string, now = Date.now(), seed =
         const startedAt = weekMonday + day * DAY + hour * 3_600_000 + Math.floor(rand() * 4) * 15 * 60_000 + offsetMs
         if (startedAt > now) continue
         const offDay = rand() < 0.12
-        const sessionPeak = cfg.targetDeg - gap + gain * week + noise(2.5) - (offDay ? between(4, 9) : 0)
+        const sessionPeak = cfg.targetDeg - gap + gain * week + noise(range * 0.02) - (offDay ? range * between(0.03, 0.07) : 0)
         const decayPerRep = Math.max(0.25, (1.6 - 0.18 * week) * steadiness) * (offDay ? 1.8 : 1)
         let t = startedAt + 5_000
         const sets: SetRecord[] = []
@@ -69,7 +72,7 @@ export function generateDemoSessions(profileId: string, now = Date.now(), seed =
           const reps = []
           for (let i = 0; i < count; i++) {
             const durationMs = Math.round(2400 + 60 * i * (offDay ? 1.6 : 1) + noise(200))
-            const peak = sessionPeak - decayPerRep * i - 1.5 * (setNumber - 1) + noise(1.5)
+            const peak = sessionPeak - decayPerRep * (range / 140) * i - (range / 140) * 1.5 * (setNumber - 1) + noise(range * 0.01)
             reps.push({ index: i + 1, peakDeg: Math.round(Math.min(179, peak) * 10) / 10, startedAt: t, endedAt: t + durationMs, durationMs })
             t += durationMs + 600
           }

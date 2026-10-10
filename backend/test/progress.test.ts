@@ -45,7 +45,7 @@ describe('GET /api/profiles/:id/progress', () => {
     const c = await signup()
     const profileId = await createProfile(c)
     expect((await c.get(`/api/profiles/${profileId}/progress`)).status).toBe(400)
-    expect((await c.get(`/api/profiles/${profileId}/progress?exercise=squat`)).status).toBe(400)
+    expect((await c.get(`/api/profiles/${profileId}/progress?exercise=jumping_jacks`)).status).toBe(400)
     expect((await c.get('/api/profiles/64b64b64b64b64b64b64b64b/progress?exercise=elbow_flexion')).status).toBe(404)
   })
 })

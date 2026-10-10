@@ -1,4 +1,4 @@
-import { EXERCISE_IDS, EXERCISES, type ExerciseId, type PlanDto } from '@arc/dependencies'
+import { EXERCISE_IDS, prescriptionFor, type ExerciseId, type PlanDto, type ProgramDto } from '@arc/dependencies'
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { api } from '../api/client'
@@ -8,36 +8,39 @@ import { EmptyState, PageHeader, Skeleton } from '../components/ui'
 import { useProfiles } from '../hooks/useProfiles'
 import { LiveRecorder, type RecordConfig } from '../record/LiveRecorder'
 
+const isExercise = (v: string | null): v is ExerciseId => EXERCISE_IDS.includes(v as ExerciseId)
+
 /**
- * /record: a session recorded in the browser for the selected profile, straight into its plan
- * (or, with no plan saved, the movement named in ?exercise= at 3 × 8 with 45 s rest). In
- * development, ?simulate replaces the camera with a pretend person doing reps.
+ * /record: a session recorded in the browser for the selected profile. The movement is the one
+ * named in ?exercise= (the dashboard's pick), else the plan's; its sets, reps, rest and goal come
+ * from `prescriptionFor`: the plan when it is for that movement, else the week Arc built, else the
+ * member's goal ranges. In development, ?simulate replaces the camera with a pretend person.
  */
 export function RecordPage() {
   const { selected, selectedId, profiles, loading } = useProfiles()
   const [params] = useSearchParams()
-  const [plan, setPlan] = useState<PlanDto | null | undefined>(undefined)
+  const [data, setData] = useState<{ plan: PlanDto | null; program: ProgramDto | null } | undefined>(undefined)
 
   useEffect(() => {
     if (!selectedId) return
     let cancelled = false
-    setPlan(undefined)
-    api.plan
-      .get(selectedId)
-      .then((p) => !cancelled && setPlan(p))
-      .catch(() => !cancelled && setPlan(null))
+    setData(undefined)
+    Promise.all([api.plan.get(selectedId).catch(() => null), api.plan.program(selectedId).catch(() => null)]).then(([plan, program]) => {
+      if (!cancelled) setData({ plan, program })
+    })
     return () => {
       cancelled = true
     }
   }, [selectedId])
 
   const requested = params.get('exercise')
-  const fallback: ExerciseId = EXERCISE_IDS.includes(requested as ExerciseId) ? (requested as ExerciseId) : 'elbow_flexion'
+  const intake = selected?.intake
   const config = useMemo<RecordConfig | null>(() => {
-    if (plan === undefined) return null
-    if (plan) return { exercise: plan.exercise, side: plan.side, plan: { sets: plan.sets, reps: plan.reps, restSeconds: plan.restSeconds, targetDeg: plan.targetDeg } }
-    return { exercise: fallback, side: 'right', plan: { sets: 3, reps: 8, restSeconds: 45, targetDeg: EXERCISES[fallback].targetDeg } }
-  }, [plan, fallback])
+    if (data === undefined) return null
+    const exercise: ExerciseId = isExercise(requested) ? requested : (data.plan?.exercise ?? 'elbow_flexion')
+    const p = prescriptionFor(exercise, { plan: data.plan, program: data.program, intake })
+    return { exercise, side: p.side, plan: { sets: p.sets, reps: p.reps, restSeconds: p.restSeconds, targetDeg: p.targetDeg } }
+  }, [data, requested, intake])
   const simulate = import.meta.env.DEV && params.has('simulate')
   const noProfiles = !loading && profiles.length === 0
 

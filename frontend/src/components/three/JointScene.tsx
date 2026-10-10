@@ -4,7 +4,7 @@ import { Canvas, useFrame, useThree } from '@react-three/fiber'
 import { useReducedMotion, type MotionValue } from 'motion/react'
 import { useEffect, useMemo, useRef } from 'react'
 import { BoxGeometry, BufferAttribute, BufferGeometry, CircleGeometry, CylinderGeometry, DoubleSide, Group, LatheGeometry, MeshBasicMaterial, MeshStandardMaterial, Object3D, Quaternion, SphereGeometry, TorusGeometry, Vector2, Vector3 } from 'three'
-import { BONES, directionFor, FRAMING, restFor, skeletonFor, type BoneName, type JointName, type Skeleton, type V3 } from './skeleton'
+import { BONES, FRAMING, restFor, skeletonFor, sweepFor, type BoneName, type JointName, type Skeleton, type V3 } from './skeleton'
 
 export interface JointSceneProps {
   exercise: ExerciseId
@@ -174,27 +174,11 @@ function Body({ exercise, angle, goalDeg, rangeDeg, idle, reduce }: Pick<JointSc
     band.dispose()
   }, [gauge, band])
 
-  // The range band (rest to rangeDeg) changes only with the exercise or the reading.
+  // Reduced motion renders on demand: draw again whenever the reading, the range or the movement changes.
   useEffect(() => {
-    const o = rest.overlay
-    const r = o.reach * 0.55
-    const end = rangeDeg != null ? directionFor(exercise, rangeDeg) : o.restDeg
-    writeGauge(band, o.mid, r, r * 0.17, o.restDeg, end, o.z - 0.01)
-    const ends = [o.restDeg, end]
-    ends.forEach((d, i) => {
-      const tick = objects.current[`band-end-${i}`]
-      if (!tick) return
-      tick.position.set(o.mid[0] + r * Math.cos(rad(d)), o.mid[1] + r * Math.sin(rad(d)), o.z)
-      tick.rotation.z = rad(d)
-      tick.scale.set(r * 0.5, r * 0.045, 0.02)
-    })
+    applied.current = null
     invalidate()
-  }, [band, exercise, rangeDeg, rest, objects, invalidate])
-
-  // Reduced motion renders on demand: draw again whenever the reading or the movement changes.
-  useEffect(() => {
-    invalidate()
-  }, [invalidate, exercise, angle, goalDeg])
+  }, [invalidate, exercise, angle, goalDeg, rangeDeg])
 
   const apply = (s: Skeleton, deg: number) => {
     const j = s.joints
@@ -205,8 +189,11 @@ function Body({ exercise, angle, goalDeg, rangeDeg, idle, reduce }: Pick<JointSc
       const from = j[bone.from]
       const to = j[bone.to]
       if (bone.name === 'pelvis') {
-        // Hip to hip; the hips are an ellipsoid set on the middle, upright.
-        obj.position.set((from[0] + to[0]) / 2, (from[1] + to[1]) / 2 + 0.13, (from[2] + to[2]) / 2)
+        // Hip to hip; the hips are an ellipsoid set on the middle, turned with the trunk when seen
+        // side on (a hinge, a crunch), level when seen face on.
+        const lean = view === 'side' ? Math.atan2(j.neck[1] - j.pelvis[1], j.neck[0] - j.pelvis[0]) - Math.PI / 2 : 0
+        obj.position.set((from[0] + to[0]) / 2 - Math.sin(lean) * 0.13, (from[1] + to[1]) / 2 + Math.cos(lean) * 0.13, (from[2] + to[2]) / 2)
+        obj.rotation.z = lean
         continue
       }
       // The exercising biceps shortens and thickens as the elbow bends.
@@ -225,9 +212,19 @@ function Body({ exercise, angle, goalDeg, rangeDeg, idle, reduce }: Pick<JointSc
     if (o['line-distal']) place(o['line-distal'], [ov.mid[0], ov.mid[1], z], [ov.end[0], ov.end[1], z], true)
     const radius = ov.reach * 0.55
     writeGauge(gauge, ov.mid, radius, radius * 0.07, ov.restDeg, ov.currentDeg, z)
+    // The covered range (rest to rangeDeg) rides on the joint, so it follows a squat or a hinge.
+    const bandEnd = rangeDeg != null ? ov.restDeg + sweepFor(exercise, rangeDeg) : ov.restDeg
+    writeGauge(band, ov.mid, radius, radius * 0.17, ov.restDeg, bandEnd, z - 0.01)
+    ;[ov.restDeg, bandEnd].forEach((d, i) => {
+      const end = o[`band-end-${i}`]
+      if (!end) return
+      end.position.set(ov.mid[0] + radius * Math.cos(rad(d)), ov.mid[1] + radius * Math.sin(rad(d)), z)
+      end.rotation.z = rad(d)
+      end.scale.set(radius * 0.5, radius * 0.045, 0.02)
+    })
     const tick = o['goal-tick']
     if (tick && goalDeg != null) {
-      const g = directionFor(exercise, goalDeg)
+      const g = ov.restDeg + sweepFor(exercise, goalDeg)
       tick.position.set(ov.mid[0] + radius * Math.cos(rad(g)), ov.mid[1] + radius * Math.sin(rad(g)), z + 0.01)
       tick.rotation.z = rad(g)
       tick.scale.set(radius * 0.36, radius * 0.073, radius * 0.073)

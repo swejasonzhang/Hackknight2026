@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { EXERCISE_IDS } from '@arc/dependencies'
 import { CoachMessage } from '../src/models/CoachMessage.ts'
 import { createProfile, makeSession, service, signup } from './helpers.ts'
 
@@ -65,13 +66,19 @@ describe('Arc, the coach', () => {
       expect(res.body.reply).toMatch(/Arc/)
       messages.push({ role: 'arc', text: res.body.reply })
       const topics: string[] = [res.body.topic]
+      let choices: { area: string; exercises: { id: string; name: string }[] }[] = []
       for (const answer of ANSWERS) {
         messages.push({ role: 'user', text: answer })
         res = await c.post('/api/coach/onboarding').send({ messages })
         messages.push({ role: 'arc', text: res.body.reply })
         if (res.body.topic) topics.push(res.body.topic)
+        // Only the "where to start" question carries the catalog.
+        if (res.body.topic === 'focus') choices = res.body.choices
+        else expect(res.body.choices, res.body.topic).toBeUndefined()
       }
       expect(topics).toEqual(['goals', 'trainingGoal', 'focus', 'side', 'limitations', 'experience', 'days', 'height', 'weight'])
+      expect(choices.map((g) => g.area)).toEqual(['Upper body', 'Back', 'Legs', 'Core'])
+      expect(choices.flatMap((g) => g.exercises.map((e) => e.id))).toEqual([...EXERCISE_IDS])
       expect(res.body.done).toBe(true)
       expect(res.body.topic).toBeUndefined()
       expect(res.body.intake).toMatchObject({ focus: 'seated_knee_extension', side: 'left', experience: 'new', daysPerWeek: 3, trainingGoal: 'hypertrophy', trainingDays: [1, 3, 5], heightCm: 168 })
@@ -139,7 +146,7 @@ describe('Arc, the coach', () => {
         days: [
           { weekday: 1, title: 'Elbow and shoulder', items: [{ exercise: 'elbow_flexion', side: 'left', sets: 3, reps: 40, restSeconds: 5 }, { exercise: 'shoulder_abduction', side: 'left', sets: 2, reps: 15, restSeconds: 45 }] },
           { weekday: 2, title: 'Not a training day', items: [{ exercise: 'elbow_flexion', side: 'left', sets: 3, reps: 15, restSeconds: 45 }] },
-          { weekday: 3, title: 'Made up', items: [{ exercise: 'deadlift', side: 'left', sets: 3, reps: 15, restSeconds: 45 }] },
+          { weekday: 3, title: 'Made up', items: [{ exercise: 'jumping_jacks', side: 'left', sets: 3, reps: 15, restSeconds: 45 }] },
         ],
       }
       const calls = stubOutside((call) => (isWeekCall(call) ? gemini(week) : gemini({ reply: 'All set.', done: true, intake })))
@@ -164,6 +171,17 @@ describe('Arc, the coach', () => {
       const c = await signup()
       const res = await c.post('/api/coach/onboarding').send({ messages: [{ role: 'user', text: 'My knee' }] })
       expect(res.body).toMatchObject({ done: false, topic: 'side', reply: 'Left or right?' })
+    })
+
+    it("gives Gemini the whole catalog and sends it with Gemini's own where-to-start question", async () => {
+      process.env.GEMINI_API_KEY = 'g-secret'
+      const calls = stubOutside(() => gemini({ reply: 'Where should we start? Everything is on your screen.', done: false, topic: 'focus', intake: null }))
+      const c = await signup()
+      const res = await c.post('/api/coach/onboarding').send({ messages: [{ role: 'user', text: 'Build muscle' }] })
+      expect(res.body.choices.flatMap((g: { exercises: { id: string }[] }) => g.exercises.map((e) => e.id))).toEqual([...EXERCISE_IDS])
+      const prompt = JSON.parse(String(calls[0]!.init.body)).systemInstruction.parts[0].text as string
+      for (const id of EXERCISE_IDS) expect(prompt).toContain(id)
+      expect(prompt).toMatch(/never offer only a few/i)
     })
 
     it('falls back to its scripted questions when Gemini fails', async () => {

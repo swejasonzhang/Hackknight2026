@@ -65,7 +65,7 @@ describe('PlanCalendar', () => {
     expect(today.closest('[role="gridcell"]')).toHaveAttribute('aria-selected', 'true')
     const details = screen.getByRole('region', { name: /selected day/i })
     const first = week.days[1]!.items[0]!
-    expect(within(details).getByText(`Elbow flexion · right · ${first.sets} × ${first.reps} · ${first.restSeconds} s rest · goal 140°`)).toBeInTheDocument()
+    expect(within(details).getByText(`Bicep curl · right · ${first.sets} × ${first.reps} · ${first.restSeconds} s rest · goal 140°`)).toBeInTheDocument()
     expect(within(details).getByRole('link', { name: /start recording/i })).toHaveAttribute('href', '/record')
     expect(within(details).getByRole('link', { name: /open in the log/i })).toHaveAttribute('href', '/plan?day=2026-10-14')
   })
@@ -74,7 +74,7 @@ describe('PlanCalendar', () => {
     renderCalendar()
     fireEvent.click(await screen.findByRole('button', { name: /^Monday 12 October/i }))
     const details = screen.getByRole('region', { name: /selected day/i })
-    expect(within(details).getByRole('link', { name: /Elbow flexion · best 128°/ })).toHaveAttribute('href', '/sessions/s12')
+    expect(within(details).getByRole('link', { name: /Bicep curl · best 128°/ })).toHaveAttribute('href', '/sessions/s12')
     expect(within(details).queryByRole('link', { name: /start recording/i })).not.toBeInTheDocument()
     fireEvent.click(day(/^Tuesday 13 October/i))
     expect(within(screen.getByRole('region', { name: /selected day/i })).getByText(/^A rest day/)).toBeInTheDocument()
@@ -92,6 +92,21 @@ describe('PlanCalendar', () => {
     expect(screen.getByRole('grid', { name: 'November 2026' })).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: /^today$/i }))
     expect(screen.getByRole('grid', { name: 'October 2026' })).toBeInTheDocument()
+  })
+
+  it('marks the days that hold the movement picked on the dashboard', async () => {
+    render(
+      <MemoryRouter>
+        <PlanCalendar profileId="p1" now={NOW} exercise="shoulder_abduction" />
+      </MemoryRouter>,
+    )
+    await screen.findByRole('grid')
+    const withRaise = week.days.filter((d) => d.items.some((i) => i.exercise === 'shoulder_abduction')).map((d) => d.weekday)
+    expect(withRaise.length).toBeGreaterThan(0)
+    const holds = screen.getAllByRole('button', { name: /includes lateral raise/i })
+    expect(holds.length).toBeGreaterThan(0)
+    for (const b of holds) expect(b).toHaveAttribute('data-holds', 'true')
+    expect(screen.getByText(/days with lateral raise/i)).toBeInTheDocument()
   })
 
   it('invites the member to plan a week with Arc when there is none', async () => {

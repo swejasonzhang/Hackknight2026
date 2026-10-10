@@ -1,4 +1,4 @@
-import { OnboardingInputSchema, SetFeedbackInputSchema, type CoachStatus, type OnboardingReply } from '@arc/dependencies'
+import { catalogByArea, OnboardingInputSchema, SetFeedbackInputSchema, type CoachStatus, type OnboardingReply } from '@arc/dependencies'
 import { Router, type RequestHandler } from 'express'
 import mongoose from 'mongoose'
 import { requireUser } from '../auth.ts'
@@ -62,6 +62,8 @@ coachRouter.post('/onboarding', limit, async (req, res) => {
 
   const reply: OnboardingReply = { reply: turn.reply, messageId: arcLine._id.toString(), done: turn.done, offline: turn.offline }
   if (turn.topic) reply.topic = turn.topic
+  // Where to start: the page shows every movement Arc can track, the same catalog Gemini was given.
+  if (turn.topic === 'focus') reply.choices = catalogByArea()
   if (turn.done && turn.intake && turn.program) {
     // Arc saves what it learned: on the profile it was given, or on a new one named after the member.
     const profile: ProfileShape = existing

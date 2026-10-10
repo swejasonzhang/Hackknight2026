@@ -1,4 +1,4 @@
-import { EXERCISES, type CoachStatus, type ExerciseId, type SessionPlan, type Side, type VoiceCommand } from '@arc/dependencies'
+import { EXERCISE_LIST, EXERCISES, type CoachStatus, type ExerciseId, type SessionPlan, type Side, type VoiceCommand } from '@arc/dependencies'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { api } from '../api/client'
@@ -23,10 +23,21 @@ type Status = { kind: 'camera' } | { kind: 'model' } | { kind: 'live' } | { kind
 const OUTLINE: [number, number][] = [
   [11, 12], [11, 13], [13, 15], [12, 14], [14, 16], [11, 23], [12, 24], [23, 24], [23, 25], [25, 27], [24, 26], [26, 28],
 ]
-const JOINT_NAMES: Record<ExerciseId, string> = {
-  elbow_flexion: 'shoulder, elbow and wrist',
-  shoulder_abduction: 'hip, shoulder and elbow',
-  seated_knee_extension: 'hip, knee and ankle',
+/** "shoulder, elbow and wrist": the joints a movement is measured at, in plain words. */
+const LANDMARK_WORDS: Record<number, string> = { 11: 'shoulder', 12: 'shoulder', 13: 'elbow', 14: 'elbow', 15: 'wrist', 16: 'wrist', 23: 'hip', 24: 'hip', 25: 'knee', 26: 'knee', 27: 'ankle', 28: 'ankle' }
+const JOINT_NAMES = Object.fromEntries(
+  EXERCISE_LIST.map((e) => {
+    const words = [...new Set(e.joints.right.map((i) => LANDMARK_WORDS[i]!))]
+    const plural = words.length === 1 ? `${words[0]}s` : words.length === 2 ? `${words[0]}s and ${words[1]}s` : `${words.slice(0, -1).join(', ')} and ${words.at(-1)}`
+    return [e.id, plural]
+  }),
+) as Record<ExerciseId, string>
+
+/** How far the pretend person reaches: a little short of the goal, always clearly past the rep threshold. */
+export function simulatedPeak(config: Pick<RecordConfig, 'exercise' | 'plan'>): number {
+  const cfg = EXERCISES[config.exercise]
+  const short = (config.plan.targetDeg - cfg.restDeg) * 0.06
+  return Math.min(cfg.maxDeg, Math.max(cfg.enterDeg + (cfg.enterDeg - cfg.exitDeg) * 0.15, config.plan.targetDeg - short))
 }
 
 /** Short spoken acknowledgements, so a hands-free member knows Arc heard them. */
@@ -248,7 +259,7 @@ export function LiveRecorder({ profileId, config, simulate = false }: { profileI
       setStatus({ kind: 'model' })
       try {
         tracker = simulate
-          ? (await import('./simulated')).createSimulatedTracker(config.exercise, config.side, Math.min(config.plan.targetDeg - 8, 170))
+          ? (await import('./simulated')).createSimulatedTracker(config.exercise, config.side, simulatedPeak(config))
           : await (await import('./pose')).createPoseTracker()
       } catch {
         if (!cancelled) setStatus({ kind: 'error', message: 'The pose model could not load. Check the internet connection, then try again.' })

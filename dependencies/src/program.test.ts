@@ -7,6 +7,7 @@ import {
   parseTrainingGoal,
   parseWeekdays,
   parseWeightKg,
+  prescriptionFor,
   programDayOn,
   programFromIntake,
   ProgramInputSchema,
@@ -146,5 +147,32 @@ describe('the program on the calendar', () => {
   it('refuses a program with the same weekday twice', () => {
     const day = programFromIntake(intake).days[0]!
     expect(ProgramInputSchema.safeParse({ summary: 'x', days: [day, day] }).success).toBe(false)
+  })
+})
+
+describe('prescriptionFor: what Record runs for the movement picked', () => {
+  const program = programFromIntake({ ...intake, focus: 'squat', experience: 'regular', trainingDays: [1, 3, 5] })
+  const plan = { exercise: 'squat' as const, side: 'left' as const, sets: 5, reps: 6, restSeconds: 90, targetDeg: 95 }
+  const monday = new Date(2026, 9, 12)
+
+  it("uses the saved plan when it is for that movement", () => {
+    expect(prescriptionFor('squat', { plan, program, intake, date: monday })).toEqual({ ...plan, source: 'plan' })
+  })
+
+  it("otherwise uses the week: today's prescription for it first, else its first day", () => {
+    const lunge = program.days.flatMap((d) => d.items).find((i) => i.exercise === 'lunge')!
+    expect(prescriptionFor('lunge', { plan, program, intake, date: monday })).toEqual({ ...lunge, source: 'week' })
+  })
+
+  it("falls back to the goal's ranges on the member's side, with the movement's own goal angle", () => {
+    const p = prescriptionFor('crunch', { plan, program, intake: { ...intake, side: 'left', trainingGoal: 'endurance' }, date: monday })
+    expect(p).toMatchObject({ exercise: 'crunch', side: 'left', targetDeg: 55, source: 'default' })
+    expect(p.reps).toBeGreaterThanOrEqual(13)
+    expect(prescriptionFor('crunch', { date: monday })).toEqual({ exercise: 'crunch', side: 'right', sets: 3, reps: 8, restSeconds: 45, targetDeg: 55, source: 'default' })
+  })
+
+  it('fills the week with movements from the focus area first', () => {
+    const legs = programFromIntake({ ...intake, focus: 'squat', experience: 'regular' })
+    expect(legs.days.map((d) => d.items[1]!.exercise)).toEqual(['lunge', 'seated_knee_extension', 'lunge'])
   })
 })
