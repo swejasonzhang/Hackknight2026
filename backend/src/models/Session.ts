@@ -1,5 +1,6 @@
 import {
   EXERCISE_IDS,
+  FORM_FAULTS,
   VOICE_COMMANDS,
   type CoachSummary,
   type ExerciseId,
@@ -59,6 +60,8 @@ const SetSchema = new Schema(
     startedAt: { type: Number, required: true },
     endedAt: { type: Number, required: true },
     endedEarly: { type: Boolean, required: true },
+    /** Reps not counted for their form, and why. */
+    rejected: { type: [new Schema({ at: { type: Number, required: true }, fault: { type: String, enum: [...FORM_FAULTS], required: true } }, { _id: false })], default: undefined },
   },
   { _id: false },
 )
@@ -152,6 +155,7 @@ export function toSessionDto(s: SessionShape): SessionDto {
       startedAt: set.startedAt,
       endedAt: set.endedAt,
       endedEarly: set.endedEarly,
+      ...(set.rejected?.length ? { rejected: set.rejected.map((r) => ({ at: r.at, fault: r.fault })) } : {}),
     })),
     summary: {
       totalReps: s.summary.totalReps,

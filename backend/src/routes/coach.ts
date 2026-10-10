@@ -85,7 +85,7 @@ coachRouter.post('/sets', limit, async (req, res) => {
   const input = validate(SetFeedbackInputSchema, req.body)
   const profile = await requireProfile(input.profileId, { kind: 'user', userId })
   const name = await memberName(userId)
-  const { text, offline } = await setFeedback({ name, exercise: input.exercise, side: input.side, plan: input.plan, setNumber: input.setNumber, reps: input.reps, intake: profile.intake })
+  const { text, offline } = await setFeedback({ name, exercise: input.exercise, side: input.side, plan: input.plan, setNumber: input.setNumber, reps: input.reps, ...(input.rejected ? { rejected: input.rejected } : {}), intake: profile.intake })
   const message = await CoachMessage.create({ ownerId: userId, profileId: profile._id, kind: 'set', role: 'arc', text, offline, createdAt: Date.now() })
   res.json(toCoachMessageDto(message))
 })

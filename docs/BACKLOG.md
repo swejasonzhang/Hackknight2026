@@ -69,3 +69,9 @@ Owners: **FS** = full-stack (this repo), **CV** = computer-vision camera app, **
 | G3 | As a member I arrange my own week and work through each day | edit any day by hand, several movements a day by muscle group; each day a checklist crossed out as sessions are recorded; Next to the following movement; Arc's week editable in the chat | 8 | Done (PR #35; ADR-0026) |
 | G4 | As a household we see who moved most | weight held saved with each session; a leaderboard of the account's profiles by reps, sets, weight moved, steadiness and an Arc score | 5 | Done (PR #36; ADR-0027) |
 | G5 | As a visitor the landing page shows the app as it is | all fifteen movements, the weight held, the body with its muscles, a demo household's leaderboard | 2 | Done (PR #37) |
+| G6 | As a member only my good-form reps count | a swinging or bent-arm rep, or one too quick, is refused with its reason; Arc says why at once and in the set's read | 5 | Done (ADR-0028) |
+| G7 | As a member the camera shows which way to move, not a skeleton | one arc on the working joint toward the goal and back, the goal ticked, a label; the count on the camera on a phone | 3 | Done (ADR-0028) |
+| G8 | As a member the figure and my goals stay inside each movement's range | per-movement furthest angle; goals checked in the editor and the API | 2 | Done (ADR-0028) |
+| G9 | As a household the leaderboard is one tap away | its own page in the navigation, "Ranking" on a phone | 1 | Done |
+| G10 | As a member the app reads well on a phone | the dashboard panel in the flow, the day's log first on the plan, the count on the camera | 2 | Done |
+

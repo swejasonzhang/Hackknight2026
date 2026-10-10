@@ -52,6 +52,11 @@ describe("AppShell", () => {
     const logos = screen.getAllByRole("link", { name: "Arc home page" });
     expect(logos).toHaveLength(2);
     for (const logo of logos) expect(logo).toHaveAttribute("href", "/");
+    // The leaderboard has its own page, on the rail and (as Ranking) on the phone bar.
+    const boards = screen.getAllByRole("link", { name: "Leaderboard" });
+    expect(boards).toHaveLength(2);
+    for (const b of boards) expect(b).toHaveAttribute("href", "/leaderboard");
+    expect(screen.getByText("Ranking")).toBeInTheDocument();
   });
 
   it("leads to the account page from the account tag, on the rail and on the phone bar", async () => {

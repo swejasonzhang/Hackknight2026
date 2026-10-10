@@ -5,6 +5,7 @@
 import { z } from 'zod'
 import { EmailSchema, NameSchema } from './fields.ts'
 import type { CatalogGroup } from './engine/exercises.ts'
+import { FORM_FAULTS } from './engine/form.ts'
 import type { ProgramDto } from './program.ts'
 import { EXERCISE_IDS, MUSCLE_IDS, VOICE_COMMANDS, type ExerciseId, type SessionPlan, type SessionRecord, type Side } from './engine/types.ts'
 
@@ -95,6 +96,8 @@ export const FatigueEstimateSchema = z.object({
   sampleReps: z.number().int().nonnegative(),
 })
 
+export const RejectedRepSchema = z.object({ at: epochMs, fault: z.enum(FORM_FAULTS) })
+
 export const SetRecordSchema = z.object({
   setNumber: z.number().int().min(1),
   reps: z.array(RepRecordSchema),
@@ -102,6 +105,8 @@ export const SetRecordSchema = z.object({
   startedAt: epochMs,
   endedAt: epochMs,
   endedEarly: z.boolean(),
+  /** Reps not counted for their form, and why. */
+  rejected: z.array(RejectedRepSchema).max(200).optional(),
 })
 
 export const SessionPlanSchema = z.object({
@@ -214,6 +219,8 @@ export const SetFeedbackInputSchema = z.object({
   plan: SessionPlanSchema,
   setNumber: z.number().int().min(1),
   reps: z.array(RepRecordSchema).max(100),
+  /** Reps the set did not count for their form, so Arc can say what to change. */
+  rejected: z.array(RejectedRepSchema).max(100).optional(),
 })
 export type SetFeedbackInput = z.infer<typeof SetFeedbackInputSchema>
 

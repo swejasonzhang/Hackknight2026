@@ -1,4 +1,4 @@
-import { describeWeek, mondayFirst, PlanInputSchema, ProgramEditSchema, UpdatePlanSchema } from '@arc/dependencies'
+import { describeWeek, goalProblem, mondayFirst, PlanInputSchema, ProgramEditSchema, UpdatePlanSchema } from '@arc/dependencies'
 import { Router } from 'express'
 import { principalOf } from '../auth.ts'
 import { HttpError, validate } from '../http.ts'
@@ -25,6 +25,8 @@ plansRouter.get('/:id/plans', async (req, res) => {
 
 plansRouter.put('/:id/plan', async (req, res) => {
   const input = validate(PlanInputSchema, req.body)
+  const problem = goalProblem(input.exercise, input.targetDeg)
+  if (problem) throw new HttpError(400, problem)
   const profile = await requireProfile(req.params.id, principalOf(req))
   await Plan.updateMany({ profileId: profile._id, active: true }, { $set: { active: false } })
   const plan = await Plan.create({ ...input, profileId: profile._id, active: true, createdAt: Date.now() })
@@ -34,6 +36,12 @@ plansRouter.put('/:id/plan', async (req, res) => {
 plansRouter.patch('/:id/plan', async (req, res) => {
   const input = validate(UpdatePlanSchema, req.body)
   const profile = await requireProfile(req.params.id, principalOf(req))
+  if (input.exercise != null || input.targetDeg != null) {
+    const current = await Plan.findOne({ profileId: profile._id, active: true }).lean<PlanShape>()
+    if (!current) throw new HttpError(404, 'No active plan')
+    const problem = goalProblem(input.exercise ?? current.exercise, input.targetDeg ?? current.targetDeg)
+    if (problem) throw new HttpError(400, problem)
+  }
   const plan = await Plan.findOneAndUpdate(
     { profileId: profile._id, active: true },
     { $set: input },

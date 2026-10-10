@@ -1,4 +1,4 @@
-import { EXERCISES, isDiverseWeek, MAX_DAY_ITEMS, muscleOf, MUSCLES, sideLabel, titleForDay, WEEKDAY_NAMES, type ExerciseId, type ProgramDay, type ProgramDto, type ProgramItem, type Side } from '@arc/dependencies'
+import { EXERCISES, goalProblem, goalRange, isDiverseWeek, MAX_DAY_ITEMS, muscleOf, MUSCLES, sideLabel, titleForDay, WEEKDAY_NAMES, type ExerciseId, type ProgramDay, type ProgramDto, type ProgramItem, type Side } from '@arc/dependencies'
 import { useEffect, useId, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { api } from '../api/client'
@@ -120,6 +120,11 @@ export function WeekEditor({ profileId, program, onSaved, history = false, side 
   const save = async () => {
     if (!days.length) return setError('Pick at least one training day.')
     if (empty) return setError(`Add a movement to ${WEEKDAY_NAMES[empty.weekday]}, or make it a rest day.`)
+    // Every goal inside its movement's range (the server checks too).
+    for (const d of days) {
+      const off = d.items.map((i) => goalProblem(i.exercise, i.targetDeg)).find(Boolean)
+      if (off) return setError(`${WEEKDAY_NAMES[d.weekday]}: ${off}`)
+    }
     setSaving(true)
     setError(null)
     try {
@@ -235,7 +240,7 @@ export function WeekEditor({ profileId, program, onSaved, history = false, side 
                                   ['sets', 'Sets', 1, 10],
                                   ['reps', 'Reps', 1, 50],
                                   ['restSeconds', 'Rest (s)', 10, 600],
-                                  ['targetDeg', 'Goal (°)', 0, 180],
+                                  ['targetDeg', 'Goal (°)', goalRange(item.exercise).min, goalRange(item.exercise).max],
                                 ] as const
                               ).map(([field, label, min, max]) => (
                                 <label key={field} className="flex flex-col gap-1">
