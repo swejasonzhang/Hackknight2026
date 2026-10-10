@@ -1,7 +1,7 @@
 # ADR-0010: Visual identity "Calibre": a calibrated instrument on paper
 
 - Date: 2026-10-10
-- Status: accepted (supersedes ADR-0008 and ADR-0009)
+- Status: accepted (supersedes ADR-0008 and ADR-0009); the Motion bullet is amended by ADR-0011
 
 ## Context
 

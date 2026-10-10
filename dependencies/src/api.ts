@@ -58,6 +58,12 @@ export type PlanInput = z.infer<typeof PlanInputSchema>
 export const UpdatePlanSchema = PlanInputSchema.partial()
 export type UpdatePlanInput = z.infer<typeof UpdatePlanSchema>
 
+/** Body of POST /api/dev/seed: the browser's `Date#getTimezoneOffset()`, so demo sessions land at local hours. */
+export const SeedRequestSchema = z
+  .object({ tzOffsetMinutes: z.number().int().min(-840).max(840).optional() })
+  .optional()
+export type SeedRequest = z.infer<typeof SeedRequestSchema>
+
 const epochMs = z.number().int().nonnegative()
 
 export const RepRecordSchema = z.object({

@@ -2,7 +2,7 @@
 
 **Range of motion is an arc.** Arc is a webcam goniometer for home use, for anyone at any age, live at [getarc.health](https://getarc.health). A separate **camera app** (built by the computer-vision teammates) watches you exercise, measures joint range of motion (ROM) in degrees, counts reps and sets, and stores each session in MongoDB. **This repository is the web app and API around that data**: accounts, one profile per person in the household, and dashboards that show progress over weeks. It is a personal tool, not a clinical one: no doctor or therapist sees the data.
 
-Stack: MongoDB Atlas · Express 5 · React 19 · Node 20 (MERN), TypeScript everywhere, Vite, Tailwind CSS 4, Motion, React Three Fiber (3D joint and progress scenes), Radix, Vitest. Hosted on Render, domain at Porkbun. Visual identity "Calibre": white and blue, an instrument on paper; Unbounded, IBM Plex Sans and IBM Plex Mono; navy rail, cobalt readouts, 3D joint and progress scenes (ADR-0010).
+Stack: MongoDB Atlas · Express 5 · React 19 · Node 20 (MERN), TypeScript everywhere, Vite, Tailwind CSS 4, Motion, React Three Fiber (3D joint and progress scenes), Radix, Vitest. Hosted on Render, domain at Porkbun. Visual identity "Calibre": white and blue, an instrument on paper; Unbounded, IBM Plex Sans and IBM Plex Mono; navy rail, cobalt readouts, 3D joint and progress scenes (ADR-0010). The landing page runs a 3D arm through elbow-flexion reps and a demo board that draws six random weeks with the app's own generator and charts (ADR-0011).
 
 ---
 
@@ -19,7 +19,7 @@ npm run dev            # API on :8787, web app on :5173
 
 Open <http://localhost:5173>. `/` is the landing page; **Get started** takes you to `/signup` (one account per household) and the app lives at `/dashboard`. Then:
 
-1. **Profiles** → **Add a profile** for each person who exercises, or **Load demo data** for a profile with six weeks of seeded sessions.
+1. **Profiles** → **Add a profile** for each person who exercises, or **Load demo data** for a profile with six weeks of random sessions at your local training hours.
 2. **Dashboard** → pick who you're looking at and the exercise. You get peak ROM per session with your goal line, the latest session rep by rep, the fatigue proxy per session, sessions per week, and a table of recent sessions (click one for the set-by-set view). Set or change your plan (sets, reps, rest, goal angle) in the panel on the right.
 
 Real sessions arrive when the camera app records them (section 4). The API refuses to start without the three secrets and prints what is missing.
@@ -149,7 +149,7 @@ Base URL in development: `http://localhost:8787`. All bodies are JSON. Validatio
 | `GET /api/profiles/:id/sessions?exercise=` | | sessions, newest first, optional exercise filter |
 | `GET /api/sessions/:id` | | one session |
 | `GET /api/profiles/:id/progress?exercise=` | | dashboard series: peak/mean/fatigue per session (oldest first), sessions per week, latest session rep by rep, plan goal |
-| `POST /api/dev/seed` | | `201`/`200` `{ profileId, sessions, created }`; your demo profile with six weeks of random sessions (a new seed per account); signed-in accounts only, in every environment |
+| `POST /api/dev/seed` | optional `{ tzOffsetMinutes }` (the browser's `getTimezoneOffset()`) | `201`/`200` `{ profileId, sessions, created }`; your demo profile with six weeks of random sessions at local training hours (a new seed per account); signed-in accounts only, in every environment |
 
 Exercise ids: `elbow_flexion`, `shoulder_abduction`, `seated_knee_extension`. Sides: `left`, `right`.
 
@@ -157,7 +157,8 @@ Exercise ids: `elbow_flexion`, `shoulder_abduction`, `seated_knee_extension`. Si
 
 ```
 dependencies/  @arc/dependencies  pure TypeScript shared by both sides: domain types, exercise configs,
-               rep counter, One Euro filter, fatigue proxy, session summary, zod API schemas
+               rep counter, One Euro filter, fatigue proxy, session summary, demo data generator,
+               progress builder, zod API schemas
 backend/       @arc/backend       Express 5 + Mongoose: models (User, Profile, Plan, Session), auth,
                routes, services; src/app.ts builds the app, src/index.ts connects and listens, test/ = API tests
 frontend/      @arc/frontend      Vite + React 19 + Tailwind + Motion: pages (Landing, Signup, Login, Dashboard,
@@ -173,7 +174,7 @@ The three JavaScript packages are npm workspaces; the camera app is a separate P
 
 The project is developed **test-first**: write the failing test, make it pass, then clean up. `npm test` must be green before a pull request is opened, and CI (`.github/workflows/ci.yml`) runs typecheck, tests and the build on every push and PR.
 
-- `dependencies/src/**/*.test.ts`: engine behaviour (rep counting, hysteresis, jitter rejection, fatigue arithmetic, summaries, schema validation).
+- `dependencies/src/**/*.test.ts`: engine behaviour (rep counting, hysteresis, jitter rejection, fatigue arithmetic, summaries, schema validation), the demo generator (repeatable per seed, upward trends, local training hours) and the progress builder.
 - `backend/test/*.test.ts`: every API route through supertest against a throwaway in-memory MongoDB, including sign-up, login, token checks, API-key access and profile isolation between accounts. Tests never touch the cluster in `.env`.
 - `frontend/src/**/*.test.ts(x)`: the API wrapper (token header, 401 handling), the route guards (app pages send visitors to `/login`, the landing page sends signed-in users to `/dashboard`), the sign-up / login form, UI primitives and the hero's rep detector.
 

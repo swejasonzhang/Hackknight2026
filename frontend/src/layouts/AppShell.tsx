@@ -1,6 +1,6 @@
-import { motion } from 'motion/react'
+import { AnimatePresence, motion, useReducedMotion } from 'motion/react'
 import { useEffect, useState } from 'react'
-import { Link, NavLink, Outlet } from 'react-router-dom'
+import { Link, NavLink, useLocation, useOutlet } from 'react-router-dom'
 import { api } from '../api/client'
 import { useAuth } from '../auth/AuthContext'
 import { Hint } from '../components/Hint'
@@ -57,6 +57,9 @@ const LINKS = [
 export function AppShell() {
   const { user, logout } = useAuth()
   const apiState = useApiState()
+  const location = useLocation()
+  const outlet = useOutlet()
+  const reduce = useReducedMotion()
 
   return (
     <div className="min-h-screen bg-vellum sm:pl-[56px]">
@@ -64,7 +67,7 @@ export function AppShell() {
         <Link to="/dashboard" className="flex h-[72px] w-full items-center justify-center border-b border-white/10 hover:no-underline" aria-label="Arc dashboard">
           <Logo size={26} tone="paper" />
         </Link>
-        <nav aria-label="Main" className="mt-4 flex flex-col">
+        <nav aria-label="Main" className="rail-nav">
           {LINKS.map(({ to, label, end }) => (
             <NavLink key={to} to={to} end={end} className="rail-link">
               {({ isActive }) => (
@@ -76,7 +79,6 @@ export function AppShell() {
             </NavLink>
           ))}
         </nav>
-        <div className="rail-ruler" aria-hidden="true" />
         <div className="flex flex-col items-center gap-3 border-t border-white/10 py-4">
           <ApiLamp state={apiState} />
           {user && (
@@ -93,7 +95,11 @@ export function AppShell() {
       </aside>
 
       <main className="mx-auto w-full max-w-[1440px] px-4 pt-5 pb-[calc(80px+env(safe-area-inset-bottom))] sm:px-6 sm:pt-6 sm:pb-12 lg:px-8 lg:pt-8">
-        <Outlet />
+        <AnimatePresence mode="wait" initial={false}>
+          <motion.div key={location.pathname} initial={reduce ? false : { opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={reduce ? undefined : { opacity: 0, y: -8 }} transition={{ duration: 0.26, ease: [0.2, 0, 0, 1] }}>
+            {outlet}
+          </motion.div>
+        </AnimatePresence>
       </main>
 
       <nav className="bar sm:hidden" aria-label="Main">

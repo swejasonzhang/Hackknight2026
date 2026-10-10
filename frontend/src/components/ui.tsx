@@ -1,6 +1,7 @@
 import * as Tabs from '@radix-ui/react-tabs'
-import { motion } from 'motion/react'
+import { motion, useReducedMotion } from 'motion/react'
 import { useId, type ReactNode } from 'react'
+import { parentVariants, riseVariants, ruleVariants } from './motion'
 
 /*
  * Shared primitives of the "Calibre" system. Styling comes from the classes in index.css:
@@ -40,17 +41,22 @@ export function Card({ children, className = '', title, subtitle, actions, index
   )
 }
 
-/** A numbered, ruled section of a readout column: navy top rule, mono index, strip title. */
+/**
+ * A numbered, ruled section: as it scrolls into view its navy rule draws across, the index and
+ * title rise, then the content follows.
+ */
 export function Strip({ index, title, aside, children, className = '', id }: { index: string; title: ReactNode; aside?: ReactNode; children: ReactNode; className?: string; id?: string }) {
+  const reduce = useReducedMotion()
   return (
-    <section id={id} className={`strip ${className}`.trim()}>
-      <header className="strip-head">
+    <motion.section id={id} className={`relative pt-4 pb-8 ${className}`.trim()} variants={parentVariants} initial={reduce ? 'show' : 'hidden'} whileInView="show" viewport={{ once: true, margin: '-60px' }}>
+      <motion.span aria-hidden="true" className="absolute inset-x-0 top-0 h-px origin-left bg-rule-strong" variants={ruleVariants} />
+      <motion.header className="strip-head" variants={riseVariants}>
         <span className="strip-index">{index}</span>
         <h2 className="t-strip">{title}</h2>
         {aside && <div className="strip-aside t-meta">{aside}</div>}
-      </header>
-      {children}
-    </section>
+      </motion.header>
+      <motion.div variants={riseVariants}>{children}</motion.div>
+    </motion.section>
   )
 }
 
@@ -124,6 +130,8 @@ export function Avatar({ name, size = 36 }: { name: string; size?: number }) {
 export interface SegmentedOption<T extends string> {
   value: T
   label: string
+  /** A shorter label shown below the sm breakpoint; `label` stays the tab's accessible name. */
+  short?: string
 }
 
 /** A selector switch: square cells on a rule, the active one navy with a cobalt top edge (Radix Tabs underneath). */
@@ -142,9 +150,21 @@ export function Segmented<T extends string>({ options, value, onChange, label }:
                 if (!active) onChange(o.value)
               }}
               className="switch-cell"
+              aria-label={o.short ? o.label : undefined}
             >
               {active && <motion.span layoutId={layoutId} aria-hidden="true" className="absolute inset-x-0 top-0 h-[2px] bg-cobalt" transition={{ duration: 0.24, ease: [0.2, 0, 0, 1] }} />}
-              <span className="relative">{o.label}</span>
+              {o.short ? (
+                <>
+                  <span aria-hidden="true" className="relative sm:hidden">
+                    {o.short}
+                  </span>
+                  <span aria-hidden="true" className="relative hidden sm:inline">
+                    {o.label}
+                  </span>
+                </>
+              ) : (
+                <span className="relative">{o.label}</span>
+              )}
             </Tabs.Trigger>
           )
         })}

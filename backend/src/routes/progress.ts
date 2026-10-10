@@ -1,11 +1,10 @@
-import { ExerciseIdSchema } from '@arc/dependencies'
+import { buildProgress, ExerciseIdSchema } from '@arc/dependencies'
 import { Router } from 'express'
 import { principalOf } from '../auth.ts'
 import { validate } from '../http.ts'
 import { Plan, type PlanShape } from '../models/Plan.ts'
 import { Session, toSessionDto, type SessionShape } from '../models/Session.ts'
 import { requireProfile } from '../services/profiles.ts'
-import { buildProgress } from '../services/progress.ts'
 
 /** Mounted at /api/profiles (behind `authenticate`) */
 export const progressRouter = Router()

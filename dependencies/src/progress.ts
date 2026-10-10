@@ -1,4 +1,5 @@
-import type { ExerciseId, ProgressDto, SessionRecord } from '@arc/dependencies'
+import type { ProgressDto } from './api.ts'
+import type { ExerciseId, SessionRecord } from './engine/types.ts'
 
 /** ISO date (YYYY-MM-DD) of the Monday that starts the UTC week containing `ms`. */
 export function weekStartIso(ms: number): string {
