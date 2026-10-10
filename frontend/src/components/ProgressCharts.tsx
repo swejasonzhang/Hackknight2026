@@ -2,8 +2,6 @@ import { FATIGUE_NUDGE, FATIGUE_STOP, type ProgressDto } from '@arc/dependencies
 import { useReducedMotion } from 'motion/react'
 import { Bar, BarChart, CartesianGrid, Line, LineChart, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { formatDate } from '../format'
-import { WhenVisible } from './motion'
-import { Strip } from './ui'
 
 const MONO = "'IBM Plex Mono', ui-monospace, monospace"
 
@@ -141,35 +139,5 @@ export function WeeklyChart({ progress, height = 200 }: { progress: ProgressDto;
         </BarChart>
       </ResponsiveContainer>
     </div>
-  )
-}
-
-/** Strips 01 to 04 of the dashboard's readout column; each chart draws in as it scrolls into view. */
-export function ProgressCharts({ progress, metricLabel }: { progress: ProgressDto; metricLabel: string }) {
-  const latest = progress.sessions.at(-1)
-  const goal = progress.targetDeg
-  return (
-    <>
-      <Strip index="01" title={`Peak ${metricLabel.toLowerCase()} per session`} aside={goal != null ? `Goal ${goal}°` : 'No goal set'}>
-        <WhenVisible height={300}>
-          <PeakChart progress={progress} />
-        </WhenVisible>
-      </Strip>
-      <Strip index="02" title="Latest session, rep by rep" aside={latest ? `${formatDate(latest.date)} · ${progress.latestSessionReps.length} reps` : undefined}>
-        <WhenVisible height={240}>
-          <RepChart progress={progress} />
-        </WhenVisible>
-      </Strip>
-      <Strip index="03" title="Fatigue per session" aside="ROM decay + tempo drift · a proxy, not a clinical measure">
-        <WhenVisible height={220}>
-          <FatigueChart progress={progress} />
-        </WhenVisible>
-      </Strip>
-      <Strip index="04" title="Sessions per week" aside="Consistency moves every other number">
-        <WhenVisible height={200}>
-          <WeeklyChart progress={progress} />
-        </WhenVisible>
-      </Strip>
-    </>
   )
 }

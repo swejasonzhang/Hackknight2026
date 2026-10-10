@@ -7,10 +7,12 @@ interface Props {
   profileId: string
   plan: PlanDto | null
   onSaved: (plan: PlanDto) => void
+  /** Stack each label over its control, for a narrow column. */
+  compact?: boolean
 }
 
 /** The plan as a datasheet: one ruled row per setting, the save as the sheet's last row. */
-export function PlanEditor({ profileId, plan, onSaved }: Props) {
+export function PlanEditor({ profileId, plan, onSaved, compact = false }: Props) {
   const [form, setForm] = useState<PlanInput>(toForm(plan))
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -39,7 +41,7 @@ export function PlanEditor({ profileId, plan, onSaved }: Props) {
   const num = (key: keyof PlanInput) => (e: ChangeEvent<HTMLInputElement>) => setForm({ ...form, [key]: Number(e.target.value) })
 
   const row = (key: string, label: string, control: React.ReactNode) => (
-    <div className="field-row">
+    <div className={compact ? 'field-row field-row-stacked' : 'field-row'}>
       <label htmlFor={id(key)} className="field-label">
         {label}
       </label>
@@ -48,7 +50,7 @@ export function PlanEditor({ profileId, plan, onSaved }: Props) {
   )
 
   return (
-    <form onSubmit={submit} className="max-w-[640px]">
+    <form onSubmit={submit} className={compact ? 'max-w-[640px] lg:max-w-none' : 'max-w-[640px]'}>
       <p className="t-desc mb-4">{plan ? 'The camera app reads this plan to know the sets, reps, rest and goal it counts against.' : 'No plan yet. Save one so the camera app knows what to count.'}</p>
       <div className="datasheet">
         {row(

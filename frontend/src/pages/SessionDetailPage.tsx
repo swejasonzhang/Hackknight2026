@@ -1,6 +1,6 @@
 import { EXERCISES, FATIGUE_MIN_REPS, type SessionDto } from '@arc/dependencies'
 import { useEffect, useState } from 'react'
-import { Link, useParams } from 'react-router-dom'
+import { Link, useLocation, useParams } from 'react-router-dom'
 import { Bar, BarChart, CartesianGrid, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { api } from '../api/client'
 import { AnimatedNumber, Page } from '../components/motion'
@@ -49,11 +49,21 @@ function goalTag(text: string) {
   }
 }
 
+/** Where "back" goes: the page the session was opened from (the plan's log, on the same day), else the plan. */
+function useBack(): { to: string; label: string } {
+  const state = useLocation().state as { from?: unknown; label?: unknown } | null
+  if (state && typeof state.from === 'string' && state.from.startsWith('/') && !state.from.startsWith('//') && typeof state.label === 'string') {
+    return { to: state.from, label: state.label }
+  }
+  return { to: '/plan', label: 'Plan' }
+}
+
 function BackLink() {
+  const back = useBack()
   return (
     <nav className={AREA.back} aria-label="Breadcrumb">
-      <Link to="/dashboard" className="t-label inline-flex items-center gap-2 text-navy hover:text-cobalt">
-        ← Dashboard
+      <Link to={back.to} className="t-label inline-flex items-center gap-2 text-navy hover:text-cobalt">
+        ← {back.label}
       </Link>
     </nav>
   )
@@ -62,6 +72,7 @@ function BackLink() {
 /** One stored session as a lab report: the sticky stage and spec list, then the readout and the strips. */
 export function SessionDetailPage() {
   const { id = '' } = useParams()
+  const back = useBack()
   const [session, setSession] = useState<SessionDto | null>(null)
   const [error, setError] = useState<string | null>(null)
 
@@ -155,8 +166,8 @@ export function SessionDetailPage() {
       {/* Report head: the way back, timestamp, DEMO tag, the exercise title with the side after a middle dot. */}
       <header className={AREA.title}>
         <div className="t-meta flex flex-wrap items-center gap-3">
-          <Link to="/dashboard" className="t-label inline-flex items-center gap-2 text-navy hover:text-cobalt">
-            ← Dashboard
+          <Link to={back.to} className="t-label inline-flex items-center gap-2 text-navy hover:text-cobalt">
+            ← {back.label}
           </Link>
           <span aria-hidden="true">/</span>
           <span>{formatDateTime(session.startedAt)}</span>
