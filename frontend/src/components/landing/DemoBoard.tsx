@@ -73,7 +73,7 @@ export function DemoBoard() {
         </button>
       </div>
 
-      <dl className="grid grid-cols-2 gap-x-8 border-t border-rule-strong sm:grid-cols-4">
+      <dl className="grid grid-cols-2 gap-x-4 border-t border-rule-strong sm:grid-cols-4 sm:gap-x-8">
         {[
           { k: 'Best rep', v: <AnimatedNumber value={best} suffix="°" />, hint: toGo > 0 ? `${toGo}° to the ${cfg.targetDeg}° goal` : `goal ${cfg.targetDeg}° reached`, tone: toGo > 0 ? ('primary' as const) : ('good' as const) },
           { k: 'Since week 1', v: <AnimatedNumber value={gain} suffix="°" />, hint: first ? `${firstDeg}° on ${formatDate(first.date)}, ${latestDeg}° now` : '', tone: 'primary' as const },
@@ -92,7 +92,7 @@ export function DemoBoard() {
 
       <div className="panel p-4 sm:p-6">
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="w-full overflow-x-auto sm:w-auto">
+          <div className="w-full sm:w-auto">
             <Segmented label="Chart" options={VIEWS} value={view} onChange={setView} />
           </div>
           <span className="t-meta flex items-center gap-2">

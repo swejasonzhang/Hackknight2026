@@ -1,7 +1,7 @@
 import { EXERCISES } from '@arc/dependencies'
 import { animate, motion, useMotionValue, useMotionValueEvent, useReducedMotion, useTransform } from 'motion/react'
 import { useEffect, useLayoutEffect, useMemo, useState } from 'react'
-import { LazyArmScene, SceneBoundary } from '../three/lazy'
+import { LazyJointScene, SceneBoundary } from '../three/lazy'
 import { Lamp } from '../ui'
 import { createRepCycle } from './repCycle'
 
@@ -29,8 +29,8 @@ function Pending({ onPending }: { onPending: (pending: boolean) => void }) {
 }
 
 /**
- * The specimen stage of the landing page: a paper panel holding the blueprint grid, the 3D elbow
- * performing elbow flexion on a loop, and the instrument's DOM callouts (exercise, set and rep
+ * The specimen stage of the landing page: a paper panel holding the blueprint grid, a whole 3D
+ * body performing elbow flexion on a loop, and the instrument's DOM callouts (exercise, set and rep
  * counters, the GOAL tick, the live readout numeral). The angle is a Motion value fed through
  * `createRepCycle`, so nothing re-renders per frame; only a completed rep touches React state.
  * Under reduced motion the limb holds 129° and the numeral reads 129°. If the 3D scene cannot
@@ -66,6 +66,20 @@ export function LiveJoint() {
   const rep = (done % REPS_PER_SET) + 1
   const set = (Math.floor(done / REPS_PER_SET) % SETS) + 1
   const live = !reduce && !pending
+  const numeral = (
+    <>
+      {live ? (
+        <motion.span className="t-readout">{readout}</motion.span>
+      ) : reduce ? (
+        <span className="t-readout">{HELD}°</span>
+      ) : (
+        <span className="t-readout font-mono text-muted">---°</span>
+      )}
+      <span className="t-meta mb-2 tabular-nums">
+        Rep {rep} / {REPS_PER_SET}
+      </span>
+    </>
+  )
 
   return (
     <div className="panel p-3 sm:p-4">
@@ -88,11 +102,12 @@ export function LiveJoint() {
           }
           onError={() => setFailed(true)}
         >
-          <LazyArmScene
+          <LazyJointScene
+            exercise="elbow_flexion"
             angle={angle}
             goalDeg={GOAL}
             className="h-full w-full"
-            label={`A 3D arm performing elbow flexion reps toward a ${GOAL} degree goal, its shoulder, elbow and wrist tracked and the angle read out live in degrees`}
+            label={`A 3D figure of a whole body doing elbow flexion reps toward a ${GOAL} degree goal, its shoulder, elbow and wrist tracked and the angle read out live in degrees`}
             fallback={<Pending onPending={setPending} />}
           />
         </SceneBoundary>
@@ -102,18 +117,13 @@ export function LiveJoint() {
           <span className="callout relative">Goal {GOAL}°</span>
         </div>
 
-        <div className="pointer-events-none absolute bottom-3 left-3 flex items-end gap-4 sm:left-4" aria-hidden="true">
-          {live ? (
-            <motion.span className="t-readout">{readout}</motion.span>
-          ) : reduce ? (
-            <span className="t-readout">{HELD}°</span>
-          ) : (
-            <span className="t-readout font-mono text-muted">---°</span>
-          )}
-          <span className="t-meta mb-2 tabular-nums">
-            Rep {rep} / {REPS_PER_SET}
-          </span>
+        {/* Over the stage from tablet up; on a phone it would cover the figure's feet, so it sits below. */}
+        <div className="pointer-events-none absolute bottom-3 left-4 hidden items-end gap-4 sm:flex" aria-hidden="true">
+          {numeral}
         </div>
+      </div>
+      <div className="flex items-end gap-4 px-1 pt-3 sm:hidden" aria-hidden="true">
+        {numeral}
       </div>
     </div>
   )

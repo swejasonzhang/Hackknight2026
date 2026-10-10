@@ -766,6 +766,13 @@
       background-color var(--t-fast) var(--ease),
       color var(--t-fast) var(--ease);
   }
+  /* The narrowest phones: tighter cells so five tabs fit a 320 px screen. */
+  @media (max-width: 24.99rem) {
+    .switch-cell {
+      padding: 0 6px;
+      letter-spacing: 0.05em;
+    }
+  }
   .switch-cell:last-child {
     border-right: 0;
   }

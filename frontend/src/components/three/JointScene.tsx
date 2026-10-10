@@ -2,14 +2,13 @@ import type { ExerciseId } from '@arc/dependencies'
 import { Grid, Line, OrbitControls, RoundedBox } from '@react-three/drei'
 import { Canvas, useFrame, useThree } from '@react-three/fiber'
 import { useReducedMotion, type MotionValue } from 'motion/react'
-import { useEffect, useMemo, useRef, type RefObject } from 'react'
+import { useEffect, useMemo, useRef, type ReactNode, type RefObject } from 'react'
 import { BufferAttribute, BufferGeometry, DoubleSide, Group, LatheGeometry, Object3D, Quaternion, Vector2, Vector3 } from 'three'
-import { armPose, type Pose } from './armPose'
-import { bodyFor, FRAMING, type PartName } from './bodyPose'
+import { BONES, directionFor, FRAMING, skeletonFor, type BoneName, type JointName, type Skeleton, type V3 } from './skeleton'
 
 export interface JointSceneProps {
   exercise: ExerciseId
-  /** The metric angle to pose at: a Motion value that changes every frame, or a fixed number. */
+  /** The reading to pose at: a Motion value that changes every frame, or a fixed number. */
   angle: MotionValue<number> | number
   /** Drawn as a navy tick on the gauge. */
   goalDeg?: number
@@ -21,25 +20,42 @@ export interface JointSceneProps {
 }
 
 const SKIN = '#c9d2df'
+const JOINT = '#aab6c8'
 const SEAT = '#dfe4ef'
 const NAVY = '#0b1b3a'
 const COBALT = '#0b3dff'
-const TRACK_Z = 0.36
-const GAUGE_R = 0.46
-const GAUGE_STEPS = 64
+const STEPS = 64
 const UP = new Vector3(0, 1, 0)
 const rad = (deg: number) => (deg * Math.PI) / 180
 
-/* Lathe profiles as [t, radius], t running 0 at the part's `from` joint to 1 at its `to` joint. */
-const PROFILES: Partial<Record<PartName, [number, number][]>> = {
-  upperArm: [[-0.02, 0], [0.01, 0.06], [0.06, 0.14], [0.16, 0.172], [0.26, 0.152], [0.39, 0.155], [0.56, 0.166], [0.74, 0.148], [0.91, 0.118], [1, 0.095], [1.02, 0]],
-  forearm: [[-0.05, 0], [-0.02, 0.095], [0.08, 0.116], [0.22, 0.126], [0.42, 0.112], [0.72, 0.086], [0.9, 0.074], [0.99, 0.062], [1, 0]],
-  thigh: [[-0.04, 0], [0, 0.17], [0.12, 0.205], [0.35, 0.215], [0.6, 0.195], [0.85, 0.16], [0.97, 0.13], [1.03, 0]],
-  shin: [[-0.05, 0], [-0.01, 0.12], [0.1, 0.13], [0.28, 0.125], [0.55, 0.1], [0.85, 0.072], [0.98, 0.062], [1, 0]],
-  torso: [[-0.02, 0], [0, 0.25], [0.12, 0.28], [0.4, 0.25], [0.7, 0.28], [0.88, 0.32], [0.97, 0.27], [1.02, 0]],
+/* Lathe profiles as [t, radius]: t runs 0 at the bone's first joint to 1 at its second. */
+const PROFILE: Partial<Record<BoneName, [number, number][]>> = {
+  torso: [[-0.03, 0], [0, 0.5], [0.12, 0.53], [0.3, 0.5], [0.5, 0.52], [0.72, 0.58], [0.86, 0.6], [0.94, 0.52], [0.99, 0.3], [1, 0.21], [1.02, 0]],
+  rUpperArm: [[-0.03, 0], [0, 0.1], [0.06, 0.165], [0.18, 0.185], [0.4, 0.165], [0.6, 0.17], [0.8, 0.145], [0.95, 0.115], [1, 0.1], [1.03, 0]],
+  rForearm: [[-0.04, 0], [0, 0.11], [0.12, 0.15], [0.3, 0.145], [0.55, 0.125], [0.8, 0.1], [0.97, 0.092], [1, 0.09], [1.02, 0]],
+  rThigh: [[-0.05, 0], [0, 0.25], [0.1, 0.31], [0.35, 0.3], [0.65, 0.255], [0.9, 0.2], [1, 0.17], [1.04, 0]],
+  rShin: [[-0.04, 0], [0, 0.17], [0.15, 0.205], [0.3, 0.21], [0.55, 0.17], [0.85, 0.13], [1, 0.12], [1.03, 0]],
 }
-/** A chest is wider than it is deep: flatten front to back, along whichever axis faces the camera's depth. */
-const CHEST_DEPTH = 0.62
+PROFILE.lUpperArm = PROFILE.rUpperArm
+PROFILE.lForearm = PROFILE.rForearm
+PROFILE.lThigh = PROFILE.rThigh
+PROFILE.lShin = PROFILE.rShin
+/** A chest is wider than it is deep: about 32 cm across and 23 cm front to back. */
+const CHEST_DEPTH = 0.72
+
+/** Mannequin ball joints, radius in body units. */
+const BALLS: [JointName, number][] = [
+  ['rShoulder', 0.2],
+  ['lShoulder', 0.2],
+  ['rElbow', 0.12],
+  ['lElbow', 0.12],
+  ['rWrist', 0.08],
+  ['lWrist', 0.08],
+  ['rKnee', 0.175],
+  ['lKnee', 0.175],
+  ['rAnkle', 0.1],
+  ['lAnkle', 0.1],
+]
 
 function lathe(profile: [number, number][]) {
   return new LatheGeometry(
@@ -48,20 +64,20 @@ function lathe(profile: [number, number][]) {
   )
 }
 
-/** Puts an object at `from`, its local +Y pointing at `to`; `stretch` scales +Y to the segment's length. */
-function place(o: Object3D, from: [number, number], to: [number, number], stretch: boolean, { girth = 1, x = 1, z = 1, depth = 0 }: { girth?: number; x?: number; z?: number; depth?: number } = {}) {
-  const dir = new Vector3(to[0] - from[0], to[1] - from[1], 0)
-  const len = dir.length()
-  o.position.set(from[0], from[1], depth)
-  o.quaternion.copy(new Quaternion().setFromUnitVectors(UP, dir.normalize()))
-  o.scale.set(girth * x, stretch ? len : 1, girth * z)
+/** Puts an object at `from` with its local +Y pointing at `to`; `stretch` scales +Y to the bone's length. */
+function place(o: Object3D, from: V3, to: V3, stretch: boolean, scale: [number, number] = [1, 1]) {
+  const d = new Vector3(to[0] - from[0], to[1] - from[1], to[2] - from[2])
+  const len = d.length()
+  o.position.set(from[0], from[1], from[2])
+  o.quaternion.copy(new Quaternion().setFromUnitVectors(UP, d.normalize()))
+  o.scale.set(scale[0], stretch ? len : 1, scale[1])
 }
 
 function gaugeGeometry(): BufferGeometry {
   const g = new BufferGeometry()
-  g.setAttribute('position', new BufferAttribute(new Float32Array((GAUGE_STEPS + 1) * 6), 3))
+  g.setAttribute('position', new BufferAttribute(new Float32Array((STEPS + 1) * 6), 3))
   const index: number[] = []
-  for (let i = 0; i < GAUGE_STEPS; i++) {
+  for (let i = 0; i < STEPS; i++) {
     const a = i * 2
     index.push(a, a + 1, a + 2, a + 1, a + 3, a + 2)
   }
@@ -70,144 +86,203 @@ function gaugeGeometry(): BufferGeometry {
 }
 
 /** The goniometer ribbon at the moving joint, from the rest direction to the current one. */
-function writeGauge(geometry: BufferGeometry, centre: [number, number], fromDeg: number, toDeg: number) {
+function writeGauge(geometry: BufferGeometry, centre: [number, number], radius: number, width: number, fromDeg: number, toDeg: number, z: number) {
   const attr = geometry.getAttribute('position') as BufferAttribute
-  for (let i = 0; i <= GAUGE_STEPS; i++) {
-    const t = rad(fromDeg + ((toDeg - fromDeg) * i) / GAUGE_STEPS)
-    attr.setXYZ(i * 2, centre[0] + (GAUGE_R - 0.03) * Math.cos(t), centre[1] + (GAUGE_R - 0.03) * Math.sin(t), TRACK_Z)
-    attr.setXYZ(i * 2 + 1, centre[0] + (GAUGE_R + 0.03) * Math.cos(t), centre[1] + (GAUGE_R + 0.03) * Math.sin(t), TRACK_Z)
+  for (let i = 0; i <= STEPS; i++) {
+    const t = rad(fromDeg + ((toDeg - fromDeg) * i) / STEPS)
+    attr.setXYZ(i * 2, centre[0] + (radius - width) * Math.cos(t), centre[1] + (radius - width) * Math.sin(t), z)
+    attr.setXYZ(i * 2 + 1, centre[0] + (radius + width) * Math.cos(t), centre[1] + (radius + width) * Math.sin(t), z)
   }
   attr.needsUpdate = true
+  geometry.computeBoundingSphere()
 }
 
-function Skin() {
-  return <meshStandardMaterial color={SKIN} roughness={0.42} metalness={0.08} side={DoubleSide} />
+function Skin({ color = SKIN }: { color?: string }) {
+  return <meshStandardMaterial color={color} roughness={0.45} metalness={0.06} side={DoubleSide} />
 }
 
 /** A tracked joint as the camera app sees it: a cobalt ring around a navy landmark dot. */
-function Landmark({ size = 1 }: { size?: number }) {
+function Landmark({ r }: { r: number }) {
   return (
     <>
       <mesh>
-        <torusGeometry args={[0.085 * size, 0.012, 12, 40]} />
+        <torusGeometry args={[r, r * 0.14, 12, 40]} />
         <meshBasicMaterial color={COBALT} />
       </mesh>
       <mesh>
-        <circleGeometry args={[0.032 * size, 24]} />
+        <circleGeometry args={[r * 0.38, 24]} />
         <meshBasicMaterial color={NAVY} />
       </mesh>
     </>
   )
 }
 
-/** A loose fist along local +Y from the wrist: palm, four curled fingers, a thumb. */
+/** An open hand along local +Y from the wrist: palm, four fingers, a thumb. */
 function Hand() {
   return (
     <>
-      <RoundedBox args={[0.09, 0.2, 0.17]} radius={0.035} smoothness={4} position={[0.01, 0.1, 0]}>
+      <RoundedBox args={[0.27, 0.36, 0.11]} radius={0.045} smoothness={4} position={[0, 0.19, 0]}>
         <Skin />
       </RoundedBox>
-      {[-0.054, -0.018, 0.018, 0.054].map((z, i) => (
-        <mesh key={z} position={[0.052, 0.19 - i * 0.004, z]} rotation={[0, 0, -1.1]}>
-          <capsuleGeometry args={[0.024, 0.05 - Math.abs(z) * 0.2, 6, 12]} />
+      {[-0.095, -0.032, 0.032, 0.095].map((x, i) => (
+        <mesh key={x} position={[x, 0.5 - Math.abs(i - 1.5) * 0.02, 0.01]} rotation={[0.18, 0, 0]}>
+          <capsuleGeometry args={[0.038, 0.2 - Math.abs(i - 1.5) * 0.03, 6, 12]} />
           <Skin />
         </mesh>
       ))}
-      <mesh position={[0.06, 0.08, -0.085]} rotation={[-0.5, 0, -0.6]}>
-        <capsuleGeometry args={[0.024, 0.07, 6, 12]} />
+      <mesh position={[0.16, 0.2, 0.03]} rotation={[0.2, 0, -0.65]}>
+        <capsuleGeometry args={[0.042, 0.16, 6, 12]} />
         <Skin />
       </mesh>
     </>
   )
 }
 
-function Part({ name, refs }: { name: PartName; refs: RefObject<Partial<Record<PartName, Object3D>>> }) {
-  const geometry = useMemo(() => (PROFILES[name] ? lathe(PROFILES[name]!) : null), [name])
-  const bind = (o: Object3D | null) => {
-    if (o) refs.current[name] = o
-    else delete refs.current[name]
-  }
-  if (geometry) {
-    return (
-      <mesh ref={bind} geometry={geometry}>
+/** A foot along local +Y from the ankle to the toes, the heel behind the ankle. */
+function Foot({ view }: { view: Skeleton['view'] }) {
+  // Side on, the sole faces local +X; face on (the foot pointing at the camera), local −Z.
+  return view === 'side' ? (
+    <RoundedBox args={[0.2, 0.98, 0.3]} radius={0.08} smoothness={4} position={[0.03, 0.27, 0]}>
+      <Skin />
+    </RoundedBox>
+  ) : (
+    <RoundedBox args={[0.3, 0.98, 0.2]} radius={0.08} smoothness={4} position={[0, 0.27, -0.03]}>
+      <Skin />
+    </RoundedBox>
+  )
+}
+
+/** The head: a skull and a nose that shows which way the body faces. */
+function Head({ view }: { view: Skeleton['view'] }) {
+  return (
+    <>
+      {/* About 22 cm tall, 15 cm wide and 19 cm deep. */}
+      <mesh position={[0, 0.41, 0]} scale={[view === 'side' ? 0.35 : 0.29, 0.42, view === 'side' ? 0.29 : 0.35]}>
+        <sphereGeometry args={[1, 32, 24]} />
         <Skin />
       </mesh>
-    )
-  }
+      <mesh position={view === 'side' ? [0.36, 0.36, 0] : [0, 0.36, 0.36]}>
+        <sphereGeometry args={[0.06, 16, 12]} />
+        <Skin />
+      </mesh>
+    </>
+  )
+}
+
+/** The stool under the seated exercise: a slab on four legs. */
+function Stool({ seat }: { seat: NonNullable<Skeleton['seat']> }) {
+  const [x0, x1] = seat.x
+  const [z0, z1] = seat.z
+  const legs: [number, number][] = [
+    [x0 + 0.12, z0 + 0.12],
+    [x0 + 0.12, z1 - 0.12],
+    [x1 - 0.12, z0 + 0.12],
+    [x1 - 0.12, z1 - 0.12],
+  ]
   return (
-    <group ref={bind}>
-      {name === 'hand' && <Hand />}
-      {name === 'head' && (
-        <>
-          <mesh position={[0, 0.06, 0]}>
-            <cylinderGeometry args={[0.06, 0.07, 0.14, 20]} />
-            <Skin />
-          </mesh>
-          <mesh position={[0, 0.26, 0]} scale={[1, 1.12, 1]}>
-            <sphereGeometry args={[0.16, 32, 24]} />
-            <Skin />
-          </mesh>
-        </>
-      )}
-      {name === 'foot' && (
-        <RoundedBox args={[0.1, 0.32, 0.13]} radius={0.04} smoothness={4} position={[0.03, 0.12, 0]}>
-          <Skin />
-        </RoundedBox>
-      )}
-      {name === 'seat' && (
-        // A stool: the slab along the segment and a pedestal under it (local +X points down).
-        <group>
-          <mesh position={[0.06, 0.65, 0]}>
-            <boxGeometry args={[0.12, 1.3, 0.7]} />
-            <meshStandardMaterial color={SEAT} roughness={0.7} />
-          </mesh>
-          <mesh position={[0.55, 0.65, 0]}>
-            <boxGeometry args={[0.9, 0.16, 0.16]} />
-            <meshStandardMaterial color={NAVY} roughness={0.6} />
-          </mesh>
-        </group>
-      )}
+    <group>
+      <mesh position={[(x0 + x1) / 2, seat.top - 0.06, (z0 + z1) / 2]}>
+        <boxGeometry args={[x1 - x0, 0.12, z1 - z0]} />
+        <meshStandardMaterial color={SEAT} roughness={0.7} />
+      </mesh>
+      {legs.map(([x, z]) => (
+        <mesh key={`${x}${z}`} position={[x, (seat.top - 0.12) / 2, z]}>
+          <boxGeometry args={[0.08, seat.top - 0.12, 0.08]} />
+          <meshStandardMaterial color={NAVY} roughness={0.6} />
+        </mesh>
+      ))}
     </group>
   )
 }
 
+type Refs = RefObject<Record<string, Object3D | undefined>>
+const bind = (refs: Refs, key: string) => (o: Object3D | null) => {
+  if (o) refs.current[key] = o
+  else delete refs.current[key]
+}
+
+function BonePart({ name, view, refs }: { name: BoneName; view: Skeleton['view']; refs: Refs }) {
+  const geometry = useMemo(() => (PROFILE[name] ? lathe(PROFILE[name]!) : null), [name])
+  if (geometry) {
+    return (
+      <mesh ref={bind(refs, name)} geometry={geometry}>
+        <Skin />
+      </mesh>
+    )
+  }
+  let body: ReactNode = null
+  if (name === 'rHand' || name === 'lHand') body = <Hand />
+  if (name === 'rFoot' || name === 'lFoot') body = <Foot view={view} />
+  if (name === 'head') body = <Head view={view} />
+  if (name === 'neck')
+    body = (
+      <mesh position={[0, 0.12, 0]}>
+        <cylinderGeometry args={[0.2, 0.22, 0.4, 24]} />
+        <Skin />
+      </mesh>
+    )
+  if (name === 'pelvis')
+    // The pelvis bone runs hip to hip; the hips are an ellipsoid set on its middle.
+    body = (
+      <mesh position={[0, 0.33, 0]} scale={view === 'side' ? [0.42, 0.62, 0.36] : [0.36, 0.62, 0.42]}>
+        <sphereGeometry args={[1, 32, 24]} />
+        <Skin />
+      </mesh>
+    )
+  return <group ref={bind(refs, name)}>{body}</group>
+}
+
 function Body({ exercise, angle, goalDeg, idle, reduce }: Pick<JointSceneProps, 'exercise' | 'angle' | 'goalDeg' | 'idle'> & { reduce: boolean }) {
   const sway = useRef<Group>(null)
-  const parts = useRef<Partial<Record<PartName, Object3D>>>({})
-  const ring = useRef<Record<'base' | 'mid' | 'end', Object3D | null>>({ base: null, mid: null, end: null })
-  const proximal = useRef<Group>(null)
-  const distal = useRef<Group>(null)
-  const goalTick = useRef<Group>(null)
+  const refs = useRef<Record<string, Object3D | undefined>>({})
   const gauge = useMemo(gaugeGeometry, [])
-  const names = useMemo(() => bodyFor(exercise, armPose(exercise, 90)).map((p) => p.name), [exercise])
   const shown = useRef<{ exercise: ExerciseId; deg: number } | null>(null)
   const applied = useRef<{ exercise: ExerciseId; deg: number } | null>(null)
   const invalidate = useThree((s) => s.invalidate)
   const frame = FRAMING[exercise]
+  const first = useMemo(() => skeletonFor(exercise, typeof angle === 'number' ? angle : angle.get()), [exercise]) // eslint-disable-line react-hooks/exhaustive-deps
+  const ring = 0.075 / frame.scale
 
   // Reduced motion renders on demand: draw again whenever the reading or the movement changes.
   useEffect(() => invalidate(), [invalidate, exercise, angle, goalDeg])
 
-  const apply = (pose: Pose, deg: number) => {
-    for (const part of bodyFor(exercise, pose)) {
-      const o = parts.current[part.name]
+  const apply = (s: Skeleton, deg: number) => {
+    const j = s.joints
+    for (const bone of BONES) {
+      const o = refs.current[bone.name]
       if (!o) continue
-      const lathe = PROFILES[part.name] != null || part.name === 'seat'
-      // The biceps shortens and thickens as the elbow bends.
-      const girth = exercise === 'elbow_flexion' && part.name === 'upperArm' ? 1 + 0.14 * Math.min(1, deg / 140) : 1
-      const flat = part.name === 'torso' ? (part.view === 'side' ? { x: CHEST_DEPTH } : { z: CHEST_DEPTH }) : {}
-      place(o, part.from, part.to, lathe, { girth, depth: part.z ?? 0, ...flat })
+      const from = j[bone.from]
+      const to = j[bone.to]
+      if (bone.name === 'pelvis') {
+        // Hip to hip, set on its middle, the ellipsoid's long axis along the hips.
+        place(o, [(from[0] + to[0]) / 2 - (s.view === 'front' ? 0 : 0), (from[1] + to[1]) / 2 - 0.2, (from[2] + to[2]) / 2], [(from[0] + to[0]) / 2, (from[1] + to[1]) / 2 + 1, (from[2] + to[2]) / 2], false)
+        continue
+      }
+      const lathed = PROFILE[bone.name] != null
+      // The exercising biceps shortens and thickens as the elbow bends.
+      const girth = exercise === 'elbow_flexion' && bone.name === 'rUpperArm' ? 1 + 0.14 * Math.min(1, deg / 140) : 1
+      const flat: [number, number] = bone.name === 'torso' ? (s.view === 'side' ? [CHEST_DEPTH, 1] : [1, CHEST_DEPTH]) : [girth, girth]
+      place(o, from, to, lathed, flat)
     }
-    ring.current.base?.position.set(pose.base[0], pose.base[1], TRACK_Z + 0.01)
-    ring.current.mid?.position.set(pose.mid[0], pose.mid[1], TRACK_Z + 0.01)
-    ring.current.end?.position.set(pose.end[0], pose.end[1], TRACK_Z + 0.01)
-    if (proximal.current) place(proximal.current, pose.base, pose.mid, true)
-    if (distal.current) place(distal.current, pose.mid, pose.end, true)
-    writeGauge(gauge, pose.mid, pose.gaugeFromDeg, pose.distalDeg)
-    if (goalTick.current && goalDeg != null) {
-      const g = armPose(exercise, goalDeg).distalDeg
-      goalTick.current.position.set(pose.mid[0] + GAUGE_R * Math.cos(rad(g)), pose.mid[1] + GAUGE_R * Math.sin(rad(g)), TRACK_Z + 0.01)
-      goalTick.current.rotation.z = rad(g)
+    for (const [name] of BALLS) refs.current[`ball-${name}`]?.position.set(...j[name])
+
+    const o = s.overlay
+    const z = o.z
+    refs.current['ring-base']?.position.set(o.base[0], o.base[1], z + 0.01)
+    refs.current['ring-mid']?.position.set(o.mid[0], o.mid[1], z + 0.01)
+    refs.current['ring-end']?.position.set(o.end[0], o.end[1], z + 0.01)
+    const proximal = refs.current['line-proximal']
+    if (proximal) place(proximal, [o.base[0], o.base[1], z], [o.mid[0], o.mid[1], z], true)
+    const distal = refs.current['line-distal']
+    if (distal) place(distal, [o.mid[0], o.mid[1], z], [o.end[0], o.end[1], z], true)
+    const radius = o.reach * 0.55
+    writeGauge(gauge, o.mid, radius, radius * 0.07, o.restDeg, o.currentDeg, z)
+    const tick = refs.current['goal-tick']
+    if (tick && goalDeg != null) {
+      const g = directionFor(exercise, goalDeg)
+      tick.position.set(o.mid[0] + radius * Math.cos(rad(g)), o.mid[1] + radius * Math.sin(rad(g)), z + 0.01)
+      tick.rotation.z = rad(g)
+      tick.scale.setScalar(radius / 0.55)
     }
   }
 
@@ -219,7 +294,7 @@ function Body({ exercise, angle, goalDeg, idle, reduce }: Pick<JointSceneProps, 
     shown.current = { exercise, deg }
     const last = applied.current
     if (!last || last.exercise !== exercise || Math.abs(last.deg - deg) > 0.01) {
-      apply(armPose(exercise, deg), deg)
+      apply(skeletonFor(exercise, deg), deg)
       applied.current = { exercise, deg }
     }
     if (sway.current) sway.current.rotation.y = idle ? -0.2 + Math.sin(state.clock.elapsedTime * 0.45) * 0.34 : -0.2
@@ -227,35 +302,41 @@ function Body({ exercise, angle, goalDeg, idle, reduce }: Pick<JointSceneProps, 
 
   return (
     <group ref={sway}>
-      <group key={exercise} position={[frame.offset[0], frame.offset[1], 0]} scale={frame.scale}>
-        {names.map((name) => (
-          <Part key={name} name={name} refs={parts} />
+      <group key={exercise} position={frame.offset} scale={frame.scale}>
+        {BONES.map((bone) => (
+          <BonePart key={bone.name} name={bone.name} view={first.view} refs={refs} />
         ))}
+        {BALLS.map(([name, r]) => (
+          <mesh key={name} ref={bind(refs, `ball-${name}`)}>
+            <sphereGeometry args={[r, 24, 18]} />
+            <Skin color={JOINT} />
+          </mesh>
+        ))}
+        {first.seat && <Stool seat={first.seat} />}
 
-        {/* The camera app's view on top of the body: landmark rings and the tracked segments. */}
-        <group ref={proximal}>
-          <Line points={[[0, 0, TRACK_Z], [0, 1, TRACK_Z]]} color={COBALT} lineWidth={2.5} transparent opacity={0.9} />
+        {/* The camera app's view on top of the body: landmark rings, the tracked segments, the arc. */}
+        <group ref={bind(refs, 'line-proximal')}>
+          <Line points={[[0, 0, 0], [0, 1, 0]]} color={COBALT} lineWidth={2.5} transparent opacity={0.9} />
         </group>
-        <group ref={distal}>
-          <Line points={[[0, 0, TRACK_Z], [0, 1, TRACK_Z]]} color={COBALT} lineWidth={2.5} transparent opacity={0.9} />
+        <group ref={bind(refs, 'line-distal')}>
+          <Line points={[[0, 0, 0], [0, 1, 0]]} color={COBALT} lineWidth={2.5} transparent opacity={0.9} />
         </group>
-        <group ref={(o) => void (ring.current.base = o)}>
-          <Landmark size={1.1} />
+        <group ref={bind(refs, 'ring-base')}>
+          <Landmark r={ring * 1.1} />
         </group>
-        <group ref={(o) => void (ring.current.mid = o)}>
-          <Landmark size={1} />
+        <group ref={bind(refs, 'ring-mid')}>
+          <Landmark r={ring} />
         </group>
-        <group ref={(o) => void (ring.current.end = o)}>
-          <Landmark size={0.85} />
+        <group ref={bind(refs, 'ring-end')}>
+          <Landmark r={ring * 0.85} />
         </group>
-
         <mesh geometry={gauge}>
           <meshBasicMaterial color={COBALT} side={DoubleSide} transparent opacity={0.85} />
         </mesh>
         {goalDeg != null && (
-          <group ref={goalTick}>
+          <group ref={bind(refs, 'goal-tick')}>
             <mesh>
-              <boxGeometry args={[0.16, 0.024, 0.024]} />
+              <boxGeometry args={[0.2, 0.04, 0.04]} />
               <meshBasicMaterial color={NAVY} />
             </mesh>
           </group>
@@ -266,15 +347,16 @@ function Body({ exercise, angle, goalDeg, idle, reduce }: Pick<JointSceneProps, 
 }
 
 /**
- * The exercise performed by a modelled body: an arm with a fist for elbow flexion, a torso and
- * a raised arm for shoulder abduction, a seated leg for knee extension. Every part is anchored on
- * the tracked landmarks (`bodyFor`), so the body moves with the joint angle; the camera app's
- * rings and segments and the goniometer arc sit on top. A new reading sweeps the body to it.
- * Never rendered in tests: import it through `LazyJointScene`.
+ * A whole body performing the exercise: head, neck, torso, pelvis, both arms with hands, both legs
+ * with feet, and mannequin ball joints, standing for elbow flexion (side on) and shoulder
+ * abduction (face on), seated on a stool for knee extension. Only the exercising limb moves with
+ * the reading (`skeletonFor`); the camera app's rings and segments and the goniometer arc sit on
+ * its joints. A new reading sweeps the limb to it. Never rendered in tests: use `LazyJointScene`.
  */
 export default function JointScene({ exercise, angle, goalDeg, idle = true, className = '', label }: JointSceneProps) {
   const reduce = useReducedMotion() ?? false
   const fixed = typeof angle === 'number' ? angle : angle.get()
+  const floorY = FRAMING[exercise].offset[1]
   return (
     <div className={`relative ${className}`.trim()} role="img" aria-label={label}>
       <Canvas dpr={[1, 1.5]} camera={{ position: [0.7, 0.35, 4.6], fov: 36 }} gl={{ antialias: true, alpha: true, powerPreference: 'high-performance' }} frameloop={reduce ? 'demand' : 'always'}>
@@ -282,7 +364,7 @@ export default function JointScene({ exercise, angle, goalDeg, idle = true, clas
         <directionalLight position={[3, 4, 5]} intensity={2.2} />
         <directionalLight position={[-4, 1.5, -3]} intensity={1.4} color="#c9d6ff" />
         <Body exercise={exercise} angle={reduce ? fixed : angle} goalDeg={goalDeg} idle={!reduce && idle} reduce={reduce} />
-        <Grid position={[0, -1.6, 0]} args={[12, 12]} cellSize={0.5} sectionSize={2} cellColor="#dfe4ef" sectionColor="#b7c2dc" fadeDistance={11} fadeStrength={1.6} infiniteGrid />
+        <Grid position={[0, floorY - 0.001, 0]} args={[12, 12]} cellSize={0.25} sectionSize={1} cellColor="#dfe4ef" sectionColor="#b7c2dc" fadeDistance={9} fadeStrength={1.6} infiniteGrid />
         <OrbitControls enableZoom={false} enablePan={false} minPolarAngle={Math.PI / 3} maxPolarAngle={Math.PI / 1.7} />
       </Canvas>
     </div>
