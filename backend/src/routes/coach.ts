@@ -53,7 +53,7 @@ coachRouter.post('/onboarding', limit, async (req, res) => {
   const input = validate(OnboardingInputSchema, req.body)
   const existing = input.profileId ? await requireProfile(input.profileId, { kind: 'user', userId }) : null
   const name = await memberName(userId)
-  const turn = await onboardingTurn(input.messages, name)
+  const turn = await onboardingTurn(input.messages, name, input.finish ?? false)
   const now = Date.now()
 
   const last = input.messages.at(-1)

@@ -3,6 +3,7 @@ import {
   catalogByArea,
   clampToRanges,
   CoachIntakeSchema,
+  isDiverseWeek,
   estimateFatigue,
   EXERCISE_LIST,
   EXERCISES,
@@ -91,10 +92,36 @@ const FOCUS_WORDS: [RegExp, ExerciseId][] = [
   [/elbows?|biceps?|curls?|\barms?\b|forearms?/, 'elbow_flexion'],
 ]
 
-/** The intake from the scripted answers, one per topic, read with plain keyword rules. */
+/** An answer that passes on the question. */
+const SKIPPED = /^\s*(skip|skipped|pass|next|no idea|not sure|rather not say)\b/i
+
+/**
+ * The answers in topic order, each read for the question it followed: the topic Arc's line
+ * carried, or for lines without one (older pages, the scripted order), the next topic in turn.
+ */
+export function answersByTopic(messages: ChatTurn[]): string[] {
+  const answers: string[] = []
+  let asked: OnboardingTopic | undefined
+  let next = 0
+  for (const m of messages) {
+    if (m.role === 'arc') asked = m.topic
+    else {
+      const topic = asked ?? ONBOARDING_TOPICS[next]
+      if (topic) answers[ONBOARDING_TOPICS.indexOf(topic)] = m.text
+      next++
+      asked = undefined
+    }
+  }
+  return answers
+}
+
+/** The intake from the answers, one per topic, read with plain keyword rules; skipped or missing answers take a sensible default. */
 export function extractIntake(answers: string[]): CoachIntake {
-  const at = (topic: OnboardingTopic) => answers[ONBOARDING_TOPICS.indexOf(topic)] ?? ''
-  const all = answers.join(' ').toLowerCase()
+  const at = (topic: OnboardingTopic) => {
+    const answer = answers[ONBOARDING_TOPICS.indexOf(topic)] ?? ''
+    return SKIPPED.test(answer) ? '' : answer
+  }
+  const all = answers.filter((a) => a && !SKIPPED.test(a)).join(' ').toLowerCase()
   const focusOf = (text: string): ExerciseId | null => FOCUS_WORDS.find(([re]) => re.test(text))?.[1] ?? null
   const sideOf = (text: string): Side | null => (/\bleft\b/.test(text) ? 'left' : /\bright\b/.test(text) ? 'right' : null)
   const limits = at('limitations').trim()
@@ -105,7 +132,7 @@ export function extractIntake(answers: string[]): CoachIntake {
     goals: at('goals').trim().slice(0, 500) || 'Move better',
     focus: focusOf(at('focus').toLowerCase()) ?? focusOf(all) ?? 'elbow_flexion',
     side: sideOf(at('side').toLowerCase()) ?? sideOf(all) ?? 'right',
-    limitations: /^(no|none|nope|nothing|nah)\b/i.test(limits) ? 'none' : limits.slice(0, 500),
+    limitations: !limits || /^(no|none|nope|nothing|nah)\b/i.test(limits) ? 'none' : limits.slice(0, 500),
     experience: /\b(new|never|beginner|first time|not really|no experience|haven't)\b/.test(exp)
       ? 'new'
       : /\b(regular|regularly|every|often|years|always|lots|a lot|daily|athlete)\b/.test(exp)
@@ -142,20 +169,27 @@ export interface OnboardingResult {
   programSource?: ProgramSource
 }
 
-function scriptedTurn(messages: ChatTurn[], name: string): OnboardingResult {
-  const answers = messages.filter((m) => m.role === 'user').map((m) => m.text)
-  const topic = ONBOARDING_TOPICS[answers.length]
-  if (topic) return { reply: ONBOARDING_QUESTIONS[topic](name), done: false, offline: true, topic }
-  const intake = extractIntake(answers)
+function scriptedTurn(messages: ChatTurn[], name: string, finish = false): OnboardingResult {
+  const answered = messages.filter((m) => m.role === 'user').length
+  const topic = ONBOARDING_TOPICS[answered]
+  if (topic && !finish) return { reply: ONBOARDING_QUESTIONS[topic](name), done: false, offline: true, topic }
+  const intake = extractIntake(answersByTopic(messages))
   const program = programFromIntake(intake)
   return { reply: closing(name, program), done: true, offline: true, intake, program, programSource: 'arc' }
+}
+
+/** Skip the rest: the week from what has been said (each answer read for its question), Gemini writing the week when it can. */
+async function finishNow(messages: ChatTurn[], name: string): Promise<OnboardingResult> {
+  const intake = extractIntake(answersByTopic(messages))
+  const { program, source } = await buildProgram(intake, name)
+  return { reply: closing(name, program), done: true, offline: !geminiConfigured(), intake, program, programSource: source }
 }
 
 const EXERCISE_ENUM = EXERCISE_LIST.map((e) => e.id)
 
 const ONBOARDING_SYSTEM = `${PERSONA}
 
-You are welcoming a new member who just signed up, in a short chat. One question at a time, in this order, learn: goals, what they want to do with their body and physique; trainingGoal, whether they would rather get stronger (strength), build muscle (hypertrophy) or build stamina (endurance), asked in plain words; focus, where to start, mapped to exactly one exercise id from the catalog below; when you ask it, name the four areas (${listOf(BODY_AREAS.map((a) => a.name.toLowerCase()))}) and tell them every exercise is listed on their screen to tap, and never offer only a few; side, left or right; limitations, any injuries, pain or limits; experience, new, some or regular; days, which days of the week they can train (weekday numbers, 0 is Sunday; if they give only a count, spread the days through the week with rest days between); height and weight, which they may skip (then null; convert feet and inches to centimetres and pounds to kilograms). Briefly react to what they said before asking the next thing. Keep each reply to one or two short spoken sentences and ask exactly one question; set topic to what that question asks about. Start, if the conversation is empty, by introducing yourself as Arc. When you know everything, set done to true, thank them by first name, tell them their week is ready on the dashboard's calendar, and fill intake with daysPerWeek equal to the number of trainingDays. Until then set done to false and intake to null. Reply only with the JSON object.
+You are welcoming a new member who just signed up, in a short chat. One question at a time, in this order, learn: goals, what they want to do with their body and physique; trainingGoal, whether they would rather get stronger (strength), build muscle (hypertrophy) or build stamina (endurance), asked in plain words; focus, where to start, mapped to exactly one exercise id from the catalog below; when you ask it, name the four areas (${listOf(BODY_AREAS.map((a) => a.name.toLowerCase()))}) and tell them every exercise is listed on their screen to tap, and never offer only a few; side, left or right; limitations, any injuries, pain or limits; experience, new, some or regular; days, which days of the week they can train (weekday numbers, 0 is Sunday; if they give only a count, spread the days through the week with rest days between); height and weight, which they may skip (then null; convert feet and inches to centimetres and pounds to kilograms). Briefly react to what they said before asking the next thing. The member can skip any question by answering Skip: acknowledge it in a word or two, take a sensible default for that topic, ask the next one, and never ask a skipped question again. Keep each reply to one or two short spoken sentences and ask exactly one question; set topic to what that question asks about. Start, if the conversation is empty, by introducing yourself as Arc. When you know everything, set done to true, thank them by first name, tell them their week is ready on the dashboard's calendar, and fill intake with daysPerWeek equal to the number of trainingDays. Until then set done to false and intake to null. Reply only with the JSON object.
 
 The catalog, every exercise Arc can track, by area:
 ${catalogByArea()
@@ -205,7 +239,8 @@ function intakeFromGemini(raw: unknown): CoachIntake | null {
   return parsed.success ? parsed.data : null
 }
 
-export async function onboardingTurn(messages: ChatTurn[], name: string): Promise<OnboardingResult> {
+export async function onboardingTurn(messages: ChatTurn[], name: string, finish = false): Promise<OnboardingResult> {
+  if (finish) return finishNow(messages, name)
   if (!geminiConfigured()) return scriptedTurn(messages, name)
   const answers = messages.filter((m) => m.role === 'user').map((m) => m.text)
   let parsed: { reply?: unknown; done?: unknown; intake?: unknown; topic?: unknown }
@@ -229,7 +264,7 @@ export async function onboardingTurn(messages: ChatTurn[], name: string): Promis
   }
   if (answers.length >= MAX_ANSWERS) {
     // Gemini kept asking: wrap up with what the answers say.
-    const fallback = extractIntake(answers)
+    const fallback = extractIntake(answersByTopic(messages))
     const program = programFromIntake(fallback)
     return { reply: closing(name, program), done: true, offline: false, intake: fallback, program, programSource: 'arc' }
   }
@@ -242,7 +277,7 @@ export async function onboardingTurn(messages: ChatTurn[], name: string): Promis
 
 const PROGRAM_SYSTEM = `${PERSONA}
 
-Build the member's training week as JSON. Use exactly the training days you are given (weekday numbers, 0 is Sunday). Each day holds one to three movements from the catalog and starts with their focus movement on their side. Keep sets, reps and rest inside the ranges for their goal: lower in the range for someone new, higher for someone who trains regularly. Give someone new one movement a day; add variety for everyone else. Respect their limits: leave out a movement that would load an injured area. Give each day a short title of at most five words. Write summary as two or three short spoken sentences to the member about their week.`
+Build the member's training week as JSON. Use exactly the training days you are given (weekday numbers, 0 is Sunday). Give each training day one body area (upper body, back, legs or core) with one to three movements from that area of the catalog, and never the same area on two training days in a row; with three or more training days, use at least three areas. The first training day opens with their focus movement on their side; the rest of the week works the other areas, so no muscle group is trained every day. Keep sets, reps and rest inside the ranges for their goal: lower in the range for someone new, higher for someone who trains regularly. Give someone new one movement a day; add variety for everyone else. Respect their limits: leave out a movement that would load an injured area. Give each day a short title of at most five words. Write summary as two or three short spoken sentences to the member about their week.`
 
 const PROGRAM_SCHEMA = {
   type: 'OBJECT',
@@ -282,8 +317,9 @@ type RawDay = { weekday?: unknown; title?: unknown; items?: unknown }
 
 /**
  * Gemini's week held to the rules: only the member's days (a day Gemini dropped is filled from
- * Arc's own week), only catalog movements, numbers clamped into the goal's ranges, and goal angles
- * from the catalog, never from the model. Null when nothing usable came back.
+ * Arc's own week), only catalog movements, numbers clamped into the goal's ranges, goal angles
+ * from the catalog, never from the model, and a different body area from one training day to the
+ * next. Null when nothing usable came back.
  */
 export function programFromGemini(raw: unknown, intake: CoachIntake): ProgramInput | null {
   if (!raw || typeof raw !== 'object') return null
@@ -318,7 +354,8 @@ export function programFromGemini(raw: unknown, intake: CoachIntake): ProgramInp
     days: fallback.days.map((d) => byWeekday.get(d.weekday) ?? d),
   }
   const checked = ProgramInputSchema.safeParse(program)
-  return checked.success ? checked.data : null
+  // A week that keeps to one area (or repeats one two days running) is thrown out for Arc's own.
+  return checked.success && isDiverseWeek(checked.data.days) ? checked.data : null
 }
 
 /** The week from Gemini when it is configured and sends something usable, else Arc's own. */

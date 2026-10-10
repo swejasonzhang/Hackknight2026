@@ -32,8 +32,8 @@ export const QUICK_REPLIES: Record<OnboardingTopic, string[]> = {
   limitations: ['None', 'A bit stiff', 'Recovering from surgery'],
   experience: ['New to it', 'Some', 'Regularly'],
   days: ['Monday, Wednesday and Friday', 'Tuesday and Thursday', 'Weekdays', 'Every day'],
-  height: ['Skip'],
-  weight: ['Skip'],
+  height: [],
+  weight: [],
 }
 
 const WEEK = [1, 2, 3, 4, 5, 6, 0]
@@ -71,12 +71,13 @@ export function WelcomePage() {
   const sendRef = useRef<(text: string) => void>(() => {})
   const listener = useMemo(() => createListener((text) => sendRef.current(text), setMic), [])
 
-  const turn = async (next: ChatTurn[]) => {
+  const turn = async (next: ChatTurn[], finish = false) => {
     setThinking(true)
     setError(null)
     try {
-      const reply = await api.coach.onboarding(profileId ? { messages: next, profileId } : { messages: next })
-      setMessages([...next, { role: 'arc', text: reply.reply }])
+      const reply = await api.coach.onboarding({ messages: next, ...(profileId ? { profileId } : {}), ...(finish ? { finish } : {}) })
+      // Arc's line keeps the topic it asked, so each answer is read for its own question.
+      setMessages([...next, reply.topic ? { role: 'arc', text: reply.reply, topic: reply.topic } : { role: 'arc', text: reply.reply }])
       setTopic(reply.topic ?? null)
       setChoices(reply.topic === 'focus' ? (reply.choices ?? catalogByArea()) : null)
       if (voiceOnRef.current) void speaker.say({ id: reply.messageId, text: reply.reply })
@@ -125,6 +126,13 @@ export function WelcomePage() {
   useEffect(() => {
     if (!thinking && !done) input.current?.focus({ preventScroll: true })
   }, [thinking, done])
+
+  /** Skip the rest: Arc builds the week now from what has been said, defaults for the rest. */
+  const finishNow = () => {
+    if (thinking || done) return
+    listener.stop()
+    void turn(messages, true)
+  }
 
   const onSubmit = (e: FormEvent) => {
     e.preventDefault()
@@ -268,6 +276,16 @@ export function WelcomePage() {
         <footer className="sticky bottom-0 z-10 border-t border-rule-strong bg-paper pb-[env(safe-area-inset-bottom)]">
           <div className="mx-auto w-full max-w-[1180px] px-4 py-3 sm:px-6 lg:grid lg:grid-cols-[minmax(0,1fr)_280px] lg:gap-10">
             <div className="min-w-0">
+              {topic && !thinking && (
+                <div className="mb-3 flex flex-wrap items-center justify-end gap-x-5 gap-y-2">
+                  <button type="button" className="t-label cursor-pointer text-ink-2 hover:text-navy" onClick={() => send('Skip')}>
+                    Skip this question →
+                  </button>
+                  <button type="button" className="t-label cursor-pointer text-cobalt" onClick={finishNow}>
+                    Build my week now
+                  </button>
+                </div>
+              )}
               {topic && !thinking && QUICK_REPLIES[topic].length > 0 ? (
                 <div className="mb-3 flex flex-wrap gap-2" role="group" aria-label="Quick answers">
                   {QUICK_REPLIES[topic].map((r) => (
