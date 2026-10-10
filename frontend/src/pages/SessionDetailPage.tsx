@@ -204,7 +204,6 @@ export function SessionDetailPage() {
               exercise={session.exercise}
               angle={best}
               goalDeg={goal}
-              theme="light"
               className="h-full w-full"
               label={`${exercise.name} posed at ${deg(best)}, the best rep of this session`}
               fallback={<div aria-hidden="true" className="hatch absolute inset-8" />}

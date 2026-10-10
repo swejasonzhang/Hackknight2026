@@ -19,3 +19,11 @@ if (!window.matchMedia) {
 afterEach(() => {
   cleanup()
 })
+
+// jsdom lacks the pointer-capture and scrolling APIs Radix Select calls while opening.
+if (!Element.prototype.hasPointerCapture) {
+  Element.prototype.hasPointerCapture = () => false
+  Element.prototype.setPointerCapture = () => {}
+  Element.prototype.releasePointerCapture = () => {}
+}
+if (!Element.prototype.scrollIntoView) Element.prototype.scrollIntoView = () => {}
