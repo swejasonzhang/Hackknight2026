@@ -15,13 +15,13 @@ import { Alert, Strip } from '../components/ui'
 
 /*
  * The landing page as a datasheet: a sticky title block whose index is a measuring scale with
- * five evenly spaced stations, beside a ruled readout column. The specimen stage (a 3D arm on a
- * blueprint grid, tracked at shoulder, elbow and wrist) is the photograph; every section after it
+ * five evenly spaced stations, beside a ruled readout column. The specimen stage (a whole 3D
+ * body curling on a blueprint grid, tracked at shoulder, elbow and wrist) is the photograph; every section after it
  * rises into place as it arrives, and the readouts strip is a live board of the app's own charts.
  */
 
 const SECTIONS = [
-  { id: 'joint', index: '01', label: 'Live arm' },
+  { id: 'joint', index: '01', label: 'Live body' },
   { id: 'method', index: '02', label: 'Method' },
   { id: 'readouts', index: '03', label: 'Readouts' },
   { id: 'household', index: '04', label: 'Household' },
@@ -37,12 +37,12 @@ const SPEC: [string, string[]][] = [
   ['Input', ['any webcam', 'right in the browser']],
   ['Output', ['peak per rep', 'set and session']],
   ['Account', ['one per household', 'a profile each']],
-  ['Privacy', ['yours', 'never shared']],
+  ['Privacy', ['video stays on device', 'only angles saved']],
 ]
 
 const METHOD = [
-  { title: 'Create the household account', text: 'One account for everyone at home. Add a profile for each person who exercises and set a goal angle per movement.' },
-  { title: 'Exercise on camera', text: 'Press Start recording: the webcam tracks shoulder, elbow and wrist right in the browser, measures every rep like a goniometer and files the session to the right profile.' },
+  { title: 'Tell Arc what you want', text: 'One account for everyone at home. Arc asks what you want from your body and builds your week, a different body area each training day. Add a profile for everyone else who exercises.' },
+  { title: 'Exercise on camera', text: 'Pick any of fifteen movements and press Start recording: the webcam tracks your whole body right in the browser, measures the working joint on every rep like a goniometer and saves each set to the right profile as it finishes.' },
   { title: 'Read the trend', text: 'Arc draws best rep, session mean and the goal on one line, so progress is a number you can watch.' },
 ]
 
@@ -50,7 +50,7 @@ const HOUSEHOLD = [
   { title: 'One account', text: 'The household signs in once. Everything lives under that account, on any device with a browser.' },
   { title: 'A profile each', text: 'Every person who exercises gets a profile with their own sessions, goals and plan. Switch between them in one step.' },
   { title: 'Any age', text: 'Range of motion is read the same way for a grandparent and a teenager: in degrees, against the goal they set.' },
-  { title: 'Private by default', text: 'Sessions belong to the account that recorded them. Nothing is shared with anyone unless you show them the screen.' },
+  { title: 'Private by default', text: 'Sessions belong to the account that recorded them, and only that account sees them. The video never leaves the device.' },
 ]
 
 const FAQ = [
@@ -60,10 +60,13 @@ const FAQ = [
     q: 'Which movements does it measure?',
     a: `${EXERCISE_LIST.length} in four areas, the same as the camera app: ${BODY_AREAS.map((a) => `${a.name.toLowerCase()} (${exercisesIn(a.id).map((e) => e.name.toLowerCase()).join(', ')})`).join('; ')}. One-sided movements on the left or right, always in degrees.`,
   },
-  { q: 'Is my data private?', a: 'Your sessions belong to your account and nobody else sees them. The video never leaves your device: only the angle of each rep is saved, and nothing is shared with anyone.' },
+  {
+    q: 'Is my data private?',
+    a: "Your sessions belong to your account and nobody else sees them. The video never leaves your device: only the angle of each rep is saved. When Arc's words and voice are switched on, what you tell Arc and a session's numbers go to Gemini, and Arc's lines to ElevenLabs, to write and speak them; hands-free commands use your browser's own speech recognition.",
+  },
 ]
 
-const FINAL = ['Every rep in degrees, not points', 'Fifteen movements in four areas', 'A goal rule on every chart', 'A nudge when range fades late in a set', 'Profiles for everyone at home', 'Private by default']
+const FINAL = ['Every rep in degrees, not points', 'Fifteen movements in four areas', 'A goal rule on every chart', "Arc's word when range fades late in a set", 'Profiles for everyone at home', 'Private by default']
 
 const pad = (n: number) => String(n).padStart(2, '0')
 
@@ -170,7 +173,7 @@ export function LandingPage() {
         <TitleBlock active={active} />
 
         <main className="min-w-0 max-w-[1280px] px-4 pb-10 sm:px-6 lg:px-8">
-          {/* ---- 01 LIVE ARM: eyebrow, display headline, the specimen stage and its spec ---- */}
+          {/* ---- 01 LIVE BODY: eyebrow, display headline, the specimen stage and its spec ---- */}
           <section id="joint" className="pt-5 sm:pt-6 lg:pt-8" aria-labelledby="headline">
             {notice && (
               <div className="mb-5">
@@ -189,7 +192,7 @@ export function LandingPage() {
             <div className="mt-6 grid gap-8 lg:grid-cols-12 lg:gap-8">
               <motion.div {...rise(0.45)} className="min-w-0 lg:col-span-7">
                 <LiveJoint />
-                <p className="t-lead mt-6">Your webcam tracks your shoulder, elbow and wrist right in the browser and measures every rep like a goniometer. Arc shows the trend, so progress is a number you can watch, not a feeling you have to trust.</p>
+                <p className="t-lead mt-6">Your webcam tracks your whole body right in the browser and measures the joint each movement works, every rep, like a goniometer. Arc shows the trend, so progress is a number you can watch, not a feeling you have to trust.</p>
                 <div className="mt-6 flex flex-col gap-2 sm:hidden">
                   {account.map((l) => (
                     <Link key={l.to} to={l.to} className={l.primary ? 'btn btn-block btn-lg btn-wide' : 'btn btn-lg btn-wide'}>

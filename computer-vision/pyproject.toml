@@ -1,7 +1,7 @@
 [project]
 name = "hackknight2026"
 version = "0.1.0"
-description = "Add your description here"
+description = "Arc's camera app: OpenCV + MediaPipe rep counting, started from an Arc plan and saving sessions to Arc"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [

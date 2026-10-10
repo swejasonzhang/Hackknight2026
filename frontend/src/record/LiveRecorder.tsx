@@ -143,8 +143,9 @@ function draw(canvas: HTMLCanvasElement, aspect: number, landmarks: Landmark[] |
 /**
  * Recording in the browser, with nothing to press: the camera starts as soon as this opens, the
  * pose model loads, and counting begins once the movement's joints are in view. The plan's sets
- * and rests run by themselves; after the last set (or "Finish and save") the session is saved
- * as the signed-in user and its report opens. The video stays in the browser.
+ * and rests run by themselves. Each set is saved to MongoDB as it finishes, into one session; the
+ * last set (or "Finish and save") marks it complete and opens its report. Over the video, the
+ * whole white skeleton and the measured joint. The video stays in the browser.
  */
 export function LiveRecorder({ profileId, config, simulate = false }: { profileId: string; config: RecordConfig; simulate?: boolean }) {
   const navigate = useNavigate()

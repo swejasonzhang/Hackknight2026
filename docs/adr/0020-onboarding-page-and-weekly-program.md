@@ -1,7 +1,7 @@
 # ADR-0020: Arc's chat is its own page, and Arc builds a weekly program shown as a calendar
 
 - Date: 2026-10-10
-- Status: accepted
+- Status: accepted; amended by ADR-0022 (a different body area each training day, skippable questions); its "next change" is ADR-0021 (Record follows the picked movement through `prescriptionFor`)
 
 ## Context
 

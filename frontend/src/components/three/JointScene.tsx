@@ -338,10 +338,10 @@ function Body({ exercise, angle, goalDeg, rangeDeg, idle, reduce }: Pick<JointSc
 
 /**
  * A whole body performing the exercise: head, neck, torso, pelvis, both arms with hands, both legs
- * with feet, and mannequin ball joints, standing for elbow flexion (side on) and shoulder
- * abduction (face on), seated on a stool for knee extension. Only the exercising limb moves with
- * the reading (`skeletonFor`); the tracker's rings and segments and the goniometer arc sit on
- * its joints, and `rangeDeg` shades the range covered from rest to that reading, end to end. Drive
+ * with feet, and mannequin ball joints, posed for each of the fifteen movements (side on, face on,
+ * seated on a stool, lying for a crunch). The reading poses it (`skeletonFor`): the working limb,
+ * or for squats, lunges, deadlifts and crunches the whole body; the tracker's rings and segments
+ * and the goniometer arc sit on its joints, and `rangeDeg` shades the range covered from rest to that reading, end to end. Drive
  * `angle` with `useRepLoop` to sweep the limb through that range rep after rep; a new fixed reading
  * sweeps the limb to it. The body is built once: switching exercise only re-poses it.
  * Never rendered in tests: use `LazyJointScene`.

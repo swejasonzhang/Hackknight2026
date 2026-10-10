@@ -1,7 +1,7 @@
 # ADR-0014: A whole human body at adult proportions, and no nested scrolling
 
 - Date: 2026-10-10
-- Status: accepted (supersedes the body parts of ADR-0013)
+- Status: accepted (supersedes the body parts of ADR-0013); amended by ADR-0021 (fifteen poses; squats, lunges, deadlifts and crunches move the whole body)
 
 ## Context
 

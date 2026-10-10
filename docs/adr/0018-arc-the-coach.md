@@ -1,7 +1,7 @@
 # ADR-0018: Arc, the coach: Gemini, ElevenLabs and hands-free voice in one flow
 
 - Date: 2026-10-10
-- Status: accepted
+- Status: accepted; amended by ADR-0020 (`/welcome` is its own page and Arc builds a weekly program) and ADR-0022 (every question skippable, a different body area each day)
 
 ## Context
 

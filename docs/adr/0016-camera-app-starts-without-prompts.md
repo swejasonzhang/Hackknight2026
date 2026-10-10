@@ -1,7 +1,7 @@
 # ADR-0016: The camera app starts straight into the plan, with no prompts
 
 - Date: 2026-10-10
-- Status: partly superseded by ADR-0017 (the launcher is removed; `main.py` still starts from a plan with these flags)
+- Status: partly superseded by ADR-0017 (the launcher is removed; `main.py` still starts from a plan with these flags); amended by ADR-0021 (all fourteen catalog movements mapped) and ADR-0023 (`--profile` sends the session to Arc)
 
 ## Context
 

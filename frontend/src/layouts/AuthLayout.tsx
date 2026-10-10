@@ -4,7 +4,8 @@ import { Logo } from '../components/icons'
 import { MaskLines } from '../components/motion'
 import { Lamp } from '../components/ui'
 
-const STEPS = ['Account', 'Profile', 'Plan']
+/** Sign-up, then the chat with Arc at /welcome, then the week it builds. */
+const STEPS = ['Account', 'Arc', 'Week']
 
 /**
  * Account pages: a navy masthead band (wordmark, a back link, the step ruler and the display
@@ -16,7 +17,7 @@ export function AuthLayout() {
   const signup = pathname === '/signup'
   const title = signup ? 'Create account' : 'Log in'
   const notes = signup
-    ? ['One account for the household. A profile each.', 'After this: add a profile, then record a session.']
+    ? ['One account for the household. A profile each.', 'After this: Arc asks what you want and builds your week.']
     : ['Pick up where you left off.', 'Demo data: six weeks of random sessions, one click away.']
 
   return (

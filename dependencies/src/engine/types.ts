@@ -1,5 +1,6 @@
 /**
- * Domain types shared by the server, the client and the computer-vision module.
+ * Domain types shared by the server and the browser (recorder, dashboard, Arc's pages); the
+ * Python camera app maps its own catalog onto the same exercise ids.
  * Everything in dependencies/src/engine is pure TypeScript: no DOM, no Node, no MediaPipe.
  */
 
@@ -33,7 +34,7 @@ export type ExerciseId = (typeof EXERCISE_IDS)[number]
 /** The dashboard's four tabs. */
 export type BodyArea = 'upper' | 'back' | 'legs' | 'core'
 
-/** Indices into MediaPipe's 33-landmark pose model. The CV module uses these; nothing else does. */
+/** Indices into MediaPipe's 33-landmark pose model, as the browser recorder, the 3D figure and the camera app number them. */
 export const LM = {
   LEFT_SHOULDER: 11,
   RIGHT_SHOULDER: 12,
@@ -61,7 +62,7 @@ export interface ExerciseConfig {
   /** One-line instruction for the user, including how to face the camera. */
   cue: string
   /**
-   * Which landmarks the CV module measures the angle at, per side. With `measure: 'tilt'` the
+   * Which landmarks the recorder measures the angle at, per side (the camera app's catalog uses the same). With `measure: 'tilt'` the
    * metric is instead the slope of the line from the first landmark to the second against the
    * horizontal (the third repeats the second).
    */
@@ -70,9 +71,9 @@ export interface ExerciseConfig {
   /** Label for the number we display and count, e.g. "Elbow flexion" or "Knee angle". */
   metricLabel: string
   /**
-   * CONTRACT WITH THE CV MODULE: it converts the raw inner angle at the joint (0..180,
-   * 180 = straight) into this metric, which must INCREASE as the user moves deeper
-   * into the rep. Everything downstream (rep counter, fatigue, dashboard) uses the metric.
+   * CONTRACT WITH THE RECORDER (and the camera app's upload): it converts the raw inner angle
+   * at the joint (0..180, 180 = straight) into this metric, which must INCREASE as the user
+   * moves deeper into the rep. Everything downstream (rep counter, fatigue, dashboard) uses the metric.
    */
   metricFromInnerAngle: (innerDeg: number) => number
   /** A rep is "in" once the metric reaches enterDeg and completes when it falls back to exitDeg. */

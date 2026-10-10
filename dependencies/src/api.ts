@@ -191,7 +191,7 @@ export interface OnboardingReply {
   /** Arc's next line. */
   reply: string
   messageId: string
-  /** True once Arc has what it needs: the profile and plan are saved. */
+  /** True once Arc has what it needs: the profile, the plan and the week are saved. */
   done: boolean
   /** True when Gemini is not configured and Arc follows its scripted questions. */
   offline: boolean
@@ -206,7 +206,7 @@ export interface OnboardingReply {
   program?: ProgramDto
 }
 
-/** Feedback for the rest after a set, before the session is saved. */
+/** Arc's read for the rest after a set (the set itself is already saved by then). */
 export const SetFeedbackInputSchema = z.object({
   profileId: z.string().min(1),
   exercise: ExerciseIdSchema,

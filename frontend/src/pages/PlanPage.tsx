@@ -12,8 +12,9 @@ import { DayLog } from '../plan/DayLog'
 import { dayKey, defaultDay, parseDayKey, type DayKey } from '../plan/days'
 
 /**
- * The plan and the log side by side, 30 to 70: on the left the plan recording counts
- * against (sticky on desktop), on the right the log, one day at a time. The day lives in the
+ * The plan and the log side by side, 30 to 70: on the left the plan (what recording its
+ * movement uses; other movements follow the week; sticky on desktop), on the right the log, one
+ * day at a time. The day lives in the
  * URL (`/plan?day=2026-10-09`), so a session opened from the log comes back to the same day.
  */
 export function PlanPage() {
@@ -54,7 +55,7 @@ export function PlanPage() {
       <PageHeader
         eyebrow="Plan · log"
         title={noProfiles ? 'Plan' : (selected?.name ?? 'Plan')}
-        subtitle="Set what recording counts, then step through the days to see each workout and how it moved."
+        subtitle="Set your own numbers for a movement, then step through the days to see each workout and how it moved."
         actions={<ProfilePicker />}
       />
       <div className="rule-strong" />
@@ -80,7 +81,7 @@ export function PlanPage() {
       ) : (
         <div className="mt-6 grid gap-8 lg:grid-cols-[minmax(0,3fr)_minmax(0,7fr)] lg:gap-10">
           <div ref={planRef} className="min-w-0 lg:sticky lg:self-start" style={{ top: planTop }}>
-            <Strip index="01" title="Plan" aside="Counted when you record">
+            <Strip index="01" title="Plan" aside="Used when you record its movement">
               {selectedId && sessions ? <PlanEditor profileId={selectedId} plan={plan} onSaved={setPlan} compact /> : <Skeleton height={360} />}
             </Strip>
           </div>

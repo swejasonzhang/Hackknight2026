@@ -25,7 +25,7 @@ uv run example_onboarding.py # runs the onboarding chat + extracts a survey + bu
 
 ## Wired into the app (2026-10-10)
 
-The prompt, model and voice settings are ported to TypeScript in `backend/src/services/` (`arc.ts`, `gemini.ts`, `voice.ts`) and exposed as `/api/coach/*`: Arc runs the onboarding chat after sign-up, reads each set and each session back, and speaks with ElevenLabs (root README, section 4b; ADR-0018). The notes below describe the module as it was before that port.
+The prompt, model and voice settings are ported to TypeScript in `backend/src/services/` (`arc.ts`, `gemini.ts`, `voice.ts`) and exposed as `/api/coach/*`: Arc runs the onboarding chat after sign-up, reads each set and each session back, and speaks with ElevenLabs (root README, section 4b; ADR-0018). The onboarding survey (goal, frequency, height, weight) joined the app's chat, which now asks nine skippable topics, and `training_plan.py`'s ranges bound every week Arc builds (`TRAINING_RANGES` in `dependencies/src/program.ts`; ADR-0020, ADR-0022). The notes below describe the module as it was before that port.
 
 ## Not wired up yet (historical)
 
