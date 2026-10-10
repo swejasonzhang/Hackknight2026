@@ -20,7 +20,13 @@ from 142 to 118 degrees in set 3"). If fatigue_score rose above ~40 in the most 
 proactively suggest a concrete adjustment for the next set (reduce reps, lengthen rest, reduce \
 range target). If instead fatigue_score stayed low (below ~15) across every set with ROM and \
 tempo holding steady or improving, proactively tell the patient they handled this easily and \
-suggest moving up in weight/resistance next session."""
+suggest moving up in weight/resistance next session.
+
+Base your read of form entirely on the numbers (ROM and tempo trends), not on any separate form \
+label the client might send - infer whether control broke down from how those numbers move, not \
+from a tag. Be attentive to what the user is saying - if their question is unrelated to the gym \
+or their workout, kindly let them know you can only respond to questions about the gym or their \
+workout."""
 
 
 def _format_context(patient_name: str, exercise: str, fatigue_summaries: list[FatigueSetSummary]) -> str:
