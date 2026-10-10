@@ -1,4 +1,4 @@
-import { EXERCISE_LIST, EXERCISES, type CoachStatus, type ExerciseId, type SessionPlan, type Side, type VoiceCommand } from '@arc/dependencies'
+import { EXERCISE_LIST, EXERCISES, sideLabel, type ExerciseId, type SessionPlan, type Side, type VoiceCommand } from '@arc/dependencies'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { api } from '../api/client'
@@ -9,9 +9,12 @@ import { visibleJoints, visibleSegments } from './overlay'
 import type { PoseTracker } from './pose'
 import { SessionSaver } from './saver'
 import { SessionRecorder, type RecorderView } from './recorder'
-import { COMMAND_LABEL, parseCommand } from '../voice/commands'
+import { COMMAND_LABEL, isForArc, parseCommand } from '../voice/commands'
 import { createListener, type Listener, type ListenerState } from '../voice/listener'
 import { createSpeaker, type Speaker, type SpokenLine } from '../voice/speaker'
+import { elevenLabsVoice } from '../voice/status'
+import { cueFor, shouldCue } from './cues'
+import { FormGuide } from './FormGuide'
 
 export interface RecordConfig {
   exercise: ExerciseId
@@ -163,7 +166,6 @@ export function LiveRecorder({ profileId, config, simulate = false }: { profileI
   const cfg = EXERCISES[config.exercise]
 
   // Arc: hands-free listening, and Arc's voice for set reads and quick replies.
-  const coachRef = useRef<CoachStatus | null>(null)
   const speakerRef = useRef<Speaker | null>(null)
   const listenerRef = useRef<Listener | null>(null)
   const lastLineRef = useRef<SpokenLine | null>(null)
@@ -173,6 +175,11 @@ export function LiveRecorder({ profileId, config, simulate = false }: { profileI
   const [heard, setHeard] = useState<VoiceCommand | null>(null)
   const [arcLine, setArcLine] = useState<SpokenLine | null>(null)
   const [arcSpeaking, setArcSpeaking] = useState(false)
+  // Which voice Arc speaks with, shown so the member knows; and the last few words each way.
+  const [voiceName, setVoiceName] = useState<'ElevenLabs' | 'browser' | null>(null)
+  const [talk, setTalk] = useState<{ who: 'you' | 'arc'; text: string }[]>([])
+  const askingRef = useRef(false)
+  const lastCueAtRef = useRef(0)
 
   const say = useCallback((line: SpokenLine, remember = true) => {
     if (remember) {
@@ -197,14 +204,48 @@ export function LiveRecorder({ profileId, config, simulate = false }: { profileI
     [config, say],
   )
 
+  // Anything the member says to Arc that is not a command: Arc answers with the live numbers.
+  const askArcRef = useRef<(text: string) => Promise<void>>(async () => {})
+  askArcRef.current = async (text: string) => {
+    const recorder = recorderRef.current
+    const v = viewRef.current
+    if (askingRef.current || !recorder || !v) return
+    askingRef.current = true
+    setTalk((t) => [...t, { who: 'you' as const, text }].slice(-4))
+    const inSet = recorder.currentSetReps.length ? recorder.currentSetReps : (recorder.completedSets.at(-1)?.reps ?? [])
+    try {
+      const m = await api.coach.ask({
+        profileId,
+        exercise: config.exercise,
+        side: config.side,
+        text: text.slice(0, 500),
+        live: {
+          setNumber: v.setNumber,
+          setsPlanned: v.setsPlanned,
+          repsInSet: v.repsInSet,
+          repsPlanned: v.repsPlanned,
+          totalReps: v.totalReps,
+          recentPeaks: inSet.slice(-8).map((r) => Math.round(r.peakDeg * 10) / 10),
+          bestDeg: v.bestDeg,
+          targetDeg: config.plan.targetDeg,
+          phase: v.phase,
+        },
+      })
+      setTalk((t) => [...t, { who: 'arc' as const, text: m.text }].slice(-4))
+      say({ id: m.id, text: m.text })
+    } catch {
+      setTalk((t) => [...t, { who: 'arc' as const, text: "I couldn't answer just then. Ask me again." }].slice(-4))
+    } finally {
+      askingRef.current = false
+    }
+  }
+
   useEffect(() => {
     let cancelled = false
-    api.coach
-      .status()
-      .then((s) => !cancelled && (coachRef.current = s))
-      .catch(() => !cancelled && (coachRef.current = { gemini: false, voice: false }))
+    const voice = elevenLabsVoice()
+    void voice.then((v) => !cancelled && setVoiceName(v ? 'ElevenLabs' : 'browser'))
     speakerRef.current = createSpeaker({
-      elevenLabs: () => coachRef.current?.voice ?? false,
+      voice,
       onSpeaking: (speaking) => {
         setArcSpeaking(speaking)
         listenerRef.current?.mute(speaking)
@@ -213,6 +254,7 @@ export function LiveRecorder({ profileId, config, simulate = false }: { profileI
     listenerRef.current = createListener((text) => {
       const command = parseCommand(text)
       if (command) runCommand(command)
+      else if (isForArc(text)) void askArcRef.current(text)
     }, setListenState)
     return () => {
       cancelled = true
@@ -303,10 +345,20 @@ export function LiveRecorder({ profileId, config, simulate = false }: { profileI
         if (canvasRef.current) draw(canvasRef.current, videoAspect, landmarks, reading)
         // Re-render only when something on screen changes.
         const key = `${next.phase}|${next.setNumber}|${next.repsInSet}|${next.totalReps}|${Math.round(next.metricDeg ?? -1)}|${Math.ceil(next.restLeftMs / 1000)}|${next.tracked}|${Math.round(next.bestDeg ?? -1)}`
+        const previousRep = viewRef.current?.lastRep
         viewRef.current = next
         if (key !== lastKey) {
           lastKey = key
           setView(next)
+        }
+        // A rep just ended: Arc may coach it (deeper, slower, fading), a few seconds apart at most.
+        if (next.phase === 'active' && next.lastRep && next.lastRep !== previousRep) {
+          const cue = cueFor(recorder.currentSetReps, EXERCISES[config.exercise], config.plan.targetDeg)
+          const at = performance.now()
+          if (cue && shouldCue({ now: at, lastCueAt: lastCueAtRef.current, arcSpeaking: speakerRef.current?.speaking ?? false })) {
+            lastCueAtRef.current = at
+            say({ text: cue })
+          }
         }
         // A set just ended and the rest began: Arc reads it back (Gemini words, ElevenLabs voice).
         const finished = recorder.completedSets
@@ -399,7 +451,7 @@ export function LiveRecorder({ profileId, config, simulate = false }: { profileI
           <canvas ref={canvasRef} className="pointer-events-none absolute inset-0 h-full w-full -scale-x-100" aria-hidden="true" />
 
           <span className="callout z-10 top-3 left-3">
-            {cfg.name} · {config.side}
+            {cfg.name} · {sideLabel(config.exercise, config.side)}
           </span>
           <span className="callout z-10 top-3 right-3 flex items-center gap-2">
             <Lamp tone={live && view?.tracked ? 'good' : 'default'} blink={!live || phase === 'waiting'} /> {statusLine}
@@ -433,6 +485,8 @@ export function LiveRecorder({ profileId, config, simulate = false }: { profileI
         </p>
       </div>
 
+      <div className="flex min-w-0 flex-col gap-4">
+      <FormGuide exercise={config.exercise} side={config.side} targetDeg={config.plan.targetDeg} />
       <aside className="min-w-0" aria-label="Live readings">
         <div className="panel p-4 sm:p-5">
           <div className="t-label flex items-center gap-2">
@@ -470,9 +524,28 @@ export function LiveRecorder({ profileId, config, simulate = false }: { profileI
                 </button>
               )}
             </div>
-            <p className="t-meta mt-2 normal-case">Say start, pause, resume, skip, rest, stop, how many, or repeat.</p>
+            <p className="t-meta mt-2 normal-case">
+              Say start, pause, resume, skip, rest, stop, how many or repeat, or just talk to Arc: ask how you're doing, about your form, or say how it feels.
+            </p>
+            {voiceName && (
+              <p className="t-meta mt-1 normal-case">
+                Arc's voice: {voiceName === 'ElevenLabs' ? 'ElevenLabs' : "your browser's (ElevenLabs is not set up on the server)"}
+              </p>
+            )}
             {heard && <p className="t-mono mt-2 text-navy">Heard: {COMMAND_LABEL[heard]}</p>}
-            {arcLine && <p className="mt-2 text-[14px] leading-[1.5] text-ink-2">{arcLine.text}</p>}
+            {talk.length > 0 ? (
+              <ol className="mt-2 flex flex-col gap-1.5" aria-label="Talking with Arc">
+                {talk.map((line, i) => (
+                  <li key={i} className={`text-[14px] leading-[1.5] ${line.who === 'arc' ? 'text-ink' : 'text-ink-2'}`}>
+                    <span className="t-mono mr-2 text-[11px] text-muted">{line.who === 'arc' ? 'ARC' : 'YOU'}</span>
+                    {line.text}
+                  </li>
+                ))}
+              </ol>
+            ) : (
+              arcLine && <p className="mt-2 text-[14px] leading-[1.5] text-ink-2">{arcLine.text}</p>
+            )}
+            {talk.length > 0 && arcLine && arcLine.text !== talk.at(-1)?.text && <p className="mt-2 text-[14px] leading-[1.5] text-ink-2">{arcLine.text}</p>}
           </div>
 
           <div className="mt-5 flex flex-wrap gap-2">
@@ -499,6 +572,7 @@ export function LiveRecorder({ profileId, config, simulate = false }: { profileI
           </div>
         </div>
       </aside>
+      </div>
     </div>
   )
 }

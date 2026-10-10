@@ -22,7 +22,7 @@ const CoachMessageSchema = new Schema<CoachMessageShape>({
   ownerId: { type: Schema.Types.ObjectId, ref: 'User', required: true, index: true },
   profileId: { type: Schema.Types.ObjectId, ref: 'Profile' },
   sessionId: { type: Schema.Types.ObjectId, ref: 'Session' },
-  kind: { type: String, enum: ['onboarding', 'set', 'session'], required: true },
+  kind: { type: String, enum: ['onboarding', 'set', 'session', 'ask'], required: true },
   role: { type: String, enum: ['arc', 'user'], required: true },
   text: { type: String, required: true, maxlength: 4000 },
   offline: { type: Boolean, required: true, default: false },

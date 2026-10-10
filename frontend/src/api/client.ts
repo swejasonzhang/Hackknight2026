@@ -1,4 +1,5 @@
 import type {
+  AskInput,
   AuthResponse,
   CoachMessageDto,
   CoachStatus,
@@ -118,6 +119,19 @@ export const api = {
       if (!res.ok) throw new ApiRequestError(res.status, `HTTP ${res.status}`)
       return res.blob()
     },
+    /** Arc's voice for a short line that is not stored: an acknowledgement, a cue during a set. */
+    speak: async (text: string): Promise<Blob> => {
+      const token = getToken()
+      const res = await fetch('/api/coach/speak', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', ...(token ? { authorization: `Bearer ${token}` } : {}) },
+        body: JSON.stringify({ text }),
+      })
+      if (!res.ok) throw new ApiRequestError(res.status, `HTTP ${res.status}`)
+      return res.blob()
+    },
+    /** Something the member said to Arc mid-workout; Arc's answer comes back as a stored message. */
+    ask: (input: AskInput) => request<CoachMessageDto>('/api/coach/ask', { method: 'POST', body: input }),
   },
   dev: {
     seed: () => request<SeedResult>('/api/dev/seed', { method: 'POST', body: { tzOffsetMinutes: new Date().getTimezoneOffset() } }),

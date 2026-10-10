@@ -48,3 +48,16 @@ export const COMMAND_LABEL: Record<VoiceCommand, string> = {
   status: 'How am I doing',
   repeat: 'Repeat',
 }
+
+const QUESTION = /^(how|what|whats|what's|is|am|are|can|could|should|why|does|do|did|will|would|when|where|which)\b/
+const FEELING = /\b(hurts?|hurting|pain|sore|ache|aching|sharp|tired|heavy|hard|easy|light|tough|dizzy|form|technique|depth|deeper|faster|slower)\b/
+
+/**
+ * Whether a phrase that is not a command is meant for Arc: a question, anything addressed to Arc
+ * by name, or how the member feels (pain, effort, form). Other talk in the room goes by.
+ */
+export function isForArc(transcript: string): boolean {
+  const text = transcript.toLowerCase().replace(/[^\p{L}\p{N}' ]+/gu, ' ').replace(/\s+/g, ' ').trim()
+  if (text.split(' ').filter(Boolean).length < 2) return false
+  return /\barc\b/.test(text) || QUESTION.test(text) || FEELING.test(text)
+}

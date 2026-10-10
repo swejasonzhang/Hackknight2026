@@ -4,6 +4,7 @@ import { ScrollToTop } from './components/ScrollToTop'
 import { AppShell } from './layouts/AppShell'
 import { AuthLayout } from './layouts/AuthLayout'
 import { AccountPage } from './pages/AccountPage'
+import { BodyGallery } from './pages/dev/BodyGallery'
 import { DashboardPage } from './pages/DashboardPage'
 import { LandingPage } from './pages/LandingPage'
 import { LoginPage } from './pages/LoginPage'
@@ -28,6 +29,7 @@ import { ProfilesProvider } from './profiles/ProfilesContext'
  *   /profiles       household profiles
  *   /sessions/:id   one session, set by set
  *   /account        who is signed in, log out, and deleting the account
+ *   /dev/bodies     development only: every movement's figure and the muscles it works
  */
 export default function App() {
   return (
@@ -76,6 +78,7 @@ export default function App() {
           <Route path="/account" element={<AccountPage />} />
         </Route>
 
+        {import.meta.env.DEV && <Route path="/dev/bodies" element={<BodyGallery />} />}
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </>

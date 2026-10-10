@@ -228,6 +228,11 @@ export class SessionRecorder {
     return this.sets
   }
 
+  /** The reps of the set in progress, the latest last (for Arc's cues and answers). */
+  get currentSetReps(): readonly RepRecord[] {
+    return this.reps
+  }
+
   /** The body for POST /api/sessions, or null when no rep was counted. */
   /** The session so far: `complete` false while it is still being recorded and saved set by set. */
   toSessionInput(profileId: string, complete = true): CreateSessionInput | null {

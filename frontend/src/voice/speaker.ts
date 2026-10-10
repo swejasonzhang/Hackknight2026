@@ -13,11 +13,13 @@ export interface Speaker {
 }
 
 /**
- * Arc's voice. A stored coach message is spoken with ElevenLabs through the API (the key never
- * reaches the browser); anything else, or when ElevenLabs is off or fails, with the browser's own
- * speech. `onSpeaking` lets the listener mute itself so Arc never hears its own words as commands.
+ * Arc's voice. Every line is spoken with ElevenLabs through the API when the server has it (the
+ * key never reaches the browser): a stored coach message by its id, a short line (an
+ * acknowledgement, a cue during a set) by its text. Without ElevenLabs, or when a call fails, the
+ * browser's own speech says it. `voice` resolves once the page knows which it has, and the first
+ * line waits for it. `onSpeaking` lets the listener mute itself so Arc never hears its own words.
  */
-export function createSpeaker({ elevenLabs, onSpeaking }: { elevenLabs: () => boolean; onSpeaking?: (speaking: boolean) => void }): Speaker {
+export function createSpeaker({ voice, onSpeaking }: { voice: Promise<boolean>; onSpeaking?: (speaking: boolean) => void }): Speaker {
   let audio: HTMLAudioElement | null = null
   let url: string | null = null
   let speaking = false
@@ -62,9 +64,11 @@ export function createSpeaker({ elevenLabs, onSpeaking }: { elevenLabs: () => bo
       const mine = ++token
       cleanup()
       set(true)
-      if (line.id && elevenLabs()) {
+      const elevenLabs = await voice.catch(() => false)
+      if (mine !== token) return
+      if (elevenLabs) {
         try {
-          const blob = await api.coach.audio(line.id)
+          const blob = line.id ? await api.coach.audio(line.id) : await api.coach.speak(line.text)
           if (mine !== token) return
           url = URL.createObjectURL(blob)
           audio = new Audio(url)

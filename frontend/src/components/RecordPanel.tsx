@@ -1,4 +1,4 @@
-import { EXERCISES, type Prescription } from '@arc/dependencies'
+import { EXERCISES, sideLabel, type Prescription } from '@arc/dependencies'
 import { useId } from 'react'
 import { Link } from 'react-router-dom'
 import { Lamp } from './ui'
@@ -13,7 +13,7 @@ const SOURCE: Record<Prescription['source'], string> = { plan: 'Plan', week: 'Th
 export function RecordPanel({ prescription }: { prescription: Prescription }) {
   const titleId = useId()
   const p = prescription
-  const summary = `${EXERCISES[p.exercise].name} · ${p.side} · ${p.sets} × ${p.reps} · ${p.restSeconds} s rest`
+  const summary = `${EXERCISES[p.exercise].name} · ${sideLabel(p.exercise, p.side)} · ${p.sets} × ${p.reps} · ${p.restSeconds} s rest`
   return (
     <section aria-labelledby={titleId} className="panel mb-6 p-4 sm:p-5">
       <div className="grid gap-4 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-start sm:gap-6">
