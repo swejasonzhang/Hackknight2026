@@ -1,6 +1,6 @@
 import { EXERCISE_IDS, type ExerciseId } from '@arc/dependencies'
 import { describe, expect, it } from 'vitest'
-import { BONES, clampMetric, framed, JOINT_NAMES, skeletonFor, type JointName, type V3 } from './skeleton'
+import { BONES, clampMetric, framed, JOINT_NAMES, restFor, skeletonFor, type JointName, type V3 } from './skeleton'
 
 const RANGE: Record<ExerciseId, number[]> = {
   elbow_flexion: [0, 30, 60, 90, 120, 150, 180],
@@ -106,6 +106,16 @@ describe('skeletonFor: a whole body for every exercise', () => {
     expect(seated.seat).toBeDefined()
     expect(seated.joints.rHip[1]).toBeGreaterThan(seated.seat!.top)
     expect(seated.joints.lToe[1]).toBeCloseTo(0.05, 6)
+  })
+
+  it('starts every movement from rest: the forearm, the arm and the shin hanging straight down', () => {
+    expect(restFor('elbow_flexion')).toBe(0)
+    expect(restFor('shoulder_abduction')).toBe(0)
+    expect(restFor('seated_knee_extension')).toBe(90)
+    for (const exercise of EXERCISE_IDS) {
+      const o = skeletonFor(exercise, restFor(exercise)).overlay
+      expect(o.currentDeg).toBeCloseTo(o.restDeg, 9)
+    }
   })
 
   it('clamps readings to what the movement can show', () => {

@@ -9,6 +9,7 @@ import { AnimatedNumber, Item, Page, Stagger } from '../components/motion'
 import { ProfilePicker } from '../components/ProfilePicker'
 import { FatigueChart, PeakChart, RepChart, WeeklyChart } from '../components/ProgressCharts'
 import { LazyJointScene, LazyProgressScene } from '../components/three/lazy'
+import { useRepLoop } from '../components/three/useRepLoop'
 import { Alert, EmptyState, Lamp, Segmented, Skeleton, StatTile, Strip } from '../components/ui'
 import { deg, fatigueLabel, formatDate, weekStartIso } from '../format'
 import { useStickyTop } from '../components/useStickyTop'
@@ -82,6 +83,8 @@ export function DashboardPage() {
   const bestAll = data && data.sessions.length ? Math.max(...data.sessions.map((s) => s.bestPeakDeg)) : null
   const thisWeek = data?.sessionsPerWeek.find((w) => w.weekStart === weekStartIso(Date.now()))?.count ?? 0
   const fatigue = latest ? fatigueLabel(latest.fatigueIndex) : null
+  // The figure works through the whole range, rep after rep: from rest to the latest best and back.
+  const loop = useRepLoop(exercise, latest ? latest.bestPeakDeg : null)
   const noSignal = !noProfiles && data != null && data.sessions.length === 0
   const firstLoad = (profilesLoading || loading) && !data
 
@@ -114,7 +117,15 @@ export function DashboardPage() {
           {latest ? (
             // The figure starts below the two callouts, so a label never covers the head.
             <div className="absolute inset-x-0 top-11 bottom-0">
-              <LazyJointScene exercise={exercise} angle={latest.bestPeakDeg} goalDeg={goal ?? undefined} className="h-full w-full" label={`${cfg.name} posed at the latest session's best rep, ${deg(latest.bestPeakDeg)}`} fallback={<div className="hatch absolute inset-8" aria-hidden="true" />} />
+              <LazyJointScene
+                exercise={exercise}
+                angle={loop ?? latest.bestPeakDeg}
+                rangeDeg={latest.bestPeakDeg}
+                goalDeg={goal ?? undefined}
+                className="h-full w-full"
+                label={`A 3D figure doing ${cfg.name.toLowerCase()} through its whole range, from rest to the latest session's best rep of ${deg(latest.bestPeakDeg)}`}
+                fallback={<div className="hatch absolute inset-8" aria-hidden="true" />}
+              />
             </div>
           ) : firstLoad ? (
             <div className="hatch absolute inset-8" aria-hidden="true" />
