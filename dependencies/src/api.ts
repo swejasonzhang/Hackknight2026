@@ -126,6 +126,8 @@ export const CreateSessionSchema = z.object({
   events: z.array(SessionEventSchema).max(500).optional(),
   /** False while the browser saves a recording set by set; absent or true for a finished session. */
   complete: z.boolean().optional(),
+  /** The weight held, in kilograms (0 for bodyweight); absent when not given. */
+  loadKg: z.number().min(0).max(500).optional(),
 }).refine((s) => s.endedAt >= s.startedAt, { message: 'endedAt must not be before startedAt', path: ['endedAt'] })
 export type CreateSessionInput = z.infer<typeof CreateSessionSchema>
 

@@ -166,8 +166,9 @@ export function SessionDetailPage() {
   const yMax = Math.ceil(Math.max(goal, ...reps.map((r) => r.peakDeg), 10) / 10) * 10
   const spec: [string, string][] = [
     ['Exercise', exercise.name],
-    ['Side', session.side],
+    ['Side', sideLabel(session.exercise, session.side)],
     ['Plan', `${session.plan.sets} × ${session.plan.reps} · ${session.plan.restSeconds} s rest`],
+    ...(session.loadKg != null ? ([['Weight', session.loadKg === 0 ? 'bodyweight' : `${session.loadKg} kg`]] as [string, string][]) : []),
     ['Duration', `${durationMin} min`],
     ['Sets', String(session.sets.length)],
   ]

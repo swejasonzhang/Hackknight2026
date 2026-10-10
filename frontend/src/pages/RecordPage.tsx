@@ -45,7 +45,9 @@ export function RecordPage() {
     if (data === undefined) return null
     const exercise: ExerciseId = isExercise(requested) ? requested : (nextEntry(today?.list ?? [])?.item.exercise ?? data.plan?.exercise ?? 'elbow_flexion')
     const p = prescriptionFor(exercise, { plan: data.plan, program: data.program, intake })
-    return { exercise, side: p.side, plan: { sets: p.sets, reps: p.reps, restSeconds: p.restSeconds, targetDeg: p.targetDeg } }
+    // The weight held last time for this movement starts the weight field.
+    const last = data.sessions.filter((s) => s.exercise === exercise && s.loadKg != null).sort((a, b) => b.startedAt - a.startedAt)[0]
+    return { exercise, side: p.side, plan: { sets: p.sets, reps: p.reps, restSeconds: p.restSeconds, targetDeg: p.targetDeg }, loadKg: last?.loadKg ?? null }
   }, [data, requested, intake, today])
   const simulate = import.meta.env.DEV && params.has('simulate')
   const noProfiles = !loading && profiles.length === 0
