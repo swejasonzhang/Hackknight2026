@@ -1,0 +1,12 @@
+[project]
+name = "ai-coach"
+version = "0.1.0"
+description = "Arc's voice AI PT: Gemini reasons over a session's ROM/fatigue numbers, ElevenLabs speaks the answer."
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "google-genai>=0.3.0",
+    "elevenlabs>=1.9.0",
+    "python-dotenv>=1.0.1",
+    "pydantic>=2.9.2",
+]
