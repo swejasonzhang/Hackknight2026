@@ -14,12 +14,13 @@ export function LoginPage() {
 
   return (
     <>
-      <div className="eyebrow mb-2">Welcome back</div>
-      <h2>Log in</h2>
-      <p className="mt-2 text-[15px] text-muted">Pick up where you left off.</p>
+      <div className="mb-5 flex items-baseline justify-between gap-4">
+        <h2 className="t-strip">Datasheet · account</h2>
+        <span className="t-meta">01 / 01</span>
+      </div>
       <AuthForm mode="login" onSubmit={onSubmit} />
-      <p className="mt-6 text-[13.5px] font-semibold text-muted">
-        New here? <Link to="/signup">Create an account</Link>
+      <p className="t-mono mt-6">
+        New here? <Link to="/signup">Create an account →</Link>
       </p>
     </>
   )

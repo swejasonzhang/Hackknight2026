@@ -5,7 +5,6 @@ import App from './App'
 import { AuthProvider } from './auth/AuthContext'
 import { HintProvider } from './components/Hint'
 import './index.css'
-import './fx.css'
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

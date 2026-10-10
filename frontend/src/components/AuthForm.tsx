@@ -1,5 +1,5 @@
 import { useId, useState, type FormEvent } from 'react'
-import { IconCheck, IconSpinner } from './icons'
+import { Lamp } from './ui'
 import { PasswordField } from './PasswordField'
 
 export type AuthFormValues = { name?: string; email: string; password: string }
@@ -15,6 +15,11 @@ export const MIN_PASSWORD = 8
 
 type Field = 'name' | 'email' | 'password' | 'confirm'
 
+/**
+ * The account datasheet: ruled rows with a mono label and a status lamp in the left cell, the
+ * control in the right cell, validation as mono lines tagged NOTE / ERR / OK, and the submit as
+ * the sheet's last row, disabled until every field is valid.
+ */
 export function AuthForm({ mode, onSubmit }: Props) {
   const signup = mode === 'signup'
   const [name, setName] = useState('')
@@ -57,35 +62,46 @@ export function AuthForm({ mode, onSubmit }: Props) {
   }
 
   const label = busy ? (signup ? 'Creating account…' : 'Logging in…') : signup ? 'Create account' : 'Log in'
+  const lampFor = (bad: boolean | undefined, ok: boolean, filled: boolean) => (bad ? 'lamp lamp-bad' : ok ? 'lamp lamp-ok' : filled ? 'lamp lamp-on' : 'lamp')
 
   return (
-    <form className="mt-6 flex flex-col gap-4" onSubmit={submit} noValidate>
+    <form className="datasheet" onSubmit={submit} noValidate aria-busy={busy || undefined}>
       {signup && (
-        <div className="field">
-          <label htmlFor={ids.name}>Name</label>
-          <input id={ids.name} className="input" type="text" autoComplete="name" required value={name} onChange={(e) => setName(e.target.value)} onBlur={() => touch('name')} />
+        <div className="field-row">
+          <label htmlFor={ids.name} className="field-label">
+            Name
+            <span aria-hidden="true" className={lampFor(false, name.trim().length > 0, false)} />
+          </label>
+          <div className="field-cell">
+            <input id={ids.name} className="input" type="text" autoComplete="name" required value={name} onChange={(e) => setName(e.target.value)} onBlur={() => touch('name')} />
+          </div>
         </div>
       )}
 
-      <div className="field">
-        <label htmlFor={ids.email}>Email</label>
-        <input
-          id={ids.email}
-          className="input"
-          type="email"
-          autoComplete="email"
-          required
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          onBlur={() => touch('email')}
-          aria-invalid={emailError ? 'true' : undefined}
-          aria-describedby={emailError ? ids.emailError : undefined}
-        />
-        {emailError && (
-          <span id={ids.emailError} className="field-msg field-msg-bad">
-            Enter a valid email address.
-          </span>
-        )}
+      <div className="field-row">
+        <label htmlFor={ids.email} className="field-label">
+          Email
+          <span aria-hidden="true" className={lampFor(emailError, emailOk, email.length > 0)} />
+        </label>
+        <div className="field-cell">
+          <input
+            id={ids.email}
+            className="input"
+            type="email"
+            autoComplete="email"
+            required
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            onBlur={() => touch('email')}
+            aria-invalid={emailError ? 'true' : undefined}
+            aria-describedby={emailError ? ids.emailError : undefined}
+          />
+          {emailError && (
+            <span id={ids.emailError} className="field-msg field-msg-bad" data-tag="ERR">
+              Enter a valid email address.
+            </span>
+          )}
+        </div>
       </div>
 
       <PasswordField
@@ -95,38 +111,39 @@ export function AuthForm({ mode, onSubmit }: Props) {
         onBlur={() => touch('password')}
         autoComplete={signup ? 'new-password' : 'current-password'}
         invalid={passwordError}
+        ok={passwordOk && password.length > 0}
         describedBy={signup ? ids.passwordHint : undefined}
       >
         {signup && (
-          <span id={ids.passwordHint} className={`field-msg ${passwordError ? 'field-msg-bad' : ''}`}>
+          <span id={ids.passwordHint} className={`field-msg ${passwordError ? 'field-msg-bad' : 'field-msg-note'}`} data-tag={passwordError ? 'ERR' : 'NOTE'}>
             At least {MIN_PASSWORD} characters.
           </span>
         )}
       </PasswordField>
 
       {signup && (
-        <PasswordField label="Confirm password" value={confirm} onChange={setConfirm} onBlur={() => touch('confirm')} autoComplete="new-password" invalid={mismatch} describedBy={mismatch || matched ? ids.confirmMsg : undefined}>
-          <span id={ids.confirmMsg} className={`field-msg ${mismatch ? 'field-msg-bad' : matched ? 'field-msg-good' : ''}`} aria-live="polite">
+        <PasswordField label="Confirm password" value={confirm} onChange={setConfirm} onBlur={() => touch('confirm')} autoComplete="new-password" invalid={mismatch} ok={matched} describedBy={mismatch || matched ? ids.confirmMsg : undefined}>
+          <span id={ids.confirmMsg} className={`field-msg ${mismatch ? 'field-msg-bad' : matched ? 'field-msg-ok' : ''}`} data-tag={mismatch ? 'ERR' : matched ? 'OK' : undefined} aria-live="polite">
             {mismatch && 'Passwords do not match.'}
-            {matched && (
-              <>
-                <IconCheck size={14} /> Passwords match.
-              </>
-            )}
+            {matched && 'Passwords match.'}
           </span>
         </PasswordField>
       )}
 
       {error && (
-        <p className="field-msg field-msg-bad text-[14px]" role="alert">
-          {error}
-        </p>
+        <div className="alert-strip alert-bad my-4" role="alert">
+          <Lamp tone="bad" />
+          <span className="t-mono font-medium tracking-[0.1em] text-ink-2">ERR</span>
+          <span className="min-w-0 flex-1 font-sans text-[14px] text-ink">{error}</span>
+        </div>
       )}
 
-      <button className="btn btn-primary btn-lg mt-1 w-full" type="submit" disabled={busy || !valid} aria-busy={busy || undefined}>
-        {busy && <IconSpinner size={16} className="animate-spin" aria-hidden="true" />}
-        {label}
-      </button>
+      <div className="pt-5">
+        <button className="btn btn-block btn-wide btn-lg" type="submit" disabled={busy || !valid}>
+          <Lamp tone={busy ? 'primary' : valid ? 'primary' : 'default'} blink={busy} />
+          {label}
+        </button>
+      </div>
     </form>
   )
 }

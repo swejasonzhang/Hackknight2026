@@ -1,25 +1,24 @@
-import { animate, motion, useReducedMotion, type Variants } from 'motion/react'
-import { useEffect, useState, type ReactNode } from 'react'
+import { animate, motion, useInView, useReducedMotion, type Variants } from 'motion/react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 
-/* Motion conventions: one easing, short durations, small distances. Static under reduced motion. */
+/* Motion principles: instruments settle, they do not bounce or fade in on scroll. */
+export const ease: [number, number, number, number] = [0.2, 0, 0, 1]
+export const DURATION = 0.24
 
-export const ease: [number, number, number, number] = [0.22, 1, 0.36, 1]
-export const DURATION = 0.4
-
-/** Fade-and-rise on mount; wrap each page in it. */
+/** Route-level wrapper: a short settle on mount. */
 export function Page({ children, className = '' }: { children: ReactNode; className?: string }) {
   const reduce = useReducedMotion()
   return (
-    <motion.div className={className} initial={reduce ? false : { opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: DURATION, ease }}>
+    <motion.div className={className} initial={reduce ? false : { opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: DURATION, ease }}>
       {children}
     </motion.div>
   )
 }
 
-const parent: Variants = { hidden: {}, show: { transition: { staggerChildren: 0.06, delayChildren: 0.04 } } }
-const child: Variants = { hidden: { opacity: 0, y: 14 }, show: { opacity: 1, y: 0, transition: { duration: DURATION, ease } } }
+const parent: Variants = { hidden: {}, show: { transition: { staggerChildren: 0.04 } } }
+const child: Variants = { hidden: { opacity: 0, y: 4 }, show: { opacity: 1, y: 0, transition: { duration: DURATION, ease } } }
 
-/** Children wrapped in <Item> reveal one after another on mount. */
+/** Children settle one after another, 40 ms apart. */
 export function Stagger({ children, className = '' }: { children: ReactNode; className?: string }) {
   const reduce = useReducedMotion()
   return (
@@ -29,11 +28,11 @@ export function Stagger({ children, className = '' }: { children: ReactNode; cla
   )
 }
 
-/** Like Stagger, but triggered when scrolled into view (once). */
+/** Like Stagger, but starts when the block enters the viewport (once). */
 export function Reveal({ children, className = '' }: { children: ReactNode; className?: string }) {
   const reduce = useReducedMotion()
   return (
-    <motion.div className={className} variants={parent} initial={reduce ? 'show' : 'hidden'} whileInView="show" viewport={{ once: true, margin: '-60px' }}>
+    <motion.div className={className} variants={parent} initial={reduce ? 'show' : 'hidden'} whileInView="show" viewport={{ once: true, margin: '-40px' }}>
       {children}
     </motion.div>
   )
@@ -47,43 +46,35 @@ export function Item({ children, className = '' }: { children: ReactNode; classN
   )
 }
 
-/** Hover lift for cards; no-op under reduced motion. */
+/** Kept for API compatibility: on this system a hover does not lift; it is a plain container. */
 export function Lift({ children, className = '' }: { children: ReactNode; className?: string }) {
-  const reduce = useReducedMotion()
-  return (
-    <motion.div className={className} whileHover={reduce ? undefined : { y: -4 }} transition={{ type: 'spring', stiffness: 380, damping: 28 }}>
-      {children}
-    </motion.div>
-  )
+  return <div className={className}>{children}</div>
 }
 
-/** Counts from 0 to `value` on mount and whenever `value` changes. */
-export function AnimatedNumber({ value, decimals = 0, suffix = '', duration = 0.9 }: { value: number; decimals?: number; suffix?: string; duration?: number }) {
+/** A number that counts up to its value when it first scrolls into view. */
+export function AnimatedNumber({ value, decimals = 0, suffix = '', duration = 0.6 }: { value: number; decimals?: number; suffix?: string; duration?: number }) {
   const reduce = useReducedMotion()
-  const [display, setDisplay] = useState(reduce ? value : 0)
+  const ref = useRef<HTMLSpanElement>(null)
+  const inView = useInView(ref, { once: true })
+  const [shown, setShown] = useState(reduce ? value : 0)
   useEffect(() => {
     if (reduce) {
-      setDisplay(value)
+      setShown(value)
       return
     }
-    const controls = animate(display, value, { duration, ease: 'easeOut', onUpdate: (v) => setDisplay(v) })
+    if (!inView) return
+    const controls = animate(0, value, { duration, ease, onUpdate: (v) => setShown(v) })
     return () => controls.stop()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [value, reduce])
+  }, [inView, reduce, value, duration])
   return (
-    <>
-      {display.toFixed(decimals)}
+    <span ref={ref}>
+      {shown.toFixed(decimals)}
       {suffix}
-    </>
+    </span>
   )
 }
 
-/** Slow vertical drift for decorative elements. */
-export function Float({ children, className = '', delay = 0 }: { children: ReactNode; className?: string; delay?: number }) {
-  const reduce = useReducedMotion()
-  return (
-    <motion.div className={className} animate={reduce ? undefined : { y: [0, -6, 0] }} transition={{ duration: 5, repeat: Infinity, ease: 'easeInOut', delay }}>
-      {children}
-    </motion.div>
-  )
+/** Kept for API compatibility: nothing floats on this system. */
+export function Float({ children, className = '' }: { children: ReactNode; className?: string; delay?: number }) {
+  return <div className={className}>{children}</div>
 }
