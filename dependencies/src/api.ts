@@ -6,10 +6,11 @@ import { z } from 'zod'
 import { EmailSchema, NameSchema } from './fields.ts'
 import type { CatalogGroup } from './engine/exercises.ts'
 import type { ProgramDto } from './program.ts'
-import { EXERCISE_IDS, VOICE_COMMANDS, type ExerciseId, type SessionPlan, type SessionRecord, type Side } from './engine/types.ts'
+import { EXERCISE_IDS, MUSCLE_IDS, VOICE_COMMANDS, type ExerciseId, type SessionPlan, type SessionRecord, type Side } from './engine/types.ts'
 
 export const ExerciseIdSchema = z.enum(EXERCISE_IDS)
 export const SideSchema = z.enum(['left', 'right'])
+export const MuscleIdSchema = z.enum(MUSCLE_IDS)
 
 // ---- accounts ----
 
