@@ -1,3 +1,4 @@
+import json
 import math
 import time
 import cv2
@@ -47,41 +48,36 @@ class RoutineExercise:
         self.current_rep_min = 180.0
         self.current_rep_max = 0.0
 
+        # Dynamic Green Line Best Form Tracking
+        self.best_peak_angle = 180.0 if not self.invert_logic else 0.0
+        self.best_endpoint_coords = None  # Stores (vertex_point, endpoint) in pixel coords
+
     def evaluate_rep_quality(self, min_ang, max_ang):
-        """Calculates form quality score based on absolute deviation from ROM targets."""
-        # Detect hyper-extension / over-extension penalties
+        """Calculates live visual feedback score for HUD display only."""
         if max_ang > self.max_allowed_extension:
             return "POOR FORM (OVER-EXTENSION)", (0, 0, 255)
 
         if self.invert_logic:
-            # For inverted logic: Goal is getting peak angle above extend_threshold
-            # and flexed angle below flex_threshold.
             target_extension = self.extend_threshold
             target_flexion = self.flex_threshold
 
             achieved_extension = max_ang
             achieved_flexion = min_ang
 
-            # Calculate shortfall from target targets
             extension_shortfall = max(0.0, target_extension - achieved_extension)
             flexion_shortfall = max(0.0, achieved_flexion - target_flexion)
-
         else:
-            # For standard logic: Goal is getting minimum angle below flex_threshold
-            # and extended angle above extend_threshold.
             target_flexion = self.flex_threshold
             target_extension = self.extend_threshold
 
             achieved_flexion = min_ang
             achieved_extension = max_ang
 
-            # Shortfall calculation: How far off from full contraction/extension?
             flexion_shortfall = max(0.0, achieved_flexion - target_flexion)
             extension_shortfall = max(0.0, target_extension - achieved_extension)
 
         total_error = flexion_shortfall + extension_shortfall
 
-        # Strict Categorization
         if total_error <= 10.0:
             return "PERFECT", (0, 255, 0)
         elif total_error <= 25.0:
@@ -103,10 +99,6 @@ class ExerciseTracker:
     LEFT_KNEE, RIGHT_KNEE = 25, 26
     LEFT_ANKLE, RIGHT_ANKLE = 27, 28
 
-    # Exercise Definitions grouped into sections
-    # Due to camera mirroring:
-    # - User's Right side uses MediaPipe LEFT landmarks
-    # - User's Left side uses MediaPipe RIGHT landmarks
     EXERCISE_CATEGORIES = {
         "ARMS": {
             "1": {
@@ -187,8 +179,8 @@ class ExerciseTracker:
                 "name": "Pec Fly",
                 "type": "standard",
                 "indices": (LEFT_WRIST, LEFT_SHOULDER, RIGHT_WRIST),
-                "flex_threshold": 25.0,   # Requires wrists to meet directly in front of chest
-                "extend_threshold": 75.0,  # Arms open wide at sides
+                "flex_threshold": 25.0,
+                "extend_threshold": 75.0,
                 "default_reps": 5,
                 "default_sets": 1,
                 "invert_logic": False,
@@ -244,8 +236,9 @@ class ExerciseTracker:
             },
             "12": {
                 "name": "Lunges",
-                "type": "standard",
-                "indices": (LEFT_HIP, LEFT_KNEE, LEFT_ANKLE),
+                "type": "leg_dual",
+                "right_indices": (LEFT_HIP, LEFT_KNEE, LEFT_ANKLE),
+                "left_indices": (RIGHT_HIP, RIGHT_KNEE, RIGHT_ANKLE),
                 "flex_threshold": 95.0,
                 "extend_threshold": 165.0,
                 "default_reps": 5,
@@ -259,19 +252,19 @@ class ExerciseTracker:
                 "name": "Ab Twist",
                 "type": "twist",
                 "indices": (LEFT_SHOULDER, RIGHT_SHOULDER, 0),
-                "flex_threshold": 8.0,
-                "extend_threshold": 22.0,
+                "flex_threshold": 2.5,   # Very responsive threshold for easy triggering
+                "extend_threshold": 8.5,   # Lowered range for lighter torso rotation
                 "default_reps": 10,
                 "default_sets": 1,
                 "invert_logic": True,
-                "max_allowed_extension": 60.0,
+                "max_allowed_extension": 40.0,
             },
             "14": {
                 "name": "Crunches",
                 "type": "standard",
                 "indices": (LEFT_SHOULDER, LEFT_HIP, LEFT_KNEE),
-                "flex_threshold": 135.0,  # Torso curled up toward knees
-                "extend_threshold": 165.0, # Lying flat on back
+                "flex_threshold": 135.0,
+                "extend_threshold": 165.0,
                 "default_reps": 8,
                 "default_sets": 1,
                 "invert_logic": False,
@@ -291,7 +284,6 @@ class ExerciseTracker:
         )
         self.mp_drawing = mp.solutions.drawing_utils
 
-        # Prompt for default rest timer if building interactive routine
         if routine is None:
             rest_input = input("Enter default rest timer duration in seconds (default 10s): ").strip()
             if rest_input.isdigit() and int(rest_input) >= 0:
@@ -303,7 +295,6 @@ class ExerciseTracker:
         self.last_rep_feedback = ("READY", (255, 255, 255))
         self.warning_status = ("NORMAL", (0, 255, 0))
 
-        # Rest Timer and Grace Period configuration
         self.rest_duration = default_rest_duration
         self.rest_timer_end = None
         self.in_rest_period = False
@@ -325,6 +316,8 @@ class ExerciseTracker:
         print("\n" + "=" * 50)
         print("    CUSTOM WORKOUT ROUTINE BUILDER")
         print("=" * 50)
+        print(" [0] Cancel / Finish building routine")
+        print(" [all] Add ALL exercises (with both Left & Right variations for bilateral movements)")
 
         for category, exercises in cls.EXERCISE_CATEGORIES.items():
             print(f"\n--- {category} ---")
@@ -335,17 +328,78 @@ class ExerciseTracker:
         adding = True
 
         while adding:
-            choice = input("\nSelect exercise number to add: ").strip()
+            choice = input("\nSelect exercise number to add (or '0' to finish, 'all' for all): ").strip().lower()
+
+            if choice == "0":
+                print("Finishing routine builder...")
+                break
+
+            if choice == "all":
+                univ_reps = input("Enter universal target reps per set (default 5): ").strip()
+                target_reps = int(univ_reps) if univ_reps.isdigit() and int(univ_reps) > 0 else 5
+
+                univ_sets = input("Enter universal target sets (default 1): ").strip()
+                target_sets = int(univ_sets) if univ_sets.isdigit() and int(univ_sets) > 0 else 1
+
+                for cat, exercises in cls.EXERCISE_CATEGORIES.items():
+                    for key, ex_data in exercises.items():
+                        max_ext = ex_data.get("max_allowed_extension", 180.0)
+                        ex_type = ex_data.get("type")
+
+                        if ex_type in ["arm_dual", "leg_dual"]:
+                            # Add both Left and Right side variations automatically when 'all' is chosen
+                            routine.append(
+                                RoutineExercise(
+                                    name=f"{ex_data['name']} (Right)",
+                                    primary_joint_indices=ex_data["right_indices"],
+                                    flex_threshold=ex_data["flex_threshold"],
+                                    extend_threshold=ex_data["extend_threshold"],
+                                    target_reps=target_reps,
+                                    target_sets=target_sets,
+                                    invert_logic=ex_data["invert_logic"],
+                                    max_allowed_extension=max_ext,
+                                )
+                            )
+                            routine.append(
+                                RoutineExercise(
+                                    name=f"{ex_data['name']} (Left)",
+                                    primary_joint_indices=ex_data["left_indices"],
+                                    flex_threshold=ex_data["flex_threshold"],
+                                    extend_threshold=ex_data["extend_threshold"],
+                                    target_reps=target_reps,
+                                    target_sets=target_sets,
+                                    invert_logic=ex_data["invert_logic"],
+                                    max_allowed_extension=max_ext,
+                                )
+                            )
+                        else:
+                            routine.append(
+                                RoutineExercise(
+                                    name=ex_data["name"],
+                                    primary_joint_indices=ex_data["indices"],
+                                    flex_threshold=ex_data["flex_threshold"],
+                                    extend_threshold=ex_data["extend_threshold"],
+                                    target_reps=target_reps,
+                                    target_sets=target_sets,
+                                    invert_logic=ex_data["invert_logic"],
+                                    max_allowed_extension=max_ext,
+                                )
+                            )
+                print(f"--> Added ALL exercises with both sides included ({target_sets} set(s) of {target_reps} reps each).")
+                break
+
             ex_data = cls.get_exercise_by_id(choice)
 
             if not ex_data:
-                print("Invalid choice. Please select a valid number.")
+                print("Invalid choice. Please select a valid number, '0' to finish, or 'all'.")
                 continue
 
             max_ext = ex_data.get("max_allowed_extension", 180.0)
+            ex_type = ex_data.get("type")
 
-            if ex_data.get("type") == "arm_dual":
-                print(f"\nSelect Arm/Side Option for {ex_data['name']}:")
+            if ex_type in ["arm_dual", "leg_dual"]:
+                side_label = "Arm/Side" if ex_type == "arm_dual" else "Leg/Side"
+                print(f"\nSelect {side_label} Option for {ex_data['name']}:")
                 print(" [1] Right Side")
                 print(" [2] Left Side")
                 print(" [3] Both Sides (Sequential)")
@@ -517,11 +571,10 @@ class ExerciseTracker:
 
     @staticmethod
     def calculate_torso_twist_angle(left_shoulder, right_shoulder):
-        """Calculates rotation/tilt angle of the shoulder line relative to horizontal screen axis."""
         dx = right_shoulder[0] - left_shoulder[0]
         dy = right_shoulder[1] - left_shoulder[1]
         radians = math.atan2(dy, dx)
-        angle = math.abs(radians * 180.0 / math.pi) if hasattr(math, 'abs') else abs(radians * 180.0 / math.pi)
+        angle = abs(radians * 180.0 / math.pi)
         return angle
 
     def advance_set_or_exercise(self):
@@ -572,7 +625,7 @@ class ExerciseTracker:
         self.warning_status = (f"Rest: {int(time_since_last_rep)}s", (200, 200, 200))
         return time_since_last_rep
 
-    def process_reps(self, current_exercise, angle):
+    def process_reps(self, current_exercise, angle, p2_px=None, p3_px=None):
         current_exercise.min_angle = min(current_exercise.min_angle, angle)
         current_exercise.max_angle = max(current_exercise.max_angle, angle)
 
@@ -581,55 +634,16 @@ class ExerciseTracker:
 
         time_since_last = self.check_fatigue_and_stalls(current_exercise)
 
-        # Inverted logic movements (e.g., Tricep Pushdowns: Flexes up, extends down)
-        if current_exercise.invert_logic:
-            if angle < current_exercise.flex_threshold:
-                if current_exercise.current_stage != "down":
-                    current_exercise.current_stage = "down"
-                    current_exercise.rep_start_time = time.time()
-                    current_exercise.current_rep_min = angle
-                    current_exercise.current_rep_max = angle
+        # Standard flexion movements
+        if not current_exercise.invert_logic:
+            if angle < current_exercise.best_peak_angle:
+                current_exercise.best_peak_angle = angle
+                if p2_px is not None and p3_px is not None:
+                    current_exercise.best_endpoint_coords = (
+                        tuple(map(int, p2_px)),
+                        tuple(map(int, p3_px)),
+                    )
 
-            if (
-                angle > current_exercise.extend_threshold
-                and current_exercise.current_stage == "down"
-            ):
-                now = time.time()
-                current_exercise.current_stage = "up"
-                current_exercise.reps_completed += 1
-
-                rep_duration = (
-                    round(now - current_exercise.rep_start_time, 2)
-                    if current_exercise.rep_start_time
-                    else 0.0
-                )
-
-                score, color = current_exercise.evaluate_rep_quality(
-                    current_exercise.current_rep_min, current_exercise.current_rep_max
-                )
-                self.last_rep_feedback = (score, color)
-
-                current_exercise.rep_logs.append(
-                    {
-                        "set": current_exercise.current_set,
-                        "rep": current_exercise.reps_completed,
-                        "min_angle": int(current_exercise.current_rep_min),
-                        "max_angle": int(current_exercise.current_rep_max),
-                        "duration": rep_duration,
-                        "rest_time": time_since_last,
-                        "score": score,
-                    }
-                )
-
-                current_exercise.last_rep_completion_time = now
-                current_exercise.current_rep_min = 180.0
-                current_exercise.current_rep_max = 0.0
-
-                if current_exercise.reps_completed >= current_exercise.target_reps:
-                    self.start_rest_period()
-
-        # Flexion-based movements (e.g., Bicep Curls)
-        else:
             if angle > current_exercise.extend_threshold:
                 if current_exercise.current_stage != "down":
                     current_exercise.current_stage = "down"
@@ -664,7 +678,60 @@ class ExerciseTracker:
                         "max_angle": int(current_exercise.current_rep_max),
                         "duration": rep_duration,
                         "rest_time": time_since_last,
-                        "score": score,
+                    }
+                )
+
+                current_exercise.last_rep_completion_time = now
+                current_exercise.current_rep_min = 180.0
+                current_exercise.current_rep_max = 0.0
+
+                if current_exercise.reps_completed >= current_exercise.target_reps:
+                    self.start_rest_period()
+
+        # Inverted logic movements
+        else:
+            if angle > current_exercise.best_peak_angle:
+                current_exercise.best_peak_angle = angle
+                if p2_px is not None and p3_px is not None:
+                    current_exercise.best_endpoint_coords = (
+                        tuple(map(int, p2_px)),
+                        tuple(map(int, p3_px)),
+                    )
+
+            if angle < current_exercise.flex_threshold:
+                if current_exercise.current_stage != "down":
+                    current_exercise.current_stage = "down"
+                    current_exercise.rep_start_time = time.time()
+                    current_exercise.current_rep_min = angle
+                    current_exercise.current_rep_max = angle
+
+            if (
+                angle > current_exercise.extend_threshold
+                and current_exercise.current_stage == "down"
+            ):
+                now = time.time()
+                current_exercise.current_stage = "up"
+                current_exercise.reps_completed += 1
+
+                rep_duration = (
+                    round(now - current_exercise.rep_start_time, 2)
+                    if current_exercise.rep_start_time
+                    else 0.0
+                )
+
+                score, color = current_exercise.evaluate_rep_quality(
+                    current_exercise.current_rep_min, current_exercise.current_rep_max
+                )
+                self.last_rep_feedback = (score, color)
+
+                current_exercise.rep_logs.append(
+                    {
+                        "set": current_exercise.current_set,
+                        "rep": current_exercise.reps_completed,
+                        "min_angle": int(current_exercise.current_rep_min),
+                        "max_angle": int(current_exercise.current_rep_max),
+                        "duration": rep_duration,
+                        "rest_time": time_since_last,
                     }
                 )
 
@@ -676,7 +743,6 @@ class ExerciseTracker:
                     self.start_rest_period()
 
     def start_rest_period(self):
-        """Triggers the rest period timer when a set completes."""
         self.waiting_for_ready = True
         if self.rest_duration > 0:
             self.in_rest_period = True
@@ -685,15 +751,13 @@ class ExerciseTracker:
             self.in_rest_period = False
 
     def start_grace_period(self):
-        """Starts a buffer delay after pressing space to avoid misreading initial positioning."""
         if self.grace_duration > 0:
             self.in_grace_period = True
             self.grace_period_end = time.time() + self.grace_duration
         else:
             self.in_grace_period = False
 
-    def export_session_data_for_db(self):
-        """Generates structured JSON object formatted for TigerDB storage and Gemini AI prompts."""
+    def export_session_data_for_db(self, output_filename="workout_session.json"):
         payload = {"timestamp": time.time(), "exercises": []}
         for ex in self.routine:
             ex_data = {
@@ -705,6 +769,11 @@ class ExerciseTracker:
                 "reps": ex.rep_logs,
             }
             payload["exercises"].append(ex_data)
+
+        with open(output_filename, "w") as f:
+            json.dump(payload, f, indent=4)
+
+        print(f"\n[INFO] Workout data successfully saved to '{output_filename}'")
         return payload
 
     def print_workout_summary(self):
@@ -725,7 +794,7 @@ class ExerciseTracker:
                 pace_str = f"+{speed_diff}s slower" if speed_diff > 0 else f"{speed_diff}s faster"
 
                 print(
-                    f"   Set {log['set']} Rep {log['rep']}: Form={log['score']} | "
+                    f"   Set {log['set']} Rep {log['rep']}: "
                     f"ROM={log['min_angle']}°-{log['max_angle']}° | "
                     f"Time={log['duration']}s ({pace_str}) | "
                     f"Rest Prior={log['rest_time']}s"
@@ -765,14 +834,12 @@ class ExerciseTracker:
             key = cv2.waitKey(1) & 0xFF
             now = time.time()
 
-            # Handle Rest Timer Expiration
             if self.in_rest_period and self.rest_timer_end:
                 if now >= self.rest_timer_end:
                     self.in_rest_period = False
                     self.waiting_for_ready = False
                     self.advance_set_or_exercise()
 
-            # Handle Grace Period Expiration
             if self.in_grace_period and self.grace_period_end:
                 if now >= self.grace_period_end:
                     self.in_grace_period = False
@@ -846,11 +913,11 @@ class ExerciseTracker:
             if results.pose_landmarks:
                 landmarks = results.pose_landmarks.landmark
 
-                # Special torso twist check vs standard 3-joint angle calculation
                 if active_exercise.name == "Ab Twist":
                     ls = [landmarks[self.LEFT_SHOULDER].x * w, landmarks[self.LEFT_SHOULDER].y * h]
                     rs = [landmarks[self.RIGHT_SHOULDER].x * w, landmarks[self.RIGHT_SHOULDER].y * h]
                     angle = self.calculate_torso_twist_angle(ls, rs)
+                    p1, p2, p3 = None, None, None
                 else:
                     p1_idx, p2_idx, p3_idx = active_exercise.indices
                     p1 = [landmarks[p1_idx].x * w, landmarks[p1_idx].y * h]
@@ -858,21 +925,76 @@ class ExerciseTracker:
                     p3 = [landmarks[p3_idx].x * w, landmarks[p3_idx].y * h]
                     angle = self.calculate_angle(p1, p2, p3)
 
-                # Process reps ONLY if not waiting, resting, or in grace period
                 if not self.waiting_for_ready and not self.in_rest_period and not self.in_grace_period:
-                    self.process_reps(active_exercise, angle)
+                    self.process_reps(active_exercise, angle, p2_px=p2, p3_px=p3)
 
-                self.mp_drawing.draw_landmarks(
-                    frame, results.pose_landmarks, self.mp_pose.POSE_CONNECTIONS
-                )
+                # --- REFINED SIDE-AWARE & CORRECTED SPATIAL GUIDES ---
+                cycle_time = 2.5
+                progress = 0.5 + 0.5 * math.sin(now * (2 * math.pi / cycle_time))
 
-                # --- Draw Semi-Transparent HUD Overlay ---
+                ex_name = active_exercise.name
+
+                if active_exercise.name == "Ab Twist":
+                    # Explicit Ab Twist guidance rendering
+                    center_x, center_y = int(w // 2), int(h // 3)
+                    direction_sign = 1 if math.sin(now * math.pi) > 0 else -1
+                    target_x = int(center_x + 80 * direction_sign * progress)
+                    cv2.arrowedLine(frame, (center_x, center_y), (target_x, center_y), (255, 0, 0), 4, tipLength=0.3)
+                    cv2.putText(frame, "ALTERNATE TWIST", (center_x - 75, center_y - 20), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 0, 0), 2)
+                elif p2 is not None:
+                    base_x, base_y = int(p2[0]), int(p2[1])
+
+                    if "Squats" in ex_name:
+                        target_y = int(base_y + 140 * progress)
+                        cv2.arrowedLine(frame, (base_x, base_y), (base_x, target_y), (255, 0, 0), 4, tipLength=0.3)
+                        cv2.putText(frame, "PACE & DEPTH", (base_x - 55, base_y - 15), cv2.FONT_HERSHEY_SIMPLEX, 0.55, (255, 0, 0), 2)
+                    elif "Lunges" in ex_name:
+                        side_dir = 30 if "Right" in ex_name else -30
+                        target_y = int(base_y + 120 * progress)
+                        cv2.arrowedLine(frame, (base_x, base_y), (base_x + side_dir, target_y), (255, 0, 0), 4, tipLength=0.3)
+                        cv2.putText(frame, "PACE & STEP", (base_x - 45, base_y - 15), cv2.FONT_HERSHEY_SIMPLEX, 0.55, (255, 0, 0), 2)
+                    elif "Shoulder Press" in ex_name or "Front Raise" in ex_name:
+                        label_txt = "PACE & RAISE" if "Front Raise" in ex_name else "PACE & PRESS"
+                        target_y = int(base_y - 20 - 100 * progress)
+                        cv2.arrowedLine(frame, (base_x, base_y + 40), (base_x, target_y), (255, 0, 0), 4, tipLength=0.3)
+                        cv2.putText(frame, label_txt, (base_x - 50, base_y - 15), cv2.FONT_HERSHEY_SIMPLEX, 0.55, (255, 0, 0), 2)
+                    elif "Lateral Raise" in ex_name:
+                        # Side-specific lateral raise arrow pointing precisely to the side of the working arm
+                        side_offset = 70 if "Right" in ex_name else -70
+                        target_x = int(base_x + side_offset * progress)
+                        cv2.arrowedLine(frame, (base_x, base_y), (target_x, base_y), (255, 0, 0), 4, tipLength=0.3)
+                        cv2.putText(frame, "PACE & RAISE", (base_x - 50, base_y - 15), cv2.FONT_HERSHEY_SIMPLEX, 0.55, (255, 0, 0), 2)
+                    elif "Chest Press" in ex_name:
+                        target_x = int(base_x + 100 * progress)
+                        cv2.arrowedLine(frame, (base_x, base_y), (target_x, base_y), (255, 0, 0), 4, tipLength=0.3)
+                        cv2.putText(frame, "PACE & PRESS", (base_x - 50, base_y - 15), cv2.FONT_HERSHEY_SIMPLEX, 0.55, (255, 0, 0), 2)
+                    elif "Pec Fly" in ex_name:
+                        left_x, right_x = base_x - 120 + int(60 * progress), base_x + 120 - int(60 * progress)
+                        cv2.arrowedLine(frame, (left_x - 40, base_y), (left_x, base_y), (255, 0, 0), 4, tipLength=0.3)
+                        cv2.arrowedLine(frame, (right_x + 40, base_y), (right_x, base_y), (255, 0, 0), 4, tipLength=0.3)
+                        cv2.putText(frame, "PACE & SQUEEZE", (base_x - 65, base_y - 25), cv2.FONT_HERSHEY_SIMPLEX, 0.55, (255, 0, 0), 2)
+                    elif "Lat Pulldown" in ex_name:
+                        target_y = int(base_y - 60 + 100 * progress)
+                        cv2.arrowedLine(frame, (base_x, base_y - 60), (base_x, target_y), (255, 0, 0), 4, tipLength=0.3)
+                        cv2.putText(frame, "PACE & PULL", (base_x - 45, base_y - 75), cv2.FONT_HERSHEY_SIMPLEX, 0.55, (255, 0, 0), 2)
+                    elif "Crunches" in ex_name:
+                        # Corrected crunch direction pointing upward/forward toward knees
+                        target_y = int(base_y + 65 - 100 * progress)
+                        cv2.arrowedLine(frame, (base_x, base_y + 65), (base_x, target_y), (255, 0, 0), 4, tipLength=0.3)
+                        cv2.putText(frame, "PACE & CURL", (base_x - 45, base_y - 15), cv2.FONT_HERSHEY_SIMPLEX, 0.55, (255, 0, 0), 2)
+                    elif p3 is not None:
+                        v_x = p3[0] - base_x
+                        v_y = p3[1] - base_y
+                        guide_x = int(base_x + v_x * progress)
+                        guide_y = int(base_y + v_y * progress)
+                        cv2.arrowedLine(frame, (base_x, base_y), (guide_x, guide_y), (255, 0, 0), 4, tipLength=0.25)
+                        cv2.putText(frame, "PACE PATH", (base_x - 35, base_y - 15), cv2.FONT_HERSHEY_SIMPLEX, 0.55, (255, 0, 0), 2)
+
                 overlay = frame.copy()
                 cv2.rectangle(overlay, (20, 20), (540, 310), (0, 0, 0), -1)
                 alpha = 0.6
                 frame = cv2.addWeighted(overlay, alpha, frame, 1 - alpha, 0)
 
-                # Text Metrics Overlay
                 cv2.putText(
                     frame,
                     f"Exercise: {active_exercise.name}",
@@ -946,7 +1068,6 @@ class ExerciseTracker:
                     1,
                 )
 
-                # --- OVERLAY BANNER FOR REST TIMER / GRACE PERIOD / WAITING ---
                 if self.in_rest_period and self.rest_timer_end:
                     remaining_rest = max(0, int(self.rest_timer_end - now))
                     cv2.rectangle(
@@ -1027,6 +1148,7 @@ class ExerciseTracker:
         cap.release()
         cv2.destroyAllWindows()
         self.print_workout_summary()
+        self.export_session_data_for_db()
 
 
 if __name__ == "__main__":
