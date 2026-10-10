@@ -110,6 +110,11 @@ const turn = ([x, y]: [number, number], deg: number): [number, number] => {
   return [x * c - y * s, x * s + y * c]
 }
 
+/** Where each movement starts: the forearm, the arm or the shin hanging straight down. */
+export function restFor(exercise: ExerciseId): number {
+  return exercise === 'seated_knee_extension' ? 90 : 0
+}
+
 export function clampMetric(exercise: ExerciseId, metricDeg: number): number {
   const [lo, hi] = exercise === 'seated_knee_extension' ? [90, 180] : [0, 180]
   return Math.min(hi, Math.max(lo, metricDeg))

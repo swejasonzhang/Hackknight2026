@@ -6,6 +6,7 @@ import { api } from '../api/client'
 import { AnimatedNumber, Page } from '../components/motion'
 import { axisTick, tooltipStyle } from '../components/ProgressCharts'
 import { LazyJointScene } from '../components/three/lazy'
+import { useRepLoop } from '../components/three/useRepLoop'
 import { Alert, Lamp, Skeleton, StatTile, Strip, Tag } from '../components/ui'
 import { deg, fatigueLabel, formatDateTime, pct } from '../format'
 import { useStickyTop } from '../components/useStickyTop'
@@ -77,6 +78,8 @@ export function SessionDetailPage() {
   const [stageRef, stageTop] = useStickyTop<HTMLElement>(24)
   const [session, setSession] = useState<SessionDto | null>(null)
   const [error, setError] = useState<string | null>(null)
+  // The figure works through the whole range, rep after rep: from rest to this session's best and back.
+  const loop = useRepLoop(session?.exercise ?? 'elbow_flexion', session ? session.summary.bestPeakDeg : null)
 
   useEffect(() => {
     let cancelled = false
@@ -205,10 +208,11 @@ export function SessionDetailPage() {
             <div className="absolute inset-x-0 top-11 bottom-0">
               <LazyJointScene
                 exercise={session.exercise}
-                angle={best}
+                angle={loop ?? best}
+                rangeDeg={best}
                 goalDeg={goal}
                 className="h-full w-full"
-                label={`${exercise.name} posed at ${deg(best)}, the best rep of this session`}
+                label={`A 3D figure doing ${exercise.name.toLowerCase()} through its whole range, from rest to this session's best rep of ${deg(best)}`}
                 fallback={<div aria-hidden="true" className="hatch absolute inset-8" />}
               />
             </div>

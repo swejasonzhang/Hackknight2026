@@ -4,7 +4,7 @@ import { Canvas, useFrame, useThree } from '@react-three/fiber'
 import { useReducedMotion, type MotionValue } from 'motion/react'
 import { useEffect, useMemo, useRef, type ReactNode, type RefObject } from 'react'
 import { BufferAttribute, BufferGeometry, DoubleSide, Group, LatheGeometry, Object3D, Quaternion, Vector2, Vector3 } from 'three'
-import { BONES, directionFor, FRAMING, skeletonFor, type BoneName, type JointName, type Skeleton, type V3 } from './skeleton'
+import { BONES, directionFor, FRAMING, restFor, skeletonFor, type BoneName, type JointName, type Skeleton, type V3 } from './skeleton'
 
 export interface JointSceneProps {
   exercise: ExerciseId
@@ -12,6 +12,8 @@ export interface JointSceneProps {
   angle: MotionValue<number> | number
   /** Drawn as a navy tick on the gauge. */
   goalDeg?: number
+  /** The range covered, rest to this reading: a faint band with a tick at each end, under the live arc. */
+  rangeDeg?: number
   /** Slow sway of the whole body so the depth reads; off under reduced motion. */
   idle?: boolean
   className?: string
@@ -232,7 +234,32 @@ function BonePart({ name, view, refs }: { name: BoneName; view: Skeleton['view']
   return <group ref={bind(refs, name)}>{body}</group>
 }
 
-function Body({ exercise, angle, goalDeg, idle, reduce }: Pick<JointSceneProps, 'exercise' | 'angle' | 'goalDeg' | 'idle'> & { reduce: boolean }) {
+/** The range covered, end to end: a faint band from rest to `rangeDeg` round the moving joint, ticked at both ends. */
+function RangeBand({ exercise, rangeDeg }: { exercise: ExerciseId; rangeDeg: number }) {
+  const { geometry, ends, mid, z, radius } = useMemo(() => {
+    const o = skeletonFor(exercise, restFor(exercise)).overlay
+    const r = o.reach * 0.55
+    const g = gaugeGeometry()
+    const end = directionFor(exercise, rangeDeg)
+    writeGauge(g, o.mid, r, r * 0.17, o.restDeg, end, o.z - 0.01)
+    return { geometry: g, ends: [o.restDeg, end], mid: o.mid, z: o.z, radius: r }
+  }, [exercise, rangeDeg])
+  return (
+    <group>
+      <mesh geometry={geometry}>
+        <meshBasicMaterial color={COBALT} side={DoubleSide} transparent opacity={0.16} depthWrite={false} />
+      </mesh>
+      {ends.map((d) => (
+        <mesh key={d} position={[mid[0] + radius * Math.cos(rad(d)), mid[1] + radius * Math.sin(rad(d)), z]} rotation={[0, 0, rad(d)]}>
+          <boxGeometry args={[radius * 0.5, radius * 0.045, 0.02]} />
+          <meshBasicMaterial color={COBALT} />
+        </mesh>
+      ))}
+    </group>
+  )
+}
+
+function Body({ exercise, angle, goalDeg, rangeDeg, idle, reduce }: Pick<JointSceneProps, 'exercise' | 'angle' | 'goalDeg' | 'rangeDeg' | 'idle'> & { reduce: boolean }) {
   const sway = useRef<Group>(null)
   const refs = useRef<Record<string, Object3D | undefined>>({})
   const gauge = useMemo(gaugeGeometry, [])
@@ -330,6 +357,7 @@ function Body({ exercise, angle, goalDeg, idle, reduce }: Pick<JointSceneProps, 
         <group ref={bind(refs, 'ring-end')}>
           <Landmark r={ring * 0.85} />
         </group>
+        {rangeDeg != null && <RangeBand exercise={exercise} rangeDeg={rangeDeg} />}
         <mesh geometry={gauge}>
           <meshBasicMaterial color={COBALT} side={DoubleSide} transparent opacity={0.85} />
         </mesh>
@@ -351,9 +379,11 @@ function Body({ exercise, angle, goalDeg, idle, reduce }: Pick<JointSceneProps, 
  * with feet, and mannequin ball joints, standing for elbow flexion (side on) and shoulder
  * abduction (face on), seated on a stool for knee extension. Only the exercising limb moves with
  * the reading (`skeletonFor`); the camera app's rings and segments and the goniometer arc sit on
- * its joints. A new reading sweeps the limb to it. Never rendered in tests: use `LazyJointScene`.
+ * its joints, and `rangeDeg` shades the range covered from rest to that reading, end to end. Drive
+ * `angle` with `useRepLoop` to sweep the limb through that range rep after rep; a new fixed reading
+ * sweeps the limb to it. Never rendered in tests: use `LazyJointScene`.
  */
-export default function JointScene({ exercise, angle, goalDeg, idle = true, className = '', label }: JointSceneProps) {
+export default function JointScene({ exercise, angle, goalDeg, rangeDeg, idle = true, className = '', label }: JointSceneProps) {
   const reduce = useReducedMotion() ?? false
   const fixed = typeof angle === 'number' ? angle : angle.get()
   const floorY = FRAMING[exercise].offset[1]
@@ -363,7 +393,7 @@ export default function JointScene({ exercise, angle, goalDeg, idle = true, clas
         <hemisphereLight args={['#ffffff', '#9aa8c2', 1.0]} />
         <directionalLight position={[3, 4, 5]} intensity={2.2} />
         <directionalLight position={[-4, 1.5, -3]} intensity={1.4} color="#c9d6ff" />
-        <Body exercise={exercise} angle={reduce ? fixed : angle} goalDeg={goalDeg} idle={!reduce && idle} reduce={reduce} />
+        <Body exercise={exercise} angle={reduce ? fixed : angle} goalDeg={goalDeg} rangeDeg={rangeDeg} idle={!reduce && idle} reduce={reduce} />
         <Grid position={[0, floorY - 0.001, 0]} args={[12, 12]} cellSize={0.25} sectionSize={1} cellColor="#dfe4ef" sectionColor="#b7c2dc" fadeDistance={9} fadeStrength={1.6} infiniteGrid />
         <OrbitControls enableZoom={false} enablePan={false} minPolarAngle={Math.PI / 3} maxPolarAngle={Math.PI / 1.7} />
       </Canvas>
