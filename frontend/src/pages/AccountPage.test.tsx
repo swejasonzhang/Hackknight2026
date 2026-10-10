@@ -1,5 +1,5 @@
 import { EMAIL_REQUIREMENT } from '@arc/dependencies'
-import { fireEvent, render, screen } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -76,7 +76,8 @@ describe('AccountPage', () => {
     fireEvent.click(deleteButton())
     expect(await screen.findByText(/landing: your account and everything in it/i, {}, { timeout: 3000 })).toBeInTheDocument()
     expect(deleteAccount).toHaveBeenCalledWith({ email: 'ada@example.com', password: 'correct horse battery', confirm: 'DELETE' })
-    expect(logout).toHaveBeenCalled()
+    // The session ends as the account page unmounts, just after the landing page appears.
+    await waitFor(() => expect(logout).toHaveBeenCalled())
   })
 
   it('keeps the member signed in and shows the reason when the server refuses, without echoing the password', async () => {
