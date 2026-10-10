@@ -1,3 +1,4 @@
+import * as Tabs from '@radix-ui/react-tabs'
 import { motion } from 'motion/react'
 import { useId, type ReactNode } from 'react'
 
@@ -104,28 +105,30 @@ export interface SegmentedOption<T extends string> {
   label: string
 }
 
-/** Tabs with a blue pill that slides to the active option. */
+/** Radix Tabs with a blue pill that slides to the active option; the same options/value/onChange API as before. */
 export function Segmented<T extends string>({ options, value, onChange, label }: { options: SegmentedOption<T>[]; value: T; onChange: (value: T) => void; label: string }) {
   const layoutId = useId()
   return (
-    <div className="inline-flex rounded-full border border-line-strong bg-surface p-1" role="tablist" aria-label={label}>
-      {options.map((o) => {
-        const active = o.value === value
-        return (
-          <button
-            key={o.value}
-            type="button"
-            role="tab"
-            aria-selected={active}
-            onClick={() => onChange(o.value)}
-            className={`relative cursor-pointer rounded-full px-4 py-2 text-[13px] font-medium transition-colors focus-visible:ring-[3px] focus-visible:ring-primary/40 focus-visible:outline-none ${active ? 'text-white' : 'text-muted hover:text-ink'}`}
-          >
-            {active && <motion.span layoutId={layoutId} className="absolute inset-0 rounded-full bg-primary shadow-blue" transition={{ type: 'spring', stiffness: 500, damping: 40 }} />}
-            <span className="relative z-10">{o.label}</span>
-          </button>
-        )
-      })}
-    </div>
+    <Tabs.Root value={value} onValueChange={(v) => onChange(v as T)}>
+      <Tabs.List aria-label={label} className="inline-flex rounded-full border border-line-strong bg-surface p-1">
+        {options.map((o) => {
+          const active = o.value === value
+          return (
+            <Tabs.Trigger
+              key={o.value}
+              value={o.value}
+              onClick={() => {
+                if (!active) onChange(o.value)
+              }}
+              className={`relative cursor-pointer rounded-full px-4 py-2 text-[13px] font-medium transition-colors focus-visible:ring-[3px] focus-visible:ring-primary/40 focus-visible:outline-none ${active ? 'text-white' : 'text-muted hover:text-ink'}`}
+            >
+              {active && <motion.span layoutId={layoutId} className="absolute inset-0 rounded-full bg-primary shadow-blue" transition={{ type: 'spring', stiffness: 500, damping: 40 }} />}
+              <span className="relative z-10">{o.label}</span>
+            </Tabs.Trigger>
+          )
+        })}
+      </Tabs.List>
+    </Tabs.Root>
   )
 }
 

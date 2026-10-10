@@ -2,7 +2,7 @@ import { motion, useReducedMotion } from 'motion/react'
 import { Link, Outlet } from 'react-router-dom'
 import { APP_NAME } from '../brand'
 import { IconArrowLeft, IconShield, IconTarget, IconUsers, Logo } from '../components/icons'
-import { LiveArc } from '../components/landing/LiveArc'
+import { LiveJoint } from '../components/landing/LiveJoint'
 import { ease } from '../components/motion'
 
 const POINTS = [
@@ -42,7 +42,7 @@ export function AuthLayout() {
             A camera app measures every rep in degrees. Arc is where you watch the trend, for everyone in the household.
           </motion.p>
           <motion.div {...rise(0.3)} className="card mt-8 hidden max-w-[560px] p-5 lg:block">
-            <LiveArc compact />
+            <LiveJoint compact exercises={false} />
           </motion.div>
           <motion.ul {...rise(0.4)} className="mt-8 hidden gap-3 sm:grid">
             {POINTS.map(({ icon: Icon, text }) => (

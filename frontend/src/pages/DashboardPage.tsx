@@ -6,6 +6,7 @@ import { IconActivity, IconCalendar, IconCamera, IconFlame, IconTarget, IconUser
 import { AnimatedNumber, Item, Page, Stagger } from '../components/motion'
 import { PlanEditor } from '../components/PlanEditor'
 import { ProgressCharts } from '../components/ProgressCharts'
+import { LazyJointScene, LazyProgressScene } from '../components/three/lazy'
 import { Alert, Card, EmptyState, PageHeader, Segmented, Skeleton, StatTile } from '../components/ui'
 import { deg, fatigueLabel, formatDate, formatDateTime, weekStartIso } from '../format'
 import { useProfiles } from '../hooks/useProfiles'
@@ -160,6 +161,30 @@ export function DashboardPage() {
             </Item>
             <Item>
               <StatTile label="Fatigue proxy" icon={<IconFlame size={18} />} value={<AnimatedNumber value={latest.fatigueIndex} decimals={2} />} hint={fatigue.text} tone={fatigue.tone} />
+            </Item>
+          </Stagger>
+          <Stagger className="mb-5 grid gap-5 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
+            <Item>
+              <Card title="Best rep, in 3D" subtitle={`${exerciseName} posed at the latest session's best rep. The amber tick is the goal; drag to look around.`}>
+                <div className="relative overflow-hidden rounded-[18px] bg-black/60">
+                  <LazyJointScene exercise={exercise} angle={latest.bestPeakDeg} goalDeg={goal ?? undefined} className="h-[280px]" label={`${exerciseName} posed at ${deg(latest.bestPeakDeg)}`} fallback={<Skeleton height={280} />} />
+                  <div className="pointer-events-none absolute top-3 left-3">
+                    <div className="text-[2.2rem] leading-none font-semibold tracking-[-0.03em] text-ink tabular-nums">{deg(latest.bestPeakDeg)}</div>
+                    <div className="mt-1 text-[11px] font-semibold tracking-[0.12em] text-muted uppercase">{formatDate(latest.date)} · best rep</div>
+                  </div>
+                </div>
+              </Card>
+            </Item>
+            <Item>
+              <Card title="Peak per session, in 3D" subtitle="One bar per session, lighter is higher; the amber plane is the goal. Hover a bar for its date.">
+                <LazyProgressScene
+                  points={progress.sessions.map((s) => ({ label: formatDate(s.date), value: s.bestPeakDeg, sub: `${s.totalReps} reps` }))}
+                  goal={goal}
+                  className="h-[280px]"
+                  label={`Best ${exerciseName.toLowerCase()} per session as 3D bars${goal != null ? ` against a ${goal} degree goal` : ''}`}
+                  fallback={<Skeleton height={280} />}
+                />
+              </Card>
             </Item>
           </Stagger>
           <ProgressCharts progress={progress} metricLabel={EXERCISES[exercise].metricLabel} />
