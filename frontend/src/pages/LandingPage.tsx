@@ -1,4 +1,4 @@
-import { BODY_AREAS, EXERCISE_LIST, exercisesIn, generateDemoSessions } from '@arc/dependencies'
+import { BODY_AREAS, EXERCISE_LIST, exercisesIn, generateDemoSessions, MUSCLE_IDS } from '@arc/dependencies'
 import * as Accordion from '@radix-ui/react-accordion'
 import { motion, useReducedMotion, useScroll, useSpring } from 'motion/react'
 import { useMemo } from 'react'
@@ -17,7 +17,8 @@ import { Alert, Strip } from '../components/ui'
  * The landing page as a datasheet: a sticky title block whose index is a measuring scale with
  * five evenly spaced stations, beside a ruled readout column. The specimen stage (a whole 3D
  * body curling on a blueprint grid, tracked at shoulder, elbow and wrist) is the photograph; every section after it
- * rises into place as it arrives, and the readouts strip is a live board of the app's own charts.
+ * rises into place as it arrives, and the readouts strip is a live board of the app's own charts,
+ * the body with the muscles each movement works, and a demo household's leaderboard.
  */
 
 const SECTIONS = [
@@ -33,22 +34,24 @@ const HOST = new URL(SITE_URL).host
 
 const SPEC: [string, string[]][] = [
   ['Movements', [`${EXERCISE_LIST.length} of them`, BODY_AREAS.map((a) => a.name.toLowerCase()).join(' · ')]],
-  ['Goals', ['an angle for each', 'from you or Arc']],
+  ['Muscles', [`${MUSCLE_IDS.length} groups, back in three`, 'target red · helpers yellow']],
+  ['Week', ['yours to arrange', 'crossed off as you go']],
   ['Input', ['any webcam', 'right in the browser']],
-  ['Output', ['peak per rep', 'set and session']],
+  ['Output', ['peak per rep, weight held', 'set, session, leaderboard']],
   ['Account', ['one per household', 'a profile each']],
   ['Privacy', ['video stays on device', 'only angles saved']],
 ]
 
 const METHOD = [
-  { title: 'Tell Arc what you want', text: 'One account for everyone at home. Arc asks what you want from your body and builds your week, a different body area each training day. Add a profile for everyone else who exercises.' },
-  { title: 'Exercise on camera', text: 'Pick any of fifteen movements and press Start recording: the webcam tracks your whole body right in the browser, measures the working joint on every rep like a goniometer and saves each set to the right profile as it finishes.' },
-  { title: 'Read the trend', text: 'Arc draws best rep, session mean and the goal on one line, so progress is a number you can watch.' },
+  { title: 'Tell Arc what you want', text: 'One account for everyone at home. Arc asks what you want from your body and builds your week: several movements a day for the muscle groups that day works. Change any of it by hand, any time.' },
+  { title: 'Exercise on camera', text: "Press Start recording: the webcam tracks your whole body right in the browser and measures the working joint on every rep like a goniometer, while a figure beside you shows the movement done right and Arc listens and answers. Each set is saved as it finishes; the day's next movement is one tap away." },
+  { title: 'Read the trend', text: 'Arc draws best rep, session mean and the goal on one line, so progress is a number you can watch, and the household leaderboard shows who moved most this week.' },
 ]
 
 const HOUSEHOLD = [
   { title: 'One account', text: 'The household signs in once. Everything lives under that account, on any device with a browser.' },
-  { title: 'A profile each', text: 'Every person who exercises gets a profile with their own sessions, goals and plan. Switch between them in one step.' },
+  { title: 'A profile each', text: 'Every person who exercises gets a profile with their own sessions, goals and week. Switch between them in one step.' },
+  { title: 'A friendly leaderboard', text: 'Everyone at home ranked on reps, sets, weight moved and steadiness, with an Arc score that factors them all in. Only your own household is compared, never strangers.' },
   { title: 'Any age', text: 'Range of motion is read the same way for a grandparent and a teenager: in degrees, against the goal they set.' },
   { title: 'Private by default', text: 'Sessions belong to the account that recorded them, and only that account sees them. The video never leaves the device.' },
 ]
@@ -58,7 +61,11 @@ const FAQ = [
   { q: 'Who is it for?', a: 'Anyone at home who wants to see their range of motion improve, at any age. One account per household, a profile per person. It is a personal tool, not a clinical one.' },
   {
     q: 'Which movements does it measure?',
-    a: `${EXERCISE_LIST.length} in four areas, the same as the camera app: ${BODY_AREAS.map((a) => `${a.name.toLowerCase()} (${exercisesIn(a.id).map((e) => e.name.toLowerCase()).join(', ')})`).join('; ')}. One-sided movements on the left or right, always in degrees.`,
+    a: `${EXERCISE_LIST.length} in four areas, the same as the camera app: ${BODY_AREAS.map((a) => `${a.name.toLowerCase()} (${exercisesIn(a.id).map((e) => e.name.toLowerCase()).join(', ')})`).join('; ')}. One-arm and one-leg movements on the side you pick, the rest on whichever side faces the camera, always in degrees.`,
+  },
+  {
+    q: 'How do I know I am doing it right?',
+    a: 'Beside the camera, a 3D figure does the movement to your goal and back, with the muscles it works painted on: red where it targets, yellow where they help. While you record, Arc listens: ask about your form or say how it feels, and it answers from your last reps.',
   },
   {
     q: 'Is my data private?',
@@ -66,7 +73,7 @@ const FAQ = [
   },
 ]
 
-const FINAL = ['Every rep in degrees, not points', 'Fifteen movements in four areas', 'A goal rule on every chart', "Arc's word when range fades late in a set", 'Profiles for everyone at home', 'Private by default']
+const FINAL = ['Every rep in degrees, not points', 'Fifteen movements, the muscles each works', 'A week you arrange, crossed off as you go', 'Arc listening and answering while you move', 'A leaderboard for everyone at home', 'Private by default']
 
 const pad = (n: number) => String(n).padStart(2, '0')
 
@@ -262,7 +269,7 @@ export function LandingPage() {
           </section>
 
           {/* ---- 03 READOUTS: the app's own charts on random demo data ---- */}
-          <Strip id="readouts" index="03" title="Readouts" className="mt-12 scroll-mt-6 sm:mt-16" aside="Five views · random demo data">
+          <Strip id="readouts" index="03" title="Readouts" className="mt-12 scroll-mt-6 sm:mt-16" aside="Seven views · random demo data">
             <DemoBoard />
           </Strip>
 
