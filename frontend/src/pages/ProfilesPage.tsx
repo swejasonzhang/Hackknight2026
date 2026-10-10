@@ -1,17 +1,33 @@
-import { useState, type FormEvent } from 'react'
+import { useId, useState, type FormEvent } from 'react'
+import { Link } from 'react-router-dom'
 import { api } from '../api/client'
-import { IconPlus, IconSparkle, IconTrash, IconUsers } from '../components/icons'
-import { Item, Lift, Page, Stagger } from '../components/motion'
-import { Alert, Avatar, Card, EmptyState, PageHeader, Skeleton } from '../components/ui'
+import { IconPlus } from '../components/icons'
+import { Page } from '../components/motion'
+import { Alert, Avatar, EmptyState, Lamp, PageHeader, Skeleton } from '../components/ui'
 import { formatDate } from '../format'
 import { useProfiles } from '../hooks/useProfiles'
 
+/* The ledger is a real <table> on tablet and desktop; on a phone every row becomes a stacked
+ * block (tag beside the name line, then contact, notes, status and actions under it). */
+const ROW = 'grid grid-cols-[44px_minmax(0,1fr)] gap-x-4 border-b border-rule sm:table-row sm:border-b-0'
+const EDGE = 'border-b-0 sm:border-b' // phone: the row carries the rule; sm+: the ledger's own cell rule
+const CELL = `block ${EDGE} sm:table-cell`
+const STACKED = `${CELL} col-start-2 border-t border-rule sm:border-t-0`
+const NAME = `flex min-h-[68px] items-center ${EDGE} sm:table-cell sm:min-h-0`
+
+/**
+ * The household register: a title block with the count readout, a navy head rule and ONE ruled
+ * ledger in which every profile is a row (the selected one carries the cobalt edge and a VIEWING
+ * lamp) and the last row is the new-entry form itself. A demo-data strip closes the sheet.
+ */
 export function ProfilesPage() {
   const { profiles, selectedId, setSelectedId, reload, loading, error } = useProfiles()
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
   const [busy, setBusy] = useState(false)
   const [message, setMessage] = useState<{ text: string; tone: 'good' | 'bad' } | null>(null)
+  const formId = useId()
+  const ids = { name: `${formId}-name`, email: `${formId}-email` }
 
   const run = async (work: () => Promise<string>) => {
     setBusy(true)
@@ -54,85 +70,154 @@ export function ProfilesPage() {
       return r.created ? `Loaded ${r.sessions} demo sessions.` : `Demo data already loaded (${r.sessions} sessions).`
     })
 
+  const count = profiles.length
+  const firstLoad = loading && count === 0
+
   return (
     <Page>
-      <PageHeader eyebrow="Household" title="Profiles" subtitle="One profile per person who exercises. The selected profile is the one the dashboard shows." />
+      {/* The new-entry row lives inside the table, so its controls point at this form by id. */}
+      <form id={formId} onSubmit={create} />
+
+      <PageHeader
+        eyebrow="Household / register"
+        title="Profiles"
+        subtitle="One profile per person who exercises. The selected profile is the one the dashboard shows."
+        actions={
+          <div className="flex items-baseline gap-3 sm:flex-col sm:items-end sm:gap-1">
+            <span className="t-value">{firstLoad ? '–' : count}</span>
+            <span className="t-meta">{count === 1 ? 'profile' : 'profiles'}</span>
+          </div>
+        }
+      />
+
+      <div className="rule-strong" />
+
       {(error || message) && (
-        <div className="mb-5">
+        <div className="flex flex-col gap-2 py-4">
           {error && <Alert tone="bad">{error}</Alert>}
           {message && <Alert tone={message.tone}>{message.text}</Alert>}
         </div>
       )}
 
-      <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,2fr)_minmax(320px,1fr)]">
-        <div>
-          {loading && (
-            <div className="grid gap-4 sm:grid-cols-2">
-              {[0, 1].map((i) => (
-                <Skeleton key={i} height={168} />
-              ))}
-            </div>
-          )}
-          {!loading && profiles.length === 0 && (
-            <EmptyState icon={<IconUsers size={44} strokeWidth={1.5} />} title="No profiles yet" description="Add yourself or a family member using the form, or load the demo profile to explore." />
-          )}
-          {profiles.length > 0 && (
-            <Stagger className="grid gap-4 sm:grid-cols-2">
-              {profiles.map((p) => {
-                const isSelected = p.id === selectedId
-                return (
-                  <Item key={p.id}>
-                    <Lift className={`card flex h-full flex-col gap-5 ${isSelected ? 'ring-2 ring-primary/50' : ''}`}>
-                      <div className="flex items-center gap-3.5">
-                        <Avatar name={p.name} size={52} />
-                        <div className="min-w-0">
-                          <div className="flex items-center gap-1 text-[17px] font-semibold tracking-[-0.01em] text-ink">
-                            <span className="truncate">{p.name}</span>
-                            {isSelected && <span className="badge bg-primary-soft text-primary">viewing</span>}
-                          </div>
-                          <div className="truncate text-[13px] text-muted">{p.email ?? `Added ${formatDate(p.createdAt)}`}</div>
-                        </div>
-                      </div>
-                      {p.notes && <div className="text-[13px] text-muted">{p.notes}</div>}
-                      <div className="mt-auto flex gap-2">
-                        <button className="btn btn-sm" onClick={() => setSelectedId(p.id)} disabled={isSelected}>
-                          {isSelected ? 'Selected' : 'View dashboard'}
-                        </button>
-                        <button className="btn btn-sm btn-danger" disabled={busy} onClick={() => remove(p.id, p.name)} aria-label={`Delete ${p.name}`}>
-                          <IconTrash size={15} /> Delete
-                        </button>
-                      </div>
-                    </Lift>
-                  </Item>
-                )
-              })}
-            </Stagger>
-          )}
-        </div>
+      <table className="ledger block sm:table" aria-busy={busy || undefined}>
+        <thead className="hidden sm:table-header-group">
+          <tr>
+            <th className="pl-3">Tag</th>
+            <th>Name</th>
+            <th>Contact</th>
+            <th className="hidden lg:table-cell">Notes</th>
+            <th>Status</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody className="block sm:table-row-group">
+          {firstLoad &&
+            [0, 1].map((i) => (
+              <tr key={`loading-${i}`} className="block sm:table-row">
+                <td colSpan={6} className="block sm:table-cell">
+                  <Skeleton height={44} />
+                </td>
+              </tr>
+            ))}
 
-        <div className="flex flex-col gap-5">
-          <Card title="Add a profile" subtitle="A name is all that's needed.">
-            <form className="flex flex-col gap-4" onSubmit={create}>
-              <div className="field">
-                <label htmlFor="profile-name">Name</label>
-                <input id="profile-name" className="input" type="text" required value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Grandma June" />
+          {!loading && count === 0 && (
+            <tr className="block sm:table-row">
+              <td colSpan={6} className="block pt-0 sm:table-cell [&>div]:border-t-0">
+                <EmptyState title="No profiles yet" description="Add the first person in the entry row below, or load the demo profile to look around." />
+              </td>
+            </tr>
+          )}
+
+          {profiles.map((p) => {
+            const isSelected = p.id === selectedId
+            return (
+              <tr key={p.id} className={`${ROW} ${isSelected ? 'shadow-[inset_3px_0_0_var(--cobalt)] sm:shadow-none' : ''}`}>
+                <td className={`${CELL} pl-3 ${isSelected ? 'sm:shadow-[inset_3px_0_0_var(--cobalt)]' : ''}`}>
+                  <Avatar name={p.name} size={44} />
+                </td>
+                <td className={NAME}>
+                  <span className="font-sans text-[16px] font-medium text-ink">{p.name}</span>
+                </td>
+                <td className={`${STACKED} font-mono text-[12.5px] text-ink-2`}>{p.email ?? `Added ${formatDate(p.createdAt)}`}</td>
+                {/* Notes: a stacked block on a phone (only when there are notes), dropped on a tablet, a cell on desktop. */}
+                <td className={`text-[13.5px] text-muted lg:table-cell ${p.notes ? `${STACKED} sm:hidden` : 'hidden'}`}>{p.notes ?? '–'}</td>
+                <td className={STACKED}>
+                  {isSelected ? (
+                    <span className="t-meta flex items-center gap-2 text-cobalt">
+                      <Lamp tone="primary" /> Viewing
+                    </span>
+                  ) : (
+                    <span className="flex items-center gap-2">
+                      <Lamp />
+                      <span className="sr-only">Not viewing</span>
+                    </span>
+                  )}
+                </td>
+                <td className={STACKED}>
+                  <div className="flex flex-wrap items-center gap-2">
+                    {isSelected ? (
+                      <button className="btn btn-sm" type="button" disabled>
+                        Selected
+                      </button>
+                    ) : (
+                      <Link to="/dashboard" className={`btn btn-sm ${busy ? 'pointer-events-none' : ''}`} aria-disabled={busy || undefined} onClick={() => setSelectedId(p.id)}>
+                        View dashboard
+                      </Link>
+                    )}
+                    <button className="btn btn-sm btn-danger" type="button" disabled={busy} onClick={() => remove(p.id, p.name)} aria-label={`Delete ${p.name}`}>
+                      Delete
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            )
+          })}
+
+          {/* NEW ENTRY: the create form is the register's own last row. */}
+          <tr className={`${ROW} border-b-0`}>
+            <td className={`${CELL} pl-3 sm:border-b-0`}>
+              <span aria-hidden="true" className="inline-flex h-11 w-11 items-center justify-center border border-rule-strong text-navy">
+                <IconPlus size={18} strokeWidth={1.75} />
+              </span>
+            </td>
+            <td className={`${NAME} sm:border-b-0 sm:pr-4`}>
+              <div className="w-full">
+                <div className="t-meta mb-2 sm:hidden">New entry</div>
+                <label htmlFor={ids.name} className="sr-only">
+                  Name
+                </label>
+                <input id={ids.name} form={formId} className="input" type="text" required placeholder="Name" autoComplete="off" value={name} onChange={(e) => setName(e.target.value)} />
               </div>
-              <div className="field">
-                <label htmlFor="profile-email">Email (optional)</label>
-                <input id="profile-email" className="input" type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
-              </div>
-              <button className="btn btn-primary" type="submit" disabled={busy || !name.trim()}>
-                <IconPlus size={16} /> Add profile
+            </td>
+            <td className={`${STACKED} sm:border-b-0 sm:pr-4`}>
+              <label htmlFor={ids.email} className="sr-only">
+                Email (optional)
+              </label>
+              <input id={ids.email} form={formId} className="input" type="email" placeholder="Email (optional)" autoComplete="off" value={email} onChange={(e) => setEmail(e.target.value)} />
+            </td>
+            <td className="hidden lg:table-cell lg:border-b-0">
+              <span className="t-meta">New entry</span>
+            </td>
+            <td className="hidden sm:table-cell sm:border-b-0" />
+            <td className={`${STACKED} sm:border-b-0`}>
+              <button className="btn btn-block w-full sm:w-auto" type="submit" form={formId} disabled={busy || !name.trim()}>
+                Add profile
               </button>
-            </form>
-          </Card>
-          <Card title="Demo data" subtitle='Creates "Demo Profile" with six weeks of seeded sessions.'>
-            <button className="btn" onClick={seed} disabled={busy}>
-              <IconSparkle size={16} /> Load demo data
-            </button>
-          </Card>
-        </div>
-      </div>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+
+      {/* DEMO DATA strip under the register's second navy rule. */}
+      <section className="rule-strong grid gap-3 border-b border-rule py-5 sm:grid-cols-[auto_minmax(0,1fr)_auto] sm:items-center sm:gap-6" aria-labelledby={`${formId}-demo`}>
+        <h2 id={`${formId}-demo`} className="t-label text-navy">
+          Demo data
+        </h2>
+        <p className="t-desc">Creates "Demo Profile" with six weeks of seeded sessions.</p>
+        <button className="btn" type="button" onClick={seed} disabled={busy}>
+          Load demo data
+        </button>
+      </section>
     </Page>
   )
 }

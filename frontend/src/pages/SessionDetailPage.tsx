@@ -1,16 +1,65 @@
-import { EXERCISES, type SessionDto } from '@arc/dependencies'
+import { EXERCISES, FATIGUE_MIN_REPS, type SessionDto } from '@arc/dependencies'
 import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { Bar, BarChart, CartesianGrid, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { api } from '../api/client'
-import { IconActivity, IconArrowLeft, IconFlame, IconTarget, IconTrend } from '../components/icons'
-import { AnimatedNumber, Item, Page, Stagger } from '../components/motion'
+import { AnimatedNumber, Page } from '../components/motion'
 import { axisTick, tooltipStyle } from '../components/ProgressCharts'
 import { LazyJointScene } from '../components/three/lazy'
-import { Alert, Card, PageHeader, Skeleton, StatTile } from '../components/ui'
+import { Alert, Lamp, Skeleton, StatTile, Strip, Tag } from '../components/ui'
 import { deg, fatigueLabel, formatDateTime, pct } from '../format'
 
-/** One stored session, set by set and rep by rep. */
+const MONO = "'IBM Plex Mono', ui-monospace, monospace"
+
+/* Desktop is a 4:8 report: the stage column (cols 1-4) is sticky beside the report column
+ * (cols 5-12). On a phone the same blocks stack in reading order: title, numeral, stage, readouts, strips. */
+const GRID = 'grid gap-x-8 gap-y-6 lg:grid-cols-12 lg:gap-y-0'
+const AREA = {
+  back: 'lg:col-span-4 lg:col-start-1 lg:row-start-1 lg:pb-5',
+  title: 'border-b border-rule-strong pb-5 lg:col-span-8 lg:col-start-5 lg:row-start-1',
+  numeral: 'lg:col-span-4 lg:col-start-5 lg:row-start-2 lg:pt-6 lg:pb-8',
+  stage: 'lg:col-span-4 lg:col-start-1 lg:row-span-2 lg:row-start-2 lg:sticky lg:top-6 lg:self-start',
+  readouts: 'lg:col-span-4 lg:col-start-9 lg:row-start-2 lg:border-l lg:border-rule lg:pt-6 lg:pb-8 lg:pl-8',
+  strips: 'lg:col-span-8 lg:col-start-5 lg:row-start-3',
+}
+
+/** A lane label (S1, S2, S3) drawn in the top margin just right of a set-boundary rule. */
+function laneLabel(text: string) {
+  return ({ viewBox }: { viewBox?: { x?: number; y?: number } }) => (
+    <text x={(viewBox?.x ?? 0) + 6} y={(viewBox?.y ?? 0) - 8} fill="var(--navy)" fontFamily={MONO} fontSize={10.5} fontWeight={500} letterSpacing="0.1em">
+      {text}
+    </text>
+  )
+}
+
+/** A square mono tag riding the right end of the goal rule. */
+function goalTag(text: string) {
+  const width = Math.round(text.length * 6.6) + 14
+  return ({ viewBox }: { viewBox?: { x?: number; y?: number; width?: number } }) => {
+    const x = (viewBox?.x ?? 0) + (viewBox?.width ?? 0) - width - 2
+    const y = (viewBox?.y ?? 0) - 9
+    return (
+      <g>
+        <rect x={x} y={y} width={width} height={18} fill="var(--paper)" stroke="var(--navy)" />
+        <text x={x + width / 2} y={y + 12.5} textAnchor="middle" fill="var(--navy)" fontFamily={MONO} fontSize={10.5} fontWeight={500} letterSpacing="0.08em">
+          {text.toUpperCase()}
+        </text>
+      </g>
+    )
+  }
+}
+
+function BackLink() {
+  return (
+    <nav className={AREA.back} aria-label="Breadcrumb">
+      <Link to="/dashboard" className="t-label inline-flex items-center gap-2 text-navy hover:text-cobalt">
+        ← Dashboard
+      </Link>
+    </nav>
+  )
+}
+
+/** One stored session as a lab report: the sticky stage and spec list, then the readout and the strips. */
 export function SessionDetailPage() {
   const { id = '' } = useParams()
   const [session, setSession] = useState<SessionDto | null>(null)
@@ -31,125 +80,205 @@ export function SessionDetailPage() {
     }
   }, [id])
 
-  const back = (
-    <nav className="mb-4 flex items-center gap-1.5 text-[13px] font-semibold text-muted" aria-label="Breadcrumb">
-      <Link to="/dashboard" className="inline-flex items-center gap-1">
-        <IconArrowLeft size={14} /> Dashboard
-      </Link>
-      <span>/</span>
-      <span>Session</span>
-    </nav>
-  )
-
   if (error) {
     return (
-      <Page>
-        {back}
-        <Alert tone="bad">{error}</Alert>
+      <Page className={GRID}>
+        <BackLink />
+        <div className="lg:col-span-8 lg:col-start-5 lg:row-start-1">
+          <Alert tone="bad">{error}</Alert>
+        </div>
       </Page>
     )
   }
+
   if (!session) {
     return (
-      <Page>
-        {back}
-        <Skeleton height={44} width={360} />
-        <div className="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-          {[0, 1, 2, 3].map((i) => (
-            <Skeleton key={i} height={128} />
+      <Page className={GRID}>
+        <p className="sr-only" role="status">
+          Loading session…
+        </p>
+        <BackLink />
+        <div className={AREA.title} aria-hidden="true">
+          <Skeleton height={14} width={200} />
+          <Skeleton height={48} width="70%" className="mt-4" />
+        </div>
+        <div className={AREA.numeral} aria-hidden="true">
+          <Skeleton height={80} width={220} />
+          <Skeleton height={12} width={170} className="mt-4" />
+        </div>
+        <aside className={AREA.stage} aria-hidden="true">
+          <div className="panel">
+            <div className="stage h-[220px] lg:h-[300px]" />
+          </div>
+        </aside>
+        <div className={AREA.readouts} aria-hidden="true">
+          {[0, 1, 2].map((i) => (
+            <Skeleton key={i} height={44} className="mt-3" />
           ))}
+        </div>
+        <div className={AREA.strips} aria-hidden="true">
+          <div className="strip">
+            <Skeleton height={240} />
+          </div>
+          <div className="strip">
+            {[0, 1, 2].map((i) => (
+              <Skeleton key={i} height={44} className="mt-2" />
+            ))}
+          </div>
         </div>
       </Page>
     )
   }
 
   const exercise = EXERCISES[session.exercise]
-  const reps = session.sets.flatMap((set) => set.reps.map((r) => ({ label: `S${set.setNumber} R${r.index}`, peakDeg: r.peakDeg })))
-  const yMax = Math.ceil(Math.max(session.plan.targetDeg, ...reps.map((r) => r.peakDeg), 10) / 10) * 10
+  const goal = session.plan.targetDeg
+  const best = session.summary.bestPeakDeg
+  const goalReached = best >= goal
   const fatigue = fatigueLabel(session.summary.fatigueIndex)
   const durationMin = Math.max(1, Math.round((session.endedAt - session.startedAt) / 60000))
-  const goalReached = session.summary.bestPeakDeg >= session.plan.targetDeg
+  const reps = session.sets.flatMap((set) => set.reps.map((r) => ({ label: `S${set.setNumber} R${r.index}`, peakDeg: r.peakDeg })))
+  const setStarts = session.sets.flatMap((set) => {
+    const first = set.reps[0]
+    return first ? [{ setNumber: set.setNumber, label: `S${set.setNumber} R${first.index}` }] : []
+  })
+  const yMax = Math.ceil(Math.max(goal, ...reps.map((r) => r.peakDeg), 10) / 10) * 10
+  const spec: [string, string][] = [
+    ['Exercise', exercise.name],
+    ['Side', session.side],
+    ['Plan', `${session.plan.sets} × ${session.plan.reps} · ${session.plan.restSeconds} s rest`],
+    ['Duration', `${durationMin} min`],
+    ['Sets', String(session.sets.length)],
+  ]
 
   return (
-    <Page>
-      {back}
-      <PageHeader
-        eyebrow={formatDateTime(session.startedAt)}
-        title={
-          <>
-            {exercise.name} <span className="font-semibold text-muted">· {session.side}</span>
-            {session.demo && <span className="badge">demo</span>}
-          </>
-        }
-        subtitle={`${session.sets.length} sets · ${durationMin} min · planned ${session.plan.sets} × ${session.plan.reps} with ${session.plan.restSeconds} s rest`}
-      />
+    <Page className={GRID}>
+      <BackLink />
 
-      <Stagger className="mb-5 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <Item>
-          <StatTile label="Reps" icon={<IconActivity size={18} />} value={<AnimatedNumber value={session.summary.totalReps} />} hint={`${session.sets.length} sets`} tone="primary" />
-        </Item>
-        <Item>
-          <StatTile label="Best rep" icon={<IconTarget size={18} />} value={<AnimatedNumber value={session.summary.bestPeakDeg} suffix="°" />} hint={goalReached ? `goal of ${deg(session.plan.targetDeg)} reached` : `goal ${deg(session.plan.targetDeg)}`} tone={goalReached ? 'good' : 'primary'} />
-        </Item>
-        <Item>
-          <StatTile label="Mean rep" icon={<IconTrend size={18} />} value={<AnimatedNumber value={session.summary.meanPeakDeg} suffix="°" />} hint={exercise.metricLabel} />
-        </Item>
-        <Item>
-          <StatTile label="Fatigue proxy" icon={<IconFlame size={18} />} value={<AnimatedNumber value={session.summary.fatigueIndex} decimals={2} />} hint={fatigue.text} tone={fatigue.tone} />
-        </Item>
-      </Stagger>
+      {/* Report head: timestamp, DEMO tag, the exercise title with the side after a middle dot. */}
+      <header className={AREA.title}>
+        <div className="t-meta flex flex-wrap items-center gap-3">
+          <span>{formatDateTime(session.startedAt)}</span>
+          {session.demo && <Tag soft>Demo</Tag>}
+        </div>
+        <h1 className="t-title mt-3">
+          {exercise.name} <span className="font-medium text-muted">· {session.side}</span>
+        </h1>
+      </header>
 
-      <div className="flex flex-col gap-5">
-        <Card title="Best rep, in 3D" subtitle={`${exercise.name} posed at ${deg(session.summary.bestPeakDeg)}; the amber tick is the ${deg(session.plan.targetDeg)} goal. Drag to look around.`}>
-          <div className="relative overflow-hidden rounded-[18px] bg-black/60">
-            <LazyJointScene exercise={session.exercise} angle={session.summary.bestPeakDeg} goalDeg={session.plan.targetDeg} className="h-[300px]" label={`${exercise.name} posed at ${deg(session.summary.bestPeakDeg)}`} fallback={<Skeleton height={300} />} />
-            <div className="pointer-events-none absolute top-3 left-3">
-              <div className="text-[2.2rem] leading-none font-semibold tracking-[-0.03em] text-ink tabular-nums">{deg(session.summary.bestPeakDeg)}</div>
-              <div className="mt-1 text-[11px] font-semibold tracking-[0.12em] text-muted uppercase">{exercise.metricLabel} · best rep</div>
+      {/* The one big readout on this page. */}
+      <div className={AREA.numeral}>
+        <div className="t-readout">
+          <AnimatedNumber value={best} suffix="°" />
+        </div>
+        <div className="t-meta mt-4 flex items-center gap-2 text-ink-2">
+          {goalReached ? (
+            <>
+              <Lamp tone="good" /> Goal {deg(goal)} reached
+            </>
+          ) : (
+            <>
+              Best rep · goal {deg(goal)}
+            </>
+          )}
+        </div>
+      </div>
+
+      {/* Stage column: the limb posed at the best rep on the blueprint grid, then the spec list. */}
+      <aside className={`${AREA.stage} grid gap-5 sm:grid-cols-2 lg:grid-cols-1`} aria-label="Session stage">
+        <div className="panel">
+          <div className="stage h-[220px] sm:h-[260px] lg:h-[300px]">
+            <LazyJointScene
+              exercise={session.exercise}
+              angle={best}
+              goalDeg={goal}
+              theme="light"
+              className="h-full w-full"
+              label={`${exercise.name} posed at ${deg(best)}, the best rep of this session`}
+              fallback={<div aria-hidden="true" className="hatch absolute inset-8" />}
+            />
+            <span className="callout pointer-events-none top-3 left-3">Best rep · {exercise.metricLabel}</span>
+            <span className="callout pointer-events-none top-3 right-3">Goal {deg(goal)}</span>
+          </div>
+        </div>
+        <dl className="border-t border-rule-strong">
+          {spec.map(([k, v]) => (
+            <div key={k} className="flex items-baseline justify-between gap-4 border-b border-rule py-3">
+              <dt className="t-label">{k}</dt>
+              <dd className="t-mono text-right text-ink">{v}</dd>
             </div>
-          </div>
-        </Card>
-        <Card title="Rep by rep" subtitle={`Peak ${exercise.metricLabel.toLowerCase()} for every rep; the dashed line is the goal.`}>
-          <ResponsiveContainer width="100%" height={280}>
-            <BarChart data={reps} margin={{ top: 8, right: 12, left: -12, bottom: 0 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="var(--chart-grid)" vertical={false} />
-              <XAxis dataKey="label" tick={{ ...axisTick, fontSize: 11 }} interval="preserveStartEnd" minTickGap={18} axisLine={false} tickLine={false} />
-              <YAxis domain={[0, yMax]} unit="°" tick={axisTick} axisLine={false} tickLine={false} />
-              <Tooltip contentStyle={tooltipStyle} formatter={(v) => `${Number(v).toFixed(0)}°`} cursor={{ fill: 'var(--surface-2)' }} />
-              <Bar dataKey="peakDeg" name="Peak" fill="var(--chart-reps)" radius={[8, 8, 0, 0]} isAnimationActive={false} />
-              <ReferenceLine y={session.plan.targetDeg} stroke="var(--chart-goal)" strokeDasharray="6 3" />
-            </BarChart>
-          </ResponsiveContainer>
-        </Card>
+          ))}
+        </dl>
+      </aside>
 
-        <Card title="Sets" subtitle="ROM drop and tempo drift compare the first and last reps of each set (needs at least 4 reps).">
-          <div className="-mx-1 overflow-x-auto px-1">
-            <table className="table">
-              <thead>
-                <tr>
-                  <th>Set</th>
-                  <th className="num">Reps</th>
-                  <th className="num">Best</th>
-                  <th className="num">ROM drop</th>
-                  <th className="num">Tempo drift</th>
-                  <th>Ended</th>
-                </tr>
-              </thead>
-              <tbody>
-                {session.sets.map((s) => (
-                  <tr key={s.setNumber}>
-                    <td className="font-bold">Set {s.setNumber}</td>
-                    <td className="num">{s.reps.length}</td>
-                    <td className="num font-bold">{deg(Math.max(...s.reps.map((r) => r.peakDeg)))}</td>
-                    <td className="num">{s.fatigue.sampleReps >= 4 ? deg(s.fatigue.romDropDeg) : '–'}</td>
-                    <td className="num">{s.fatigue.sampleReps >= 4 ? pct(s.fatigue.tempoDrift) : '–'}</td>
-                    <td>{s.endedEarly ? <span className="badge ml-0">early</span> : <span className="text-muted">as planned</span>}</td>
-                  </tr>
+      {/* Secondary readouts, a three-row ledger beside the numeral. */}
+      <div className={AREA.readouts}>
+        <StatTile label="Reps" value={<AnimatedNumber value={session.summary.totalReps} />} hint={`${session.sets.length} sets`} tone="primary" />
+        <StatTile label="Mean rep" value={<AnimatedNumber value={session.summary.meanPeakDeg} suffix="°" />} hint={exercise.metricLabel} />
+        <StatTile label="Fatigue proxy" value={<AnimatedNumber value={session.summary.fatigueIndex} decimals={2} />} hint={fatigue.text} tone={fatigue.tone} />
+      </div>
+
+      <div className={AREA.strips}>
+        <Strip index="01" title="Rep by rep, by set" aside={`Peak ${exercise.metricLabel.toLowerCase()} · ${reps.length} reps`}>
+          <div className="h-[240px] sm:h-[280px]">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={reps} margin={{ top: 28, right: 16, left: -12, bottom: 0 }} barCategoryGap="30%">
+                <CartesianGrid stroke="var(--chart-grid)" vertical={false} />
+                <XAxis dataKey="label" tickFormatter={(v: string) => v.replace(/^S\d+\s/, '')} tick={{ ...axisTick, fontSize: 11, fontFamily: MONO }} interval="preserveStartEnd" minTickGap={14} axisLine={false} tickLine={false} />
+                <YAxis domain={[0, yMax]} unit="°" tick={{ ...axisTick, fontFamily: MONO }} axisLine={false} tickLine={false} />
+                <Tooltip contentStyle={tooltipStyle} formatter={(v) => `${Number(v).toFixed(0)}°`} cursor={{ fill: 'var(--vellum)' }} />
+                <Bar dataKey="peakDeg" name="Peak" fill="var(--chart-data)" maxBarSize={12} isAnimationActive={false} />
+                {setStarts.map((s, i) => (
+                  <ReferenceLine key={s.setNumber} x={s.label} position="start" stroke={i === 0 ? 'none' : 'var(--chart-goal)'} label={laneLabel(`S${s.setNumber}`)} />
                 ))}
-              </tbody>
-            </table>
+                <ReferenceLine y={goal} stroke="var(--chart-goal)" label={goalTag(`Goal ${deg(goal)}`)} />
+              </BarChart>
+            </ResponsiveContainer>
           </div>
-        </Card>
+        </Strip>
+
+        <Strip index="02" title="Sets" aside={`${session.sets.length} of ${session.plan.sets} planned`}>
+          <table className="ledger">
+            <thead>
+              <tr>
+                <th>Set</th>
+                <th className="num">Reps</th>
+                <th className="num">Best</th>
+                <th className="num hidden sm:table-cell">ROM drop</th>
+                <th className="num hidden sm:table-cell">Tempo drift</th>
+                <th>Ended</th>
+              </tr>
+            </thead>
+            <tbody>
+              {session.sets.map((s) => {
+                const enough = s.fatigue.sampleReps >= FATIGUE_MIN_REPS
+                const setBest = s.reps.length > 0 ? Math.max(...s.reps.map((r) => r.peakDeg)) : null
+                const drop = enough ? deg(s.fatigue.romDropDeg) : '–'
+                const drift = enough ? pct(s.fatigue.tempoDrift) : '–'
+                return (
+                  <tr key={s.setNumber}>
+                    <td className="font-mono text-[12.5px] font-medium text-navy">
+                      {String(s.setNumber).padStart(2, '0')}
+                      <div className="t-meta mt-1 normal-case sm:hidden">
+                        drop {drop} · drift {drift}
+                      </div>
+                    </td>
+                    <td className="num">{s.reps.length}</td>
+                    <td className="num font-medium text-navy">{deg(setBest)}</td>
+                    <td className={`num hidden sm:table-cell ${enough ? '' : 'text-muted'}`}>{drop}</td>
+                    <td className={`num hidden sm:table-cell ${enough ? '' : 'text-muted'}`}>{drift}</td>
+                    <td>
+                      <span className="t-meta flex items-center gap-2 text-ink-2">
+                        <Lamp tone={s.endedEarly ? 'warn' : 'default'} />
+                        {s.endedEarly ? 'Early' : 'As planned'}
+                      </span>
+                    </td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+          <p className="t-desc mt-3">ROM drop and tempo drift compare the first and last reps of each set, so a set needs at least {FATIGUE_MIN_REPS} reps to read them.</p>
+        </Strip>
       </div>
     </Page>
   )

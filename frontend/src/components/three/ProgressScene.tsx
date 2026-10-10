@@ -19,12 +19,15 @@ export interface ProgressSceneProps {
   maxBars?: number
   className?: string
   label: string
+  /** `light` draws for paper (cobalt bars, navy goal plane); `dark` for a black stage. */
+  theme?: 'light' | 'dark'
 }
 
 const WIDTH = 0.24
 const GAP = 0.14
 const HEIGHT = 2.1
-const BLUE = new Color('#00a1ff')
+const HUES: Record<'light' | 'dark', string> = { light: '#0b3dff', dark: '#00a1ff' }
+const GOAL: Record<'light' | 'dark', string> = { light: '#0b1b3a', dark: '#ffb020' }
 const ease = (t: number) => 1 - Math.pow(1 - Math.min(1, Math.max(0, t)), 3)
 
 function Bar({ index, x, target, colour, hovered, onHover, animate }: { index: number; x: number; target: number; colour: Color; hovered: boolean; onHover: (i: number | null, at?: { x: number; y: number }) => void; animate: boolean }) {
@@ -54,8 +57,10 @@ function Bar({ index, x, target, colour, hovered, onHover, animate }: { index: n
  * tooltip and an animated rise on first paint. The DOM list beside the canvas is the text
  * equivalent. Never rendered in tests: import it through `LazyProgressScene`.
  */
-export default function ProgressScene({ points, goal, unit = '°', maxBars = 24, className = '', label }: ProgressSceneProps) {
+export default function ProgressScene({ points, goal, unit = '°', maxBars = 24, className = '', label, theme = 'light' }: ProgressSceneProps) {
   const reduce = useReducedMotion()
+  const base = useMemo(() => new Color(HUES[theme]), [theme])
+  const goalColour = GOAL[theme]
   const [hovered, setHovered] = useState<{ index: number; x: number; y: number } | null>(null)
   const onHover = (index: number | null, at?: { x: number; y: number }) => setHovered(index == null ? null : { index, x: at?.x ?? 0, y: at?.y ?? 0 })
   const shown = points.slice(-maxBars)
@@ -63,8 +68,8 @@ export default function ProgressScene({ points, goal, unit = '°', maxBars = 24,
   const min = Math.min(...shown.map((p) => p.value), goal ?? Infinity)
   const span = (WIDTH + GAP) * shown.length - GAP
   const colours = useMemo(
-    () => shown.map((p) => BLUE.clone().offsetHSL(0, 0, (max === min ? 0.5 : (p.value - min) / (max - min)) * 0.22 - 0.08)),
-    [shown, max, min],
+    () => shown.map((p) => base.clone().offsetHSL(0, 0, (max === min ? 0.5 : (p.value - min) / (max - min)) * 0.22 - 0.08)),
+    [shown, max, min, base],
   )
   const bars = shown.map((p, i) => ({ ...p, x: -span / 2 + WIDTH / 2 + i * (WIDTH + GAP), h: (p.value / max) * HEIGHT }))
   const goalH = goal != null ? (goal / max) * HEIGHT : null
@@ -76,8 +81,8 @@ export default function ProgressScene({ points, goal, unit = '°', maxBars = 24,
     <div className={`relative ${className}`.trim()}>
       <div role="img" aria-label={label} className="h-full w-full">
         <Canvas dpr={[1, 1.5]} camera={{ position: [0, 2.1, Math.max(5.2, span * 1.15)], fov: 34 }} gl={{ antialias: true, alpha: true, powerPreference: 'high-performance' }} frameloop={reduce ? 'demand' : 'always'}>
-          <ambientLight intensity={0.6} />
-          <pointLight position={[3, 5, 4]} intensity={40} color="#00a1ff" />
+          <ambientLight intensity={theme === 'light' ? 1.3 : 0.6} />
+          <pointLight position={[3, 5, 4]} intensity={theme === 'light' ? 18 : 40} color={theme === 'light' ? '#ffffff' : '#00a1ff'} />
           <pointLight position={[-4, 3, -2]} intensity={12} color="#ffffff" />
           <group position={[0, -HEIGHT / 2 + 0.2, 0]}>
             {bars.map((b, i) => (
@@ -87,11 +92,11 @@ export default function ProgressScene({ points, goal, unit = '°', maxBars = 24,
               <group position={[0, goalH, 0]}>
                 <mesh rotation={[-Math.PI / 2, 0, 0]}>
                   <planeGeometry args={[span + 0.8, 0.9]} />
-                  <meshBasicMaterial color="#ffb020" transparent opacity={0.16} side={DoubleSide} depthWrite={false} />
+                  <meshBasicMaterial color={goalColour} transparent opacity={theme === 'light' ? 0.1 : 0.16} side={DoubleSide} depthWrite={false} />
                 </mesh>
                 <mesh position={[0, 0, 0.45]}>
-                  <boxGeometry args={[span + 0.8, 0.012, 0.012]} />
-                  <meshBasicMaterial color="#ffb020" />
+                  <boxGeometry args={[span + 0.8, 0.014, 0.014]} />
+                  <meshBasicMaterial color={goalColour} />
                 </mesh>
               </group>
             )}
@@ -99,19 +104,19 @@ export default function ProgressScene({ points, goal, unit = '°', maxBars = 24,
           <OrbitControls enableZoom={false} enablePan={false} minPolarAngle={Math.PI / 3.2} maxPolarAngle={Math.PI / 2.1} minAzimuthAngle={-0.6} maxAzimuthAngle={0.6} />
         </Canvas>
       </div>
-      <div className="pointer-events-none absolute inset-x-3 bottom-2 flex justify-between text-[11px] font-medium text-muted" aria-hidden="true">
+      <div className={`pointer-events-none absolute inset-x-3 bottom-2 flex justify-between font-mono text-[10.5px] tracking-[0.1em] uppercase ${theme === 'light' ? 'text-muted' : 'text-[#8b8b94]'}`} aria-hidden="true">
         <span>{first?.label}</span>
         <span>{lastBar && lastBar !== first ? lastBar.label : ''}</span>
       </div>
       {goal != null && (
-        <span aria-hidden="true" className="pointer-events-none absolute top-2 right-3 rounded-full bg-black/70 px-2 py-0.5 text-[11px] font-semibold text-[#ffb020]">
+        <span aria-hidden="true" className={`pointer-events-none absolute top-2 right-3 border px-1.5 py-0.5 font-mono text-[10.5px] font-medium tracking-[0.1em] uppercase ${theme === 'light' ? 'border-rule-strong bg-paper text-navy' : 'border-[#ffb020]/40 bg-black/70 text-[#ffb020]'}`}>
           goal {goal}{unit}
         </span>
       )}
       {hoveredBar && hovered && (
-        <div aria-hidden="true" className="pointer-events-none absolute z-10 -translate-x-1/2 -translate-y-[calc(100%+14px)] rounded-[10px] border border-white/15 bg-black/85 px-2.5 py-1.5 text-center whitespace-nowrap shadow-[0_0_20px_rgb(0_161_255/0.35)]" style={{ left: hovered.x, top: hovered.y }}>
-          <div className="text-[13px] font-semibold text-white tabular-nums">{Math.round(hoveredBar.value)}{unit}</div>
-          <div className="text-[11px] text-[#8b8b94]">{hoveredBar.label}{hoveredBar.sub ? ` · ${hoveredBar.sub}` : ''}</div>
+        <div aria-hidden="true" className={`pointer-events-none absolute z-10 -translate-x-1/2 -translate-y-[calc(100%+14px)] border px-2.5 py-1.5 text-center whitespace-nowrap ${theme === 'light' ? 'border-rule-strong bg-paper' : 'border-white/15 bg-black/85'}`} style={{ left: hovered.x, top: hovered.y }}>
+          <div className={`font-display text-[14px] font-semibold tabular-nums ${theme === 'light' ? 'text-cobalt' : 'text-white'}`}>{Math.round(hoveredBar.value)}{unit}</div>
+          <div className={`font-mono text-[10.5px] tracking-[0.06em] ${theme === 'light' ? 'text-muted' : 'text-[#8b8b94]'}`}>{hoveredBar.label}{hoveredBar.sub ? ` · ${hoveredBar.sub}` : ''}</div>
         </div>
       )}
       <ul className="sr-only">

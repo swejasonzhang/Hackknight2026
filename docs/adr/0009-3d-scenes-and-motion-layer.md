@@ -1,7 +1,7 @@
 # ADR-0009: 3D scenes and a motion layer on top of the neon black identity
 
 - Date: 2026-10-09
-- Status: accepted (extends ADR-0008)
+- Status: superseded by ADR-0010 (the 3D scenes remain, re-themed for paper; the effects layer was removed), 2026-10-10
 
 ## Context
 

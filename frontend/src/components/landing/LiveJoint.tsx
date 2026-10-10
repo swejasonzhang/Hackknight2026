@@ -1,116 +1,119 @@
-import { EXERCISES, EXERCISE_LIST, type ExerciseId } from '@arc/dependencies'
+import { EXERCISES } from '@arc/dependencies'
 import { animate, motion, useMotionValue, useMotionValueEvent, useReducedMotion, useTransform } from 'motion/react'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useState } from 'react'
 import { LazyJointScene, SceneBoundary } from '../three/lazy'
-import { Segmented } from '../ui'
-import { LiveArc } from './LiveArc'
+import { Lamp } from '../ui'
 import { createRepCycle } from './repCycle'
 
-/** Six demo reps per loop; the last ones shrink so the nudge has something to say. */
-const PEAKS: Record<ExerciseId, number[]> = {
-  elbow_flexion: [131, 128, 134, 125, 129, 122],
-  shoulder_abduction: [151, 148, 154, 145, 149, 142],
-  seated_knee_extension: [169, 166, 172, 163, 167, 160],
-}
-const REST: Record<ExerciseId, number> = { elbow_flexion: 18, shoulder_abduction: 15, seated_knee_extension: 95 }
+const EXERCISE = EXERCISES.elbow_flexion
+const GOAL = EXERCISE.targetDeg
+/** Six demo reps per loop; the later ones shrink, as a real set does. */
+const PEAKS = [131, 128, 134, 125, 129, 122]
+const REST = 18
 const SECONDS_PER_REP = 2.4
-const OPTIONS = EXERCISE_LIST.map((e) => ({ value: e.id, label: e.name }))
+const PAUSE_BETWEEN_LOOPS = 1.4
+const REPS_PER_SET = 8
+const SETS = 3
+/** The demo profile's best elbow flexion: the pose held when motion is reduced. */
+const HELD = 129
+/** Where the counters stand in the held pose: the fourth rep of the second set. */
+const HELD_REPS_DONE = 11
+
+/** The Suspense fallback: a hatched rectangle on the grid that also reports whether the scene is still loading. */
+function Pending({ onPending }: { onPending: (pending: boolean) => void }) {
+  useLayoutEffect(() => {
+    onPending(true)
+    return () => onPending(false)
+  }, [onPending])
+  return <div className="hatch absolute inset-6" aria-hidden="true" />
+}
 
 /**
- * The landing's living demo: a 3D limb performing reps for the chosen exercise, the angle read out
- * live, and a set card that counts reps and flags fading range. Falls back to the 2D arc when
- * WebGL is unavailable. Under reduced motion the limb holds a pose near the goal.
+ * The specimen stage of the landing page: a paper panel holding the blueprint grid, the 3D elbow
+ * performing elbow flexion on a loop, and the instrument's DOM callouts (exercise, set and rep
+ * counters, the GOAL tick, the live readout numeral). The angle is a Motion value fed through
+ * `createRepCycle`, so nothing re-renders per frame; only a completed rep touches React state.
+ * Under reduced motion the limb holds 129° and the numeral reads 129°. If the 3D scene cannot
+ * start, a "3D unavailable" callout sits on the grid and the numeral keeps reading.
  */
-export function LiveJoint({ compact = false, exercises = true }: { compact?: boolean; exercises?: boolean }) {
+export function LiveJoint() {
   const reduce = useReducedMotion()
-  const [exercise, setExercise] = useState<ExerciseId>('elbow_flexion')
+  const angle = useMotionValue(reduce ? HELD : REST)
+  const cycle = useMemo(() => createRepCycle({ top: 115, bottom: 35 }), [])
+  const [done, setDone] = useState(reduce ? HELD_REPS_DONE : 0)
+  const [pending, setPending] = useState(false)
   const [failed, setFailed] = useState(false)
-  const cfg = EXERCISES[exercise]
-  const peaksFor = PEAKS[exercise]
-  const angle = useMotionValue(reduce ? cfg.targetDeg - 8 : REST[exercise])
-  const [peaks, setPeaks] = useState<number[]>(reduce ? peaksFor : [])
-  const cycle = useMemo(() => createRepCycle({ top: cfg.enterDeg + 25, bottom: cfg.exitDeg - 5 }), [cfg])
 
   useEffect(() => {
-    setPeaks(reduce ? PEAKS[exercise] : [])
     cycle.reset()
     if (reduce) {
-      angle.set(EXERCISES[exercise].targetDeg - 8)
+      angle.set(HELD)
+      setDone(HELD_REPS_DONE)
       return
     }
-    angle.set(REST[exercise])
-    const frames = [REST[exercise], ...PEAKS[exercise].flatMap((p) => [p, REST[exercise]])]
-    const controls = animate(angle, frames, { duration: PEAKS[exercise].length * SECONDS_PER_REP, ease: 'easeInOut', repeat: Infinity, repeatDelay: 1.4 })
+    angle.set(REST)
+    setDone(0)
+    const frames = [REST, ...PEAKS.flatMap((p) => [p, REST])]
+    const controls = animate(angle, frames, { duration: PEAKS.length * SECONDS_PER_REP, ease: 'easeInOut', repeat: Infinity, repeatDelay: PAUSE_BETWEEN_LOOPS })
     return () => controls.stop()
-  }, [angle, cycle, exercise, reduce])
+  }, [angle, cycle, reduce])
 
   useMotionValueEvent(angle, 'change', (v) => {
-    const e = cycle.feed(v)
-    if (e.completed && e.peak != null) {
-      const peak = e.peak
-      setPeaks((prev) => (prev.length >= peaksFor.length ? [peak] : [...prev, peak]))
-    }
+    if (cycle.feed(v).completed) setDone((n) => n + 1)
   })
 
-  const label = useTransform(angle, (v) => `${Math.round(v)}°`)
-  const last = peaks.at(-1)
-  const low = cfg.targetDeg - 15
-  const nudge = last == null ? null : last < low ? { text: 'Range shrinking late in the set', tone: 'warn' as const } : { text: 'Full range', tone: 'good' as const }
-
-  if (failed) return <LiveArc compact={compact} />
+  const readout = useTransform(angle, (v) => `${Math.round(v)}°`)
+  const rep = (done % REPS_PER_SET) + 1
+  const set = (Math.floor(done / REPS_PER_SET) % SETS) + 1
+  const live = !reduce && !pending
 
   return (
-    <div className={`grid items-stretch gap-4 ${compact ? 'sm:grid-cols-[minmax(0,1fr)_160px]' : 'sm:grid-cols-[minmax(0,1fr)_190px]'}`}>
-      <div className="relative overflow-hidden rounded-[22px] bg-black/60">
-        <SceneBoundary fallback={null} onError={() => setFailed(true)}>
-          <LazyJointScene
-            exercise={exercise}
-            angle={angle}
-            goalDeg={cfg.targetDeg}
-            className={compact ? 'h-[250px]' : 'h-[300px] sm:h-[340px]'}
-            label={`A 3D ${cfg.name.toLowerCase()} performing reps toward a ${cfg.targetDeg} degree goal`}
-            fallback={<div className={`skeleton ${compact ? 'h-[250px]' : 'h-[300px] sm:h-[340px]'}`} />}
-          />
-        </SceneBoundary>
-        <div className="pointer-events-none absolute top-4 left-4">
-          <motion.div className="font-display text-[2.6rem] leading-none text-ink tabular-nums glow-text">{label}</motion.div>
-          <div className="mt-1 text-[11.5px] font-semibold tracking-[0.12em] text-muted uppercase">
-            {cfg.metricLabel} · goal {cfg.targetDeg}°
-          </div>
+    <div className="panel p-3 sm:p-4">
+      <div className="flex items-center justify-between gap-4 px-1 pb-3">
+        <div className="flex items-center gap-2.5">
+          <Lamp tone={failed ? 'default' : 'primary'} />
+          <span className="t-label text-navy">{EXERCISE.name} · right</span>
         </div>
-        {exercises && (
-          <div className="absolute bottom-3 left-1/2 w-max max-w-[calc(100%-1.5rem)] -translate-x-1/2">
-            <Segmented label="Exercise shown" options={OPTIONS} value={exercise} onChange={setExercise} />
-          </div>
-        )}
+        <span className="t-meta tabular-nums" aria-hidden="true">
+          Set {set}/{SETS}
+        </span>
       </div>
 
-      <div className="rounded-[18px] border border-line bg-surface/90 p-4">
-        <div className="flex items-baseline justify-between">
-          <span className="text-[11px] font-semibold tracking-[0.12em] text-muted uppercase">Live set</span>
-          <span className="text-[13px] font-semibold text-ink tabular-nums">
-            Rep {peaks.length} <span className="font-medium text-muted">/ {peaksFor.length}</span>
-          </span>
+      <div className="stage h-[260px] overflow-hidden sm:h-[360px] lg:h-[420px]">
+        <SceneBoundary
+          fallback={
+            <div className="absolute inset-0 grid place-items-center" aria-hidden="true">
+              <span className="callout relative">3D unavailable</span>
+            </div>
+          }
+          onError={() => setFailed(true)}
+        >
+          <LazyJointScene
+            exercise="elbow_flexion"
+            angle={angle}
+            goalDeg={GOAL}
+            className="h-full w-full"
+            label={`A 3D elbow performing elbow flexion reps toward a ${GOAL} degree goal, read out live in degrees`}
+            fallback={<Pending onPending={setPending} />}
+          />
+        </SceneBoundary>
+
+        <div className="pointer-events-none absolute top-[34%] right-3 flex items-center sm:right-4" aria-hidden="true">
+          <span className="h-px w-8 bg-navy sm:w-12" />
+          <span className="callout relative">Goal {GOAL}°</span>
         </div>
-        <div className="mt-3 flex h-16 items-end gap-1.5" aria-hidden="true">
-          {peaksFor.map((_, i) => {
-            const p = peaks[i]
-            const height = p == null ? 0 : Math.max(8, ((p - (cfg.targetDeg - 45)) / 45) * 100)
-            return (
-              <div key={i} className="flex h-full flex-1 items-end rounded-[6px] bg-surface-2">
-                {p != null && (
-                  <motion.div className={`w-full rounded-[6px] ${p < low ? 'bg-warn' : 'bg-sky'}`} initial={reduce ? false : { height: 0 }} animate={{ height: `${Math.min(100, height)}%` }} transition={{ type: 'spring', stiffness: 260, damping: 22 }} />
-                )}
-              </div>
-            )
-          })}
-        </div>
-        <div className="mt-3 h-5 text-[12.5px] font-semibold">
-          {nudge && (
-            <motion.span key={peaks.length} initial={reduce ? false : { opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} className={nudge.tone === 'warn' ? 'text-warn' : 'text-sky'}>
-              {nudge.text}
-            </motion.span>
+
+        <div className="pointer-events-none absolute bottom-3 left-3 flex items-end gap-4 sm:left-4" aria-hidden="true">
+          {live ? (
+            <motion.span className="t-readout">{readout}</motion.span>
+          ) : reduce ? (
+            <span className="t-readout">{HELD}°</span>
+          ) : (
+            <span className="t-readout font-mono text-muted">---°</span>
           )}
+          <span className="t-meta mb-2 tabular-nums">
+            Rep {rep} / {REPS_PER_SET}
+          </span>
         </div>
       </div>
     </div>

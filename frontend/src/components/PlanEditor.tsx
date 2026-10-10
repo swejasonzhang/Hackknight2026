@@ -1,7 +1,7 @@
 import { EXERCISE_LIST, type ExerciseId, type PlanDto, type PlanInput, type Side } from '@arc/dependencies'
-import { useEffect, useState, type ChangeEvent, type FormEvent } from 'react'
+import { useEffect, useId, useState, type ChangeEvent, type FormEvent } from 'react'
 import { api } from '../api/client'
-import { Card } from './ui'
+import { Alert, Lamp } from './ui'
 
 interface Props {
   profileId: string
@@ -9,12 +9,14 @@ interface Props {
   onSaved: (plan: PlanDto) => void
 }
 
-/** Set or replace the profile's plan: sets, reps, rest and the goal angle. */
+/** The plan as a datasheet: one ruled row per setting, the save as the sheet's last row. */
 export function PlanEditor({ profileId, plan, onSaved }: Props) {
   const [form, setForm] = useState<PlanInput>(toForm(plan))
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [savedAt, setSavedAt] = useState<number | null>(null)
+  const base = useId()
+  const id = (k: string) => `${base}-${k}`
 
   useEffect(() => {
     setForm(toForm(plan))
@@ -36,53 +38,60 @@ export function PlanEditor({ profileId, plan, onSaved }: Props) {
 
   const num = (key: keyof PlanInput) => (e: ChangeEvent<HTMLInputElement>) => setForm({ ...form, [key]: Number(e.target.value) })
 
+  const row = (key: string, label: string, control: React.ReactNode) => (
+    <div className="field-row">
+      <label htmlFor={id(key)} className="field-label">
+        {label}
+      </label>
+      <div className="field-cell">{control}</div>
+    </div>
+  )
+
   return (
-    <Card title="Your plan" subtitle={plan ? 'The camera app reads this to know your sets, reps and goal.' : 'No plan yet. Save one so the camera app knows what to count.'}>
-      <form className="flex flex-col gap-4" onSubmit={submit}>
-        <div className="grid grid-cols-2 gap-3.5">
-          <label className="field">
-            <span className="text-[13px] font-bold text-ink-2">Exercise</span>
-            <select className="input" value={form.exercise} onChange={(e) => setForm({ ...form, exercise: e.target.value as ExerciseId })}>
-              {EXERCISE_LIST.map((ex) => (
-                <option key={ex.id} value={ex.id}>
-                  {ex.name}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="field">
-            <span className="text-[13px] font-bold text-ink-2">Side</span>
-            <select className="input" value={form.side} onChange={(e) => setForm({ ...form, side: e.target.value as Side })}>
-              <option value="right">Right</option>
-              <option value="left">Left</option>
-            </select>
-          </label>
-          <label className="field">
-            <span className="text-[13px] font-bold text-ink-2">Sets</span>
-            <input className="input" type="number" min={1} max={10} value={form.sets} onChange={num('sets')} />
-          </label>
-          <label className="field">
-            <span className="text-[13px] font-bold text-ink-2">Reps per set</span>
-            <input className="input" type="number" min={1} max={50} value={form.reps} onChange={num('reps')} />
-          </label>
-          <label className="field">
-            <span className="text-[13px] font-bold text-ink-2">Rest (seconds)</span>
-            <input className="input" type="number" min={10} max={600} value={form.restSeconds} onChange={num('restSeconds')} />
-          </label>
-          <label className="field">
-            <span className="text-[13px] font-bold text-ink-2">Goal (degrees)</span>
-            <input className="input" type="number" min={0} max={180} value={form.targetDeg} onChange={num('targetDeg')} />
-          </label>
+    <form onSubmit={submit} className="max-w-[640px]">
+      <p className="t-desc mb-4">{plan ? 'The camera app reads this plan to know the sets, reps, rest and goal it counts against.' : 'No plan yet. Save one so the camera app knows what to count.'}</p>
+      <div className="datasheet">
+        {row(
+          'exercise',
+          'Exercise',
+          <select id={id('exercise')} className="input" value={form.exercise} onChange={(e) => setForm({ ...form, exercise: e.target.value as ExerciseId })}>
+            {EXERCISE_LIST.map((ex) => (
+              <option key={ex.id} value={ex.id}>
+                {ex.name}
+              </option>
+            ))}
+          </select>,
+        )}
+        {row(
+          'side',
+          'Side',
+          <select id={id('side')} className="input" value={form.side} onChange={(e) => setForm({ ...form, side: e.target.value as Side })}>
+            <option value="right">Right</option>
+            <option value="left">Left</option>
+          </select>,
+        )}
+        {row('sets', 'Sets', <input id={id('sets')} className="input input-mono" type="number" min={1} max={10} value={form.sets} onChange={num('sets')} />)}
+        {row('reps', 'Reps per set', <input id={id('reps')} className="input input-mono" type="number" min={1} max={50} value={form.reps} onChange={num('reps')} />)}
+        {row('rest', 'Rest (seconds)', <input id={id('rest')} className="input input-mono" type="number" min={10} max={600} value={form.restSeconds} onChange={num('restSeconds')} />)}
+        {row('goal', 'Goal (degrees)', <input id={id('goal')} className="input input-mono" type="number" min={0} max={180} value={form.targetDeg} onChange={num('targetDeg')} />)}
+      </div>
+      {error && (
+        <div className="mt-4">
+          <Alert tone="bad">{error}</Alert>
         </div>
-        {error && <p className="text-[14px] text-bad">{error}</p>}
-        <div className="flex items-center gap-3">
-          <button className="btn btn-primary" type="submit" disabled={saving}>
-            {saving ? 'Saving…' : 'Save plan'}
-          </button>
-          {savedAt && !saving && <span className="text-[13px] font-bold text-good">Saved.</span>}
-        </div>
-      </form>
-    </Card>
+      )}
+      <div className="mt-5 flex flex-wrap items-center gap-4">
+        <button className="btn btn-block" type="submit" disabled={saving}>
+          <Lamp tone="primary" blink={saving} />
+          {saving ? 'Saving…' : 'Save plan'}
+        </button>
+        {savedAt && !saving && (
+          <span className="t-mono flex items-center gap-2 text-ok" role="status">
+            <Lamp tone="good" /> OK · Saved.
+          </span>
+        )}
+      </div>
+    </form>
   )
 }
 

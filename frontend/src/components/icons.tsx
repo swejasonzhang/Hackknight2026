@@ -1,4 +1,4 @@
-/* Icon set: Lucide, re-exported under the names the app already uses, plus the Arc logo mark. */
+/* Icon set: Lucide, re-exported under the names the app uses, plus the Arc mark. */
 export {
   Activity as IconActivity,
   ArrowLeft as IconArrowLeft,
@@ -23,21 +23,15 @@ export {
   Users as IconUsers,
 } from 'lucide-react'
 
-/** The Arc mark: a glowing blue arc on a dark tile. `tone="light"` is for white sections. */
-export function Logo({ size = 28, tone = 'dark', glow = true }: { size?: number; tone?: 'dark' | 'light'; glow?: boolean }) {
-  const tile = tone === 'light' ? '#26262b' : '#0a0a0c'
+/** The Arc mark: a square tile, an arc, a cobalt point. `tone="paper"` is for navy surfaces. */
+export function Logo({ size = 28, tone = 'navy' }: { size?: number; tone?: 'navy' | 'paper' }) {
+  const tile = tone === 'paper' ? '#ffffff' : '#0b1b3a'
+  const arc = tone === 'paper' ? '#0b1b3a' : '#ffffff'
   return (
-    <svg
-      width={size}
-      height={size}
-      viewBox="0 0 64 64"
-      aria-hidden="true"
-      className="shrink-0"
-      style={glow ? { filter: 'drop-shadow(0 0 6px rgb(0 161 255 / 0.65))' } : undefined}
-    >
-      <rect width="64" height="64" rx="18" fill={tile} stroke="rgb(0 161 255 / 0.55)" strokeWidth="2" />
-      <path d="M14 46a20 20 0 0 1 36 0" fill="none" stroke="#00a1ff" strokeWidth="6" strokeLinecap="round" />
-      <circle cx="32" cy="46" r="5" fill="#ffffff" />
+    <svg width={size} height={size} viewBox="0 0 64 64" aria-hidden="true" className="shrink-0">
+      <rect width="64" height="64" fill={tile} />
+      <path d="M14 46a18 18 0 0 1 36 0" fill="none" stroke={arc} strokeWidth="5" strokeLinecap="square" />
+      <rect x="28" y="42" width="8" height="8" fill="#0b3dff" />
     </svg>
   )
 }

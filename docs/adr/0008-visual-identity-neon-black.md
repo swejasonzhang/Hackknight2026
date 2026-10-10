@@ -1,7 +1,7 @@
 # ADR-0008: Visual identity: neon black
 
 - Date: 2026-10-09
-- Status: accepted (supersedes ADR-0006)
+- Status: superseded by ADR-0010, 2026-10-10
 
 ## Context
 
