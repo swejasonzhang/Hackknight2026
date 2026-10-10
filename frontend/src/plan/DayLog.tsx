@@ -1,11 +1,13 @@
-import { EXERCISES, sideLabel, type SessionDto } from '@arc/dependencies'
+import { EXERCISES, sideLabel, type ProgramDto, type SessionDto } from '@arc/dependencies'
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react'
 import { useId, useMemo, useRef, type KeyboardEvent } from 'react'
 import { Link } from 'react-router-dom'
 import { ease } from '../components/motion'
 import { Lamp, Tag } from '../components/ui'
 import { deg, fatigueLabel, formatDate } from '../format'
+import { plannedDay } from './checklist'
 import { dayStart, firstDay, groupByDay, progressFor, shiftDay, weekOf, type DayKey } from './days'
+import { TodayList } from './TodayList'
 
 const long = (key: DayKey) => dayStart(key).toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' })
 const monthDay = (key: DayKey) => dayStart(key).toLocaleDateString(undefined, { month: 'long', day: 'numeric' })
@@ -21,15 +23,19 @@ interface Props {
   /** The viewer's today: the log never steps past it. */
   today: DayKey
   onDayChange: (day: DayKey) => void
+  /** The week in force: a training day shows what was planned, crossed out as it gets done. */
+  program?: ProgramDto | null
 }
 
 /**
  * The plan page's log, one day at a time: step back and forth a day, or pick a day from its
- * week, and read that day's workouts with how each one moved against the previous session of
- * the same movement, the first one, and the goal. A day without workouts is a rest day and
- * offers the last workout before it.
+ * week. A training day of the week in force shows what was planned, under the muscle group each
+ * movement works, crossed out as it gets done; today each one can be recorded, the next offered
+ * first. Then the day's workouts, with how each one moved against the previous session of the same
+ * movement, the first one, and the goal. A day with neither is a rest day and offers the last
+ * workout before it.
  */
-export function DayLog({ sessions, day, today, onDayChange }: Props) {
+export function DayLog({ sessions, day, today, onDayChange, program }: Props) {
   const reduce = useReducedMotion()
   const titleId = useId()
   const byDay = useMemo(() => groupByDay(sessions), [sessions])
@@ -37,6 +43,7 @@ export function DayLog({ sessions, day, today, onDayChange }: Props) {
   const direction = useRef(0)
   const list = byDay.get(day) ?? []
   const week = weekOf(day)
+  const planned = plannedDay(program, sessions, day)
 
   const go = (next: DayKey) => {
     if (next === day || next > today) return
@@ -104,7 +111,15 @@ export function DayLog({ sessions, day, today, onDayChange }: Props) {
           exit={reduce ? undefined : { opacity: 0, x: -16 * direction.current }}
           transition={{ duration: 0.24, ease }}
         >
-          {list.length === 0 ? (
+          {planned && (
+            <section className="panel mt-4 p-4" aria-label={`Planned for ${long(day)}`}>
+              <div className="t-label flex items-center gap-2">
+                <Lamp tone={planned.list.every((e) => e.done) ? 'good' : day === today ? 'primary' : 'default'} /> Planned · {planned.day.title}
+              </div>
+              <TodayList list={planned.list} canRecord={day === today} back={{ from: `/plan?day=${day}`, label: 'Plan' }} label={`Planned for ${long(day)}`} />
+            </section>
+          )}
+          {list.length === 0 && planned ? null : list.length === 0 ? (
             <div className="mt-6 border border-rule bg-paper px-5 py-8 text-center sm:px-8">
               <div className="t-label flex items-center justify-center gap-2">
                 <Lamp /> Rest day

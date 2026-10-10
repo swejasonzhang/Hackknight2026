@@ -12,6 +12,8 @@ import { Alert, Lamp, Skeleton, StatTile, Strip, Tag } from '../components/ui'
 import { deg, fatigueLabel, formatDateTime, pct } from '../format'
 import { useStickyTop } from '../components/useStickyTop'
 import { MuscleKey } from '../components/MuscleKey'
+import { dayKey } from '../plan/days'
+import { DayWorkout } from '../plan/DayWorkout'
 
 const MONO = "'IBM Plex Mono', ui-monospace, monospace"
 
@@ -250,6 +252,8 @@ export function SessionDetailPage() {
       </div>
 
       <div className={AREA.strips}>
+        {/* Straight after a recording on a training day: this movement crossed out, the next one offered. */}
+        {dayKey(session.startedAt) === dayKey(Date.now()) && <DayWorkout profileId={session.profileId} day={dayKey(session.startedAt)} />}
         <ArcRead session={session} autoSpeak={arcRead} />
         <Strip index="01" title="Rep by rep, by set" aside={`Peak ${exercise.metricLabel.toLowerCase()} · ${reps.length} reps`}>
           <div className="h-[240px] sm:h-[280px]">

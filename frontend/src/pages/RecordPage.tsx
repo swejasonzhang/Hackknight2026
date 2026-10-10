@@ -1,32 +1,37 @@
-import { EXERCISE_IDS, prescriptionFor, type ExerciseId, type PlanDto, type ProgramDto } from '@arc/dependencies'
+import { EXERCISE_IDS, prescriptionFor, type ExerciseId, type PlanDto, type ProgramDto, type SessionDto } from '@arc/dependencies'
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { api } from '../api/client'
 import { Page } from '../components/motion'
 import { ProfilePicker } from '../components/ProfilePicker'
-import { EmptyState, PageHeader, Skeleton } from '../components/ui'
+import { EmptyState, Lamp, PageHeader, Skeleton } from '../components/ui'
 import { useProfiles } from '../hooks/useProfiles'
+import { nextEntry, plannedDay } from '../plan/checklist'
+import { dayKey } from '../plan/days'
+import { TodayList } from '../plan/TodayList'
 import { LiveRecorder, type RecordConfig } from '../record/LiveRecorder'
 
 const isExercise = (v: string | null): v is ExerciseId => EXERCISE_IDS.includes(v as ExerciseId)
 
 /**
  * /record: a session recorded in the browser for the selected profile. The movement is the one
- * named in ?exercise= (the dashboard's pick), else the plan's; its sets, reps, rest and goal come
- * from `prescriptionFor`: the plan when it is for that movement, else the week Arc built, else the
- * member's goal ranges. In development, ?simulate replaces the camera with a pretend person.
+ * named in ?exercise= (the dashboard's pick, the log's Record), else today's next movement not
+ * done yet, else the plan's; its sets, reps, rest and goal come from `prescriptionFor`: today's
+ * prescription in the week, else the plan, else the week, else the member's goal ranges. On a
+ * training day, today's workout sits under the camera, crossed out as it gets done, with the way
+ * to the next movement. In development, ?simulate replaces the camera with a pretend person.
  */
 export function RecordPage() {
   const { selected, selectedId, profiles, loading } = useProfiles()
   const [params] = useSearchParams()
-  const [data, setData] = useState<{ plan: PlanDto | null; program: ProgramDto | null } | undefined>(undefined)
+  const [data, setData] = useState<{ plan: PlanDto | null; program: ProgramDto | null; sessions: SessionDto[] } | undefined>(undefined)
 
   useEffect(() => {
     if (!selectedId) return
     let cancelled = false
     setData(undefined)
-    Promise.all([api.plan.get(selectedId).catch(() => null), api.plan.program(selectedId).catch(() => null)]).then(([plan, program]) => {
-      if (!cancelled) setData({ plan, program })
+    Promise.all([api.plan.get(selectedId).catch(() => null), api.plan.program(selectedId).catch(() => null), api.sessions.list(selectedId).catch(() => [])]).then(([plan, program, sessions]) => {
+      if (!cancelled) setData({ plan, program, sessions })
     })
     return () => {
       cancelled = true
@@ -35,12 +40,13 @@ export function RecordPage() {
 
   const requested = params.get('exercise')
   const intake = selected?.intake
+  const today = useMemo(() => (data ? plannedDay(data.program, data.sessions, dayKey(Date.now())) : null), [data])
   const config = useMemo<RecordConfig | null>(() => {
     if (data === undefined) return null
-    const exercise: ExerciseId = isExercise(requested) ? requested : (data.plan?.exercise ?? 'elbow_flexion')
+    const exercise: ExerciseId = isExercise(requested) ? requested : (nextEntry(today?.list ?? [])?.item.exercise ?? data.plan?.exercise ?? 'elbow_flexion')
     const p = prescriptionFor(exercise, { plan: data.plan, program: data.program, intake })
     return { exercise, side: p.side, plan: { sets: p.sets, reps: p.reps, restSeconds: p.restSeconds, targetDeg: p.targetDeg } }
-  }, [data, requested, intake])
+  }, [data, requested, intake, today])
   const simulate = import.meta.env.DEV && params.has('simulate')
   const noProfiles = !loading && profiles.length === 0
 
@@ -60,7 +66,22 @@ export function RecordPage() {
             }
           />
         ) : config && selectedId ? (
-          <LiveRecorder key={`${selectedId}-${config.exercise}-${config.side}`} profileId={selectedId} config={config} simulate={simulate} />
+          <LiveRecorder
+            key={`${selectedId}-${config.exercise}-${config.side}`}
+            profileId={selectedId}
+            config={config}
+            simulate={simulate}
+            below={
+              today && (
+                <section className="panel mt-4 p-4 sm:p-5" aria-label="Today's workout">
+                  <div className="t-label flex items-center gap-2">
+                    <Lamp tone="primary" /> Today · {today.day.title}
+                  </div>
+                  <TodayList list={today.list} current={config.exercise} canRecord label="Today's workout" />
+                </section>
+              )
+            }
+          />
         ) : (
           <Skeleton height={420} />
         )}

@@ -1,5 +1,5 @@
 import { EXERCISE_LIST, EXERCISES, sideLabel, type ExerciseId, type SessionPlan, type Side, type VoiceCommand } from '@arc/dependencies'
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { api } from '../api/client'
 import { Lamp, StatTile } from '../components/ui'
@@ -150,7 +150,7 @@ function draw(canvas: HTMLCanvasElement, aspect: number, landmarks: Landmark[] |
  * last set (or "Finish and save") marks it complete and opens its report. Over the video, the
  * whole white skeleton and the measured joint. The video stays in the browser.
  */
-export function LiveRecorder({ profileId, config, simulate = false }: { profileId: string; config: RecordConfig; simulate?: boolean }) {
+export function LiveRecorder({ profileId, config, simulate = false, below }: { profileId: string; config: RecordConfig; simulate?: boolean; below?: ReactNode }) {
   const navigate = useNavigate()
   const videoRef = useRef<HTMLVideoElement>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
@@ -483,6 +483,7 @@ export function LiveRecorder({ profileId, config, simulate = false }: { profileI
           The video stays on this device. Each set's angles are saved to your account as the set finishes
           {savedSets > 0 ? ` · saved through set ${savedSets}` : ''}.
         </p>
+        {below}
       </div>
 
       <div className="flex min-w-0 flex-col gap-4">
