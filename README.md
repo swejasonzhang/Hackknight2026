@@ -17,7 +17,7 @@ cp .env.example .env   # fill in MONGODB_URI, JWT_SECRET and CV_API_KEY (see bel
 npm run dev            # API on :8787, web app on :5173
 ```
 
-Open <http://localhost:5173>. `/` is the landing page; **Get started** takes you to `/signup` (one account per household) and the app lives at `/dashboard`. Then:
+Open <http://localhost:5173>. `/` is the landing page; **Create account** takes you to `/signup` (one account per household) and the app lives at `/dashboard`. The Arc logo in the app leads back to the landing page, where **Open dashboard** returns you to the app. Then:
 
 1. **Profiles** → **Add a profile** for each person who exercises, or **Load demo data** for a profile with six weeks of random sessions at your local training hours.
 2. **Dashboard** → pick who you're looking at and the exercise. The panel reads out the latest session; beside it every chart is folded behind a **+** with its latest reading on the row: peak ROM per session against your goal, the latest session rep by rep, the fatigue proxy, sessions per week and a 3D view. Open one, or **Open all**.
@@ -177,7 +177,7 @@ The project is developed **test-first**: write the failing test, make it pass, t
 
 - `dependencies/src/**/*.test.ts`: engine behaviour (rep counting, hysteresis, jitter rejection, fatigue arithmetic, summaries, schema validation), the demo generator (repeatable per seed, upward trends, local training hours) and the progress builder.
 - `backend/test/*.test.ts`: every API route through supertest against a throwaway in-memory MongoDB, including sign-up, login, token checks, API-key access and profile isolation between accounts. Tests never touch the cluster in `.env`.
-- `frontend/src/**/*.test.ts(x)`: the API wrapper (token header, 401 handling), the route guards (app pages send visitors to `/login`, the landing page sends signed-in users to `/dashboard`), the sign-up / login form, UI primitives, the dashboard's chart folds, the plan page's day log (stepping, rest days, progress against the previous session and the goal) and its local-calendar day arithmetic, and the hero's rep detector.
+- `frontend/src/**/*.test.ts(x)`: the API wrapper (token header, 401 handling), the route guards (app pages send visitors to `/login`, sign-up and log-in send signed-in users to `/dashboard`), the app logo leading to the landing page and the landing page's buttons for visitors and signed-in users, the sign-up / login form, UI primitives, the dashboard's chart folds, the plan page's day log (stepping, rest days, progress against the previous session and the goal) and its local-calendar day arithmetic, and the hero's rep detector.
 
 How the team works (sprints, stories, definition of done, PR checklist) is in [CONTRIBUTING.md](CONTRIBUTING.md) and [docs/](docs/).
 

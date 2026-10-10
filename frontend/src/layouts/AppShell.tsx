@@ -65,7 +65,7 @@ export function AppShell() {
   return (
     <div className="min-h-screen bg-vellum sm:pl-[56px]">
       <aside className="rail hidden sm:flex" aria-label="App">
-        <Link to="/dashboard" className="flex h-[72px] w-full items-center justify-center border-b border-white/10 hover:no-underline" aria-label="Arc dashboard">
+        <Link to="/" className="flex h-[72px] w-full items-center justify-center border-b border-white/10 hover:no-underline" aria-label="Arc home page">
           <Logo size={26} tone="paper" />
         </Link>
         <nav aria-label="Main" className="rail-nav">
@@ -105,7 +105,9 @@ export function AppShell() {
 
       <nav className="bar sm:hidden" aria-label="Main">
         <div className="flex items-center justify-center gap-1.5 border-r border-white/10">
-          <Logo size={20} tone="paper" />
+          <Link to="/" aria-label="Arc home page" className="inline-flex hover:no-underline">
+            <Logo size={20} tone="paper" />
+          </Link>
           <Lamp tone={API_TONE[apiState]} blink={apiState === 'checking'} />
           <span className="sr-only">API status: {API_TEXT[apiState]}</span>
         </div>
