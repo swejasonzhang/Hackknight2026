@@ -1,6 +1,7 @@
 import { EXERCISE_LIST, type ExerciseId, type PlanDto, type PlanInput, type Side } from '@arc/dependencies'
 import { useEffect, useId, useState, type ChangeEvent, type FormEvent } from 'react'
 import { api } from '../api/client'
+import { Select } from './Select'
 import { Alert, Lamp } from './ui'
 
 interface Props {
@@ -10,6 +11,12 @@ interface Props {
   /** Stack each label over its control, for a narrow column. */
   compact?: boolean
 }
+
+const EXERCISE_OPTIONS = EXERCISE_LIST.map((ex) => ({ value: ex.id, label: ex.name }))
+const SIDE_OPTIONS: { value: Side; label: string }[] = [
+  { value: 'right', label: 'Right' },
+  { value: 'left', label: 'Left' },
+]
 
 /** The plan as a datasheet: one ruled row per setting, the save as the sheet's last row. */
 export function PlanEditor({ profileId, plan, onSaved, compact = false }: Props) {
@@ -56,21 +63,12 @@ export function PlanEditor({ profileId, plan, onSaved, compact = false }: Props)
         {row(
           'exercise',
           'Exercise',
-          <select id={id('exercise')} className="input" value={form.exercise} onChange={(e) => setForm({ ...form, exercise: e.target.value as ExerciseId })}>
-            {EXERCISE_LIST.map((ex) => (
-              <option key={ex.id} value={ex.id}>
-                {ex.name}
-              </option>
-            ))}
-          </select>,
+          <Select<ExerciseId> id={id('exercise')} value={form.exercise} options={EXERCISE_OPTIONS} onChange={(exercise) => setForm({ ...form, exercise })} />,
         )}
         {row(
           'side',
           'Side',
-          <select id={id('side')} className="input" value={form.side} onChange={(e) => setForm({ ...form, side: e.target.value as Side })}>
-            <option value="right">Right</option>
-            <option value="left">Left</option>
-          </select>,
+          <Select<Side> id={id('side')} value={form.side} options={SIDE_OPTIONS} onChange={(side) => setForm({ ...form, side })} />,
         )}
         {row('sets', 'Sets', <input id={id('sets')} className="input input-mono" type="number" min={1} max={10} value={form.sets} onChange={num('sets')} />)}
         {row('reps', 'Reps per set', <input id={id('reps')} className="input input-mono" type="number" min={1} max={50} value={form.reps} onChange={num('reps')} />)}

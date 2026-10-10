@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom'
 import { useProfiles } from '../hooks/useProfiles'
+import { Select } from './Select'
 import { Avatar } from './ui'
 
 /** The switcher for who the whole app is reading: an underlined mono readout, no box. */
@@ -17,13 +18,7 @@ export function ProfilePicker() {
     <span className="flex min-w-0 items-center gap-3">
       {selected && <Avatar name={selected.name} size={28} />}
       <span className="t-meta hidden sm:inline">Profile</span>
-      <select className="select-readout min-w-0" value={selectedId} onChange={(e) => setSelectedId(e.target.value)} aria-label="Who's exercising">
-        {profiles.map((p) => (
-          <option key={p.id} value={p.id}>
-            {p.name}
-          </option>
-        ))}
-      </select>
+      <Select variant="readout" aria-label="Who's exercising" className="min-w-0" value={selectedId} options={profiles.map((p) => ({ value: p.id, label: p.name }))} onChange={setSelectedId} />
     </span>
   )
 }
