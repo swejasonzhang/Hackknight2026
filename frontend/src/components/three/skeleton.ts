@@ -514,11 +514,6 @@ export function skeletonFor(exercise: ExerciseId, metricDeg: number): Skeleton {
   return skeleton
 }
 
-/** Direction of the moving segment for a reading, for a movement whose base holds still (the three arm and knee classics). */
-export function directionFor(exercise: ExerciseId, metricDeg: number): number {
-  return skeletonFor(exercise, restFor(exercise)).overlay.restDeg + sweepFor(exercise, metricDeg)
-}
-
 /** The MediaPipe landmark each joint stands for, so the simulator reads its landmarks off this body. */
 export const LANDMARK_OF: Partial<Record<JointName, number>> = {
   lShoulder: LM.LEFT_SHOULDER,

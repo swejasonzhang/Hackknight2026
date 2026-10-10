@@ -67,7 +67,7 @@ coachRouter.post('/onboarding', limit, async (req, res) => {
   if (turn.done && turn.intake && turn.program) {
     // Arc saves what it learned: on the profile it was given, or on a new one named after the member.
     const profile: ProfileShape = existing
-      ? (await Profile.findByIdAndUpdate(existing._id, { $set: { intake: turn.intake, notes: turn.intake.goals.slice(0, 500) } }, { new: true }).lean<ProfileShape>())!
+      ? (await Profile.findByIdAndUpdate(existing._id, { $set: { intake: turn.intake, notes: turn.intake.goals.slice(0, 500) } }, { returnDocument: 'after' }).lean<ProfileShape>())!
       : (await Profile.create({ ownerId: userId, name, notes: turn.intake.goals.slice(0, 500), intake: turn.intake, createdAt: now })).toObject()
     // The week, and the active plan Record starts from: the week's first movement.
     await Program.updateMany({ profileId: profile._id, active: true }, { $set: { active: false } })

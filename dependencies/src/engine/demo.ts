@@ -1,7 +1,7 @@
 import { EXERCISES } from './exercises.ts'
 import { estimateFatigue } from './fatigue.ts'
 import { summarizeSets } from './summary.ts'
-import { EXERCISE_IDS, type SessionRecord, type SetRecord } from './types.ts'
+import { EXERCISE_IDS, type ExerciseId, type SessionRecord, type SetRecord } from './types.ts'
 
 /** Small seeded PRNG: random-looking data that a seed reproduces exactly (tests pass a fixed seed). */
 function mulberry32(seed: number): () => number {
@@ -23,11 +23,37 @@ const WEEKS = 6
 const HOURS = [7, 8, 12, 17, 18, 19, 20]
 
 /**
+ * The weight a demo member holds for each movement in week one and how much it rises a week, in
+ * kilograms: dumbbells for the arm and shoulder work, a cable or band for the pulldown, a bar for
+ * the deadlift, a goblet squat and a medicine-ball twist; lunges, the seated knee extension and
+ * crunches are bodyweight (0).
+ */
+const DEMO_LOAD: Record<ExerciseId, [number, number]> = {
+  elbow_flexion: [6, 0.5],
+  tricep_extension: [5, 0.5],
+  shoulder_press: [8, 0.5],
+  shoulder_abduction: [3, 0.25],
+  front_raise: [3, 0.25],
+  chest_press: [10, 1],
+  pec_fly: [5, 0.5],
+  lat_pulldown: [25, 1.5],
+  bent_over_row: [10, 1],
+  deadlift: [30, 2.5],
+  squat: [10, 1],
+  lunge: [0, 0],
+  seated_knee_extension: [0, 0],
+  crunch: [0, 0],
+  ab_twist: [4, 0],
+}
+
+/**
  * Six weeks of believable practice for every exercise, different for every seed: each exercise
  * starts a quarter to two fifths of its range short of its goal and closes most of that gap; two or three
  * sessions a week on random days (Monday to Saturday) and times; reps fade within a set less as
  * the weeks go by; about one session in eight is an off day with lower range, more fatigue and
- * sometimes a last set ended early. The same seed always gives the same data.
+ * sometimes a last set ended early. Each session holds a weight that rises week by week (from a
+ * stream of its own, so the reps a seed gives never change). The same seed always gives the same
+ * data.
  *
  * `tzOffsetMinutes` is the viewer's `Date#getTimezoneOffset()` (240 in New York in October), so
  * the days and hours read as a real routine on their clock rather than on the server's UTC one.
@@ -37,6 +63,8 @@ export function generateDemoSessions(profileId: string, now = Date.now(), seed =
   const between = (lo: number, hi: number) => lo + rand() * (hi - lo)
   const noise = (amp: number) => (rand() * 2 - 1) * amp
   const sessions: DemoSession[] = []
+  // The weights come from their own stream, so adding them left every rep of a seed as it was.
+  const weigh = mulberry32(seed ^ 0x5eed)
 
   // Work on the viewer's wall clock (local time written as if it were UTC): find this week's
   // Monday 00:00 there, walk back WEEKS - 1 weeks, then shift each start back to a real instant.
@@ -53,6 +81,8 @@ export function generateDemoSessions(profileId: string, now = Date.now(), seed =
     const gap = range * between(0.25, 0.4)
     const gain = (gap / WEEKS) * between(0.6, 1.1)
     const steadiness = between(0.7, 1.3)
+    const [startKg, perWeekKg] = DEMO_LOAD[exercise]
+    const strength = 0.85 + weigh() * 0.3
     for (let week = 0; week < WEEKS; week++) {
       const weekMonday = thisMonday - (WEEKS - 1 - week) * 7 * DAY
       const days = [0, 1, 2, 3, 4, 5].sort(() => rand() - 0.5).slice(0, rand() < 0.4 ? 2 : 3).sort((a, b) => a - b)
@@ -89,6 +119,7 @@ export function generateDemoSessions(profileId: string, now = Date.now(), seed =
           sets,
           summary: summarizeSets(sets),
           demo: true,
+          loadKg: Math.round((startKg * strength + perWeekKg * week) * 2) / 2,
         })
       }
     }

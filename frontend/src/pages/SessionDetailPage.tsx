@@ -12,6 +12,8 @@ import { Alert, Lamp, Skeleton, StatTile, Strip, Tag } from '../components/ui'
 import { deg, fatigueLabel, formatDateTime, pct } from '../format'
 import { useStickyTop } from '../components/useStickyTop'
 import { MuscleKey } from '../components/MuscleKey'
+import { dayKey } from '../plan/days'
+import { DayWorkout } from '../plan/DayWorkout'
 
 const MONO = "'IBM Plex Mono', ui-monospace, monospace"
 
@@ -82,8 +84,9 @@ export function SessionDetailPage() {
   const [stageRef, stageTop] = useStickyTop<HTMLElement>(24)
   const [session, setSession] = useState<SessionDto | null>(null)
   const [error, setError] = useState<string | null>(null)
-  // The figure works through the whole range, rep after rep: from rest to this session's best and back.
-  const loop = useRepLoop(session?.exercise ?? 'elbow_flexion', session ? session.summary.bestPeakDeg : null)
+  // The figure works through the range, rep after rep: from rest to this session's best and back,
+  // never past the goal's tick on its arc.
+  const loop = useRepLoop(session?.exercise ?? 'elbow_flexion', session ? Math.min(session.summary.bestPeakDeg, session.plan.targetDeg) : null)
 
   useEffect(() => {
     let cancelled = false
@@ -164,8 +167,9 @@ export function SessionDetailPage() {
   const yMax = Math.ceil(Math.max(goal, ...reps.map((r) => r.peakDeg), 10) / 10) * 10
   const spec: [string, string][] = [
     ['Exercise', exercise.name],
-    ['Side', session.side],
+    ['Side', sideLabel(session.exercise, session.side)],
     ['Plan', `${session.plan.sets} × ${session.plan.reps} · ${session.plan.restSeconds} s rest`],
+    ...(session.loadKg != null ? ([['Weight', session.loadKg === 0 ? 'bodyweight' : `${session.loadKg} kg`]] as [string, string][]) : []),
     ['Duration', `${durationMin} min`],
     ['Sets', String(session.sets.length)],
   ]
@@ -218,8 +222,8 @@ export function SessionDetailPage() {
             <div className="absolute inset-x-0 top-11 bottom-0">
               <LazyJointScene
                 exercise={session.exercise}
-                angle={loop ?? best}
-                rangeDeg={best}
+                angle={loop ?? Math.min(best, goal)}
+                rangeDeg={Math.min(best, goal)}
                 goalDeg={goal}
                 mirrored={exercise.sided && session.side === 'left'}
                 className="h-full w-full"
@@ -250,6 +254,8 @@ export function SessionDetailPage() {
       </div>
 
       <div className={AREA.strips}>
+        {/* Straight after a recording on a training day: this movement crossed out, the next one offered. */}
+        {dayKey(session.startedAt) === dayKey(Date.now()) && <DayWorkout profileId={session.profileId} day={dayKey(session.startedAt)} />}
         <ArcRead session={session} autoSpeak={arcRead} />
         <Strip index="01" title="Rep by rep, by set" aside={`Peak ${exercise.metricLabel.toLowerCase()} · ${reps.length} reps`}>
           <div className="h-[240px] sm:h-[280px]">
