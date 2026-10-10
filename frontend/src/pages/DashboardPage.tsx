@@ -15,10 +15,10 @@ import { Alert, EmptyState, Lamp, Segmented, Skeleton, StatTile, Strip } from '.
 import { deg, fatigueLabel, formatDate, weekStartIso } from '../format'
 import { useStickyTop } from '../components/useStickyTop'
 import { useProfiles } from '../hooks/useProfiles'
+import { PlanCalendar } from '../plan/PlanCalendar'
 
 /** The switch carries short labels; the full exercise name is printed on the stage beneath it. */
-const SHORT: Record<ExerciseId, string> = { elbow_flexion: 'Elbow', shoulder_abduction: 'Shoulder', seated_knee_extension: 'Knee' }
-const EXERCISE_OPTIONS = EXERCISE_LIST.map((e) => ({ value: e.id, label: SHORT[e.id] }))
+const EXERCISE_OPTIONS = EXERCISE_LIST.map((e) => ({ value: e.id, label: e.short }))
 
 /**
  * The dashboard as an instrument: a sticky measurement panel (who, which movement, the 3D
@@ -222,14 +222,19 @@ export function DashboardPage() {
 
         <RecordPanel plan={plan} exercise={exercise} />
 
+        {selected && !noProfiles && <PlanCalendar profileId={selected.id} />}
+
         {noProfiles && (
           <Strip index="00" title="Setup">
             <EmptyState
               title="No profiles yet"
-              description="A profile is one person who exercises; everyone in the household gets their own. Add one, or load the demo profile to see six weeks of readouts."
+              description="A profile is one person who exercises; everyone in the household gets their own. Chat with Arc and it sets yours up with a week of training, add one yourself, or load the demo profile to see six weeks of readouts."
               action={
                 <>
-                  <Link className="btn btn-block" to="/profiles">
+                  <Link className="btn btn-block" to="/welcome">
+                    Tell Arc what you want
+                  </Link>
+                  <Link className="btn" to="/profiles">
                     Add a profile
                   </Link>
                   {demoButton(false)}
@@ -240,7 +245,7 @@ export function DashboardPage() {
         )}
 
         {noSignal && (
-          <Strip index="00" title="Waiting for a session">
+          <Strip index="02" title="Waiting for a session">
             <EmptyState
               title={`No sessions yet for ${cfg.name.toLowerCase()}`}
               description={
@@ -294,21 +299,21 @@ function chartFolds({
   return [
     {
       id: 'peak',
-      index: '01',
+      index: '02',
       title: `Peak ${metricLabel.toLowerCase()} per session`,
       summary: `${deg(bestAll)} best${goal != null ? ` · goal ${goal}°` : ''}`,
       render: () => <PeakChart progress={data} />,
     },
     {
       id: 'reps',
-      index: '02',
+      index: '03',
       title: 'Latest session, rep by rep',
       summary: `${formatDate(latest.date)} · ${data.latestSessionReps.length} reps`,
       render: () => <RepChart progress={data} />,
     },
     {
       id: 'fatigue',
-      index: '03',
+      index: '04',
       title: 'Fatigue per session',
       summary: `${latest.fatigueIndex.toFixed(2)} latest`,
       aside: 'ROM decay + tempo drift · a proxy, not a clinical measure',
@@ -316,7 +321,7 @@ function chartFolds({
     },
     {
       id: 'weekly',
-      index: '04',
+      index: '05',
       title: 'Sessions per week',
       summary: `${thisWeek} this week`,
       aside: 'Consistency moves every other number',
@@ -324,7 +329,7 @@ function chartFolds({
     },
     {
       id: '3d',
-      index: '05',
+      index: '06',
       title: 'Peak per session, in 3D',
       summary: `${data.sessions.length} sessions`,
       aside: 'Drag to orbit · lighter is higher',

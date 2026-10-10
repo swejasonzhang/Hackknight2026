@@ -30,6 +30,20 @@ export function weekOf(key: DayKey): DayKey[] {
   return Array.from({ length: 7 }, (_, i) => shiftDay(monday, i))
 }
 
+/** The six Monday-to-Sunday weeks that show a month on a calendar, `monthOf` being any day in it. */
+export function monthGrid(monthOf: DayKey): DayKey[] {
+  const first = dayStart(monthOf)
+  const firstKey = fromDate(new Date(first.getFullYear(), first.getMonth(), 1))
+  const start = weekOf(firstKey)[0]!
+  return Array.from({ length: 42 }, (_, i) => shiftDay(start, i))
+}
+
+/** The first of the month `months` away from the month holding `key`. */
+export function shiftMonth(key: DayKey, months: number): DayKey {
+  const d = dayStart(key)
+  return fromDate(new Date(d.getFullYear(), d.getMonth() + months, 1))
+}
+
 /** A day key from untrusted text (a URL parameter); null unless it names a real calendar day. */
 export function parseDayKey(text: string | null | undefined): DayKey | null {
   if (!text || !/^\d{4}-\d{2}-\d{2}$/.test(text)) return null

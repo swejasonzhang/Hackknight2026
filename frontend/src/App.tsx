@@ -23,7 +23,8 @@ import { ProfilesProvider } from './profiles/ProfilesContext'
  *   /dashboard      progress for the selected profile, every chart folded behind a plus
  *   /plan           the plan beside the log, one day at a time (?day=YYYY-MM-DD)
  *   /record         record a session in the browser: webcam, pose tracking, reps, save
- *   /welcome        the chat with Arc after sign-up: goals, area, side, limits -> first plan
+ *   /welcome        a full page between sign-up and the dashboard: the chat with Arc, then the week
+ *                   it built (skippable; ?profile=<id> for an existing profile)
  *   /profiles       household profiles
  *   /sessions/:id   one session, set by set
  *   /account        who is signed in, log out, and deleting the account
@@ -46,6 +47,18 @@ export default function App() {
           <Route path="/login" element={<LoginPage />} />
         </Route>
 
+        {/* Arc's chat is its own full page between sign-up and the dashboard: no app rail. */}
+        <Route
+          path="/welcome"
+          element={
+            <RequireAuth>
+              <ProfilesProvider>
+                <WelcomePage />
+              </ProfilesProvider>
+            </RequireAuth>
+          }
+        />
+
         <Route
           element={
             <RequireAuth>
@@ -58,7 +71,6 @@ export default function App() {
           <Route path="/dashboard" element={<DashboardPage />} />
           <Route path="/plan" element={<PlanPage />} />
           <Route path="/record" element={<RecordPage />} />
-          <Route path="/welcome" element={<WelcomePage />} />
           <Route path="/profiles" element={<ProfilesPage />} />
           <Route path="/sessions/:id" element={<SessionDetailPage />} />
           <Route path="/account" element={<AccountPage />} />

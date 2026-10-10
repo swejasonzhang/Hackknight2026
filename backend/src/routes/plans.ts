@@ -3,6 +3,7 @@ import { Router } from 'express'
 import { principalOf } from '../auth.ts'
 import { HttpError, validate } from '../http.ts'
 import { Plan, toPlanDto, type PlanShape } from '../models/Plan.ts'
+import { Program, toProgramDto, type ProgramShape } from '../models/Program.ts'
 import { requireProfile } from '../services/profiles.ts'
 
 /** Mounted at /api/profiles (behind `authenticate`) */
@@ -39,4 +40,12 @@ plansRouter.patch('/:id/plan', async (req, res) => {
   ).lean<PlanShape>()
   if (!plan) throw new HttpError(404, 'No active plan')
   res.json(toPlanDto(plan))
+})
+
+/** The week Arc built (ADR-0020): which days to train and what each holds. */
+plansRouter.get('/:id/program', async (req, res) => {
+  const profile = await requireProfile(req.params.id, principalOf(req))
+  const program = await Program.findOne({ profileId: profile._id, active: true }).sort({ createdAt: -1, _id: -1 }).lean<ProgramShape>()
+  if (!program) throw new HttpError(404, 'No program yet')
+  res.json(toProgramDto(program))
 })

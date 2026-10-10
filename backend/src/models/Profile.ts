@@ -20,6 +20,10 @@ const IntakeSchema = new Schema<CoachIntake>(
     limitations: { type: String, maxlength: 500, default: '' },
     experience: { type: String, enum: ['new', 'some', 'regular'], required: true },
     daysPerWeek: { type: Number, required: true, min: 1, max: 7 },
+    trainingGoal: { type: String, enum: ['strength', 'hypertrophy', 'endurance'] },
+    trainingDays: { type: [Number], default: undefined },
+    heightCm: { type: Number, min: 80, max: 250 },
+    weightKg: { type: Number, min: 25, max: 350 },
   },
   { _id: false },
 )
@@ -40,8 +44,12 @@ export function toProfileDto(p: ProfileShape): ProfileDto {
   if (p.email) dto.email = p.email
   if (p.notes) dto.notes = p.notes
   if (p.intake) {
-    const { goals, focus, side, limitations, experience, daysPerWeek } = p.intake
+    const { goals, focus, side, limitations, experience, daysPerWeek, trainingGoal, trainingDays, heightCm, weightKg } = p.intake
     dto.intake = { goals, focus, side, limitations: limitations ?? '', experience, daysPerWeek }
+    if (trainingGoal) dto.intake.trainingGoal = trainingGoal
+    if (trainingDays?.length) dto.intake.trainingDays = [...trainingDays]
+    if (heightCm != null) dto.intake.heightCm = heightCm
+    if (weightKg != null) dto.intake.weightKg = weightKg
   }
   return dto
 }

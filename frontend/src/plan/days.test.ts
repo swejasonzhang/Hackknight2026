@@ -1,6 +1,6 @@
 import type { ExerciseId, SessionDto, Side } from '@arc/dependencies'
 import { describe, expect, it } from 'vitest'
-import { dayKey, defaultDay, firstDay, groupByDay, parseDayKey, progressFor, shiftDay, weekOf } from './days'
+import { dayKey, defaultDay, firstDay, groupByDay, monthGrid, parseDayKey, progressFor, shiftDay, shiftMonth, weekOf } from './days'
 
 /** Local wall-clock time, so the tests hold in any timezone (CI runs on UTC, laptops do not). */
 const at = (y: number, m: number, d: number, h = 12, min = 0) => new Date(y, m - 1, d, h, min).getTime()
@@ -47,6 +47,21 @@ describe('day keys', () => {
     expect(parseDayKey('2026-02-30')).toBeNull()
     expect(parseDayKey('yesterday')).toBeNull()
     expect(parseDayKey(null)).toBeNull()
+  })
+})
+
+describe('the month on a calendar', () => {
+  it('lays a month out as six Monday-to-Sunday weeks', () => {
+    const grid = monthGrid('2026-10-20')
+    expect(grid).toHaveLength(42)
+    expect(grid[0]).toBe('2026-09-28') // the Monday before 1 October, a Thursday
+    expect(grid.indexOf('2026-10-01')).toBe(3)
+    expect(grid.at(-1)).toBe('2026-11-08')
+  })
+
+  it('steps whole months, across the year end', () => {
+    expect(shiftMonth('2026-10-31', 1)).toBe('2026-11-01')
+    expect(shiftMonth('2026-01-15', -1)).toBe('2025-12-01')
   })
 })
 

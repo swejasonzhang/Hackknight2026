@@ -31,6 +31,8 @@ export type JointTriple = readonly [number, number, number]
 export interface ExerciseConfig {
   id: ExerciseId
   name: string
+  /** A word or two for tight spots: tabs, calendar cells. */
+  short: string
   /** One-line instruction for the user, including how to face the camera. */
   cue: string
   /** Which landmarks the CV module measures the angle at, per side. */

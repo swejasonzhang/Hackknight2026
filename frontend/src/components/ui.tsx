@@ -90,7 +90,7 @@ export function EmptyState({ icon, title, description, action }: { icon?: ReactN
         <h2 className="t-display-sm mt-4 text-navy">{title}</h2>
         {description && <p className="t-lead mt-4 text-[16px]">{description}</p>}
       </div>
-      {action && <div className="flex flex-wrap gap-3">{action}</div>}
+      {action && <div className="flex flex-wrap gap-3 sm:flex-col sm:items-stretch">{action}</div>}
     </div>
   )
 }

@@ -4,6 +4,7 @@
  */
 import { z } from 'zod'
 import { EmailSchema, NameSchema } from './fields.ts'
+import type { ProgramDto } from './program.ts'
 import { VOICE_COMMANDS, type ExerciseId, type SessionPlan, type SessionRecord, type Side } from './engine/types.ts'
 
 export const ExerciseIdSchema = z.enum(['elbow_flexion', 'shoulder_abduction', 'seated_knee_extension'])
@@ -152,6 +153,13 @@ export const OnboardingInputSchema = z.object({
 export type OnboardingInput = z.infer<typeof OnboardingInputSchema>
 
 export const ExperienceSchema = z.enum(['new', 'some', 'regular'])
+/** The ai-coach module's three training goals: strength, muscle size (hypertrophy) and stamina. */
+export const TRAINING_GOALS = ['strength', 'hypertrophy', 'endurance'] as const
+export const TrainingGoalSchema = z.enum(TRAINING_GOALS)
+export type TrainingGoal = z.infer<typeof TrainingGoalSchema>
+/** A day of the week as `Date#getDay` counts it: 0 is Sunday, 6 is Saturday. */
+export const WeekdaySchema = z.number().int().min(0).max(6)
+
 /** What Arc learns from the onboarding chat, saved on the profile and used in every later read. */
 export const CoachIntakeSchema = z.object({
   goals: z.string().trim().min(1).max(500),
@@ -160,8 +168,17 @@ export const CoachIntakeSchema = z.object({
   limitations: z.string().trim().max(500),
   experience: ExperienceSchema,
   daysPerWeek: z.number().int().min(1).max(7),
+  /** Added with the ai-coach survey; profiles from before it have none of these. */
+  trainingGoal: TrainingGoalSchema.optional(),
+  trainingDays: z.array(WeekdaySchema).min(1).max(7).optional(),
+  heightCm: z.number().min(80).max(250).optional(),
+  weightKg: z.number().min(25).max(350).optional(),
 })
 export type CoachIntake = z.infer<typeof CoachIntakeSchema>
+
+/** What Arc asks about, in order. The page shows a lamp per topic and quick replies for the current one. */
+export const ONBOARDING_TOPICS = ['goals', 'trainingGoal', 'focus', 'side', 'limitations', 'experience', 'days', 'height', 'weight'] as const
+export type OnboardingTopic = (typeof ONBOARDING_TOPICS)[number]
 
 export interface OnboardingReply {
   /** Arc's next line. */
@@ -171,9 +188,13 @@ export interface OnboardingReply {
   done: boolean
   /** True when Gemini is not configured and Arc follows its scripted questions. */
   offline: boolean
+  /** What Arc's line asks about; absent once Arc is done. */
+  topic?: OnboardingTopic
   intake?: CoachIntake
   profileId?: string
   plan?: PlanDto
+  /** The week Arc built from the answers. */
+  program?: ProgramDto
 }
 
 /** Feedback for the rest after a set, before the session is saved. */

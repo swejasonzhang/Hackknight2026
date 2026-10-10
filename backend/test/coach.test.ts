@@ -18,7 +18,19 @@ function stubOutside(handler: (call: Call) => Response | Promise<Response>) {
 const gemini = (json: unknown) => new Response(JSON.stringify({ candidates: [{ content: { parts: [{ text: JSON.stringify(json) }] } }] }), { status: 200 })
 const geminiText = (text: string) => new Response(JSON.stringify({ candidates: [{ content: { parts: [{ text }] } }] }), { status: 200 })
 
-const ANSWERS = ['I want to bend my knee all the way again after surgery', 'My knee', 'The left one', 'It was surgery in March, a bit stiff', "I'm new to this", 'Three days a week']
+const ANSWERS = [
+  'I want to bend my knee all the way again after surgery',
+  'Build some muscle',
+  'My knee',
+  'The left one',
+  'It was surgery in March, a bit stiff',
+  "I'm new to this",
+  'Monday, Wednesday and Friday',
+  `5'6"`,
+  'skip',
+]
+/** Gemini's two jobs in one stub: the chat turn, and the week (asked with its own instructions). */
+const isWeekCall = (call: Call) => String(call.init.body).includes("Build the member's training week")
 
 describe('Arc, the coach', () => {
   beforeEach(() => {
@@ -44,41 +56,72 @@ describe('Arc, the coach', () => {
   })
 
   describe('onboarding after sign-up', () => {
-    it('without Gemini, asks its questions one at a time, then saves the profile and a plan from the answers', async () => {
+    it('without Gemini, asks its questions one topic at a time, then saves the profile, the week and a plan from the answers', async () => {
       const c = await signup('Rose Tan')
       const messages: { role: 'arc' | 'user'; text: string }[] = []
       let res = await c.post('/api/coach/onboarding').send({ messages })
       expect(res.status).toBe(200)
-      expect(res.body.offline).toBe(true)
-      expect(res.body.done).toBe(false)
+      expect(res.body).toMatchObject({ offline: true, done: false, topic: 'goals' })
       expect(res.body.reply).toMatch(/Arc/)
       messages.push({ role: 'arc', text: res.body.reply })
+      const topics: string[] = [res.body.topic]
       for (const answer of ANSWERS) {
         messages.push({ role: 'user', text: answer })
         res = await c.post('/api/coach/onboarding').send({ messages })
         messages.push({ role: 'arc', text: res.body.reply })
+        if (res.body.topic) topics.push(res.body.topic)
       }
+      expect(topics).toEqual(['goals', 'trainingGoal', 'focus', 'side', 'limitations', 'experience', 'days', 'height', 'weight'])
       expect(res.body.done).toBe(true)
-      expect(res.body.intake).toMatchObject({ focus: 'seated_knee_extension', side: 'left', experience: 'new', daysPerWeek: 3 })
+      expect(res.body.topic).toBeUndefined()
+      expect(res.body.intake).toMatchObject({ focus: 'seated_knee_extension', side: 'left', experience: 'new', daysPerWeek: 3, trainingGoal: 'hypertrophy', trainingDays: [1, 3, 5], heightCm: 168 })
+      expect(res.body.intake).not.toHaveProperty('weightKg')
       expect(res.body.intake.goals).toMatch(/bend my knee/)
-      expect(res.body.plan).toMatchObject({ exercise: 'seated_knee_extension', side: 'left', sets: 3, reps: 8, restSeconds: 60, targetDeg: 175 })
+      // Muscle size, someone new: the bottom of 3-5 sets and 8-12 reps, the top of 60-180 s rest.
+      expect(res.body.program).toMatchObject({ source: 'arc', active: true })
+      expect(res.body.program.days.map((d: { weekday: number }) => d.weekday)).toEqual([1, 3, 5])
+      expect(res.body.program.days[0].items).toEqual([{ exercise: 'seated_knee_extension', side: 'left', sets: 3, reps: 8, restSeconds: 180, targetDeg: 175 }])
+      expect(res.body.plan).toMatchObject({ exercise: 'seated_knee_extension', side: 'left', sets: 3, reps: 8, restSeconds: 180, targetDeg: 175 })
+      expect(res.body.reply).toMatch(/Monday, Wednesday and Friday/)
 
       const profiles = (await c.get('/api/profiles')).body
       expect(profiles).toHaveLength(1)
       expect(profiles[0]).toMatchObject({ id: res.body.profileId, name: 'Rose Tan' })
-      expect(profiles[0].intake.focus).toBe('seated_knee_extension')
+      expect(profiles[0].intake).toMatchObject({ focus: 'seated_knee_extension', trainingGoal: 'hypertrophy', heightCm: 168 })
+      expect((await c.get(`/api/profiles/${res.body.profileId}/program`)).body).toEqual(res.body.program)
       // Every line of the chat is kept.
-      expect(await CoachMessage.countDocuments({ kind: 'onboarding' })).toBe(13)
+      expect(await CoachMessage.countDocuments({ kind: 'onboarding' })).toBe(19)
+    })
+
+    it('runs again for an existing profile and replaces its week, keeping one active', async () => {
+      const c = await signup()
+      const profileId = await createProfile(c, 'Grace')
+      const messages: { role: 'arc' | 'user'; text: string }[] = []
+      let res
+      for (const answer of [...ANSWERS, 'unused']) {
+        res = await c.post('/api/coach/onboarding').send({ messages, profileId })
+        if (res.body.done) break
+        messages.push({ role: 'arc', text: res.body.reply }, { role: 'user', text: answer })
+      }
+      expect(res!.body).toMatchObject({ done: true, profileId })
+      const again = await c.post('/api/coach/onboarding').send({ messages, profileId })
+      expect(again.body.program.id).not.toBe(res!.body.program.id)
+      expect((await c.get(`/api/profiles/${profileId}/program`)).body.id).toBe(again.body.program.id)
     })
 
     it('with Gemini, sends the conversation with Arc as the persona and the key in a header, never the URL', async () => {
       process.env.GEMINI_API_KEY = 'g-secret'
-      const intake = { goals: 'Lift my arm overhead again', focus: 'shoulder_abduction', side: 'right', limitations: 'none', experience: 'regular', daysPerWeek: 4 }
-      const calls = stubOutside(() => gemini({ reply: 'Great, your plan is ready, Ada.', done: true, intake }))
+      const intake = { goals: 'Lift my arm overhead again', trainingGoal: 'strength', focus: 'shoulder_abduction', side: 'right', limitations: 'none', experience: 'regular', trainingDays: [2, 4], daysPerWeek: 4, heightCm: null, weightKg: 70.4 }
+      const calls = stubOutside((call) => (isWeekCall(call) ? new Response('bad request', { status: 400 }) : gemini({ reply: 'Great, your week is ready, Ada.', done: true, intake })))
       const c = await signup()
       const res = await c.post('/api/coach/onboarding').send({ messages: [{ role: 'arc', text: 'Hi, I am Arc.' }, { role: 'user', text: 'I want to raise my right arm overhead' }] })
-      expect(res.body).toMatchObject({ done: true, offline: false, reply: 'Great, your plan is ready, Ada.' })
-      expect(res.body.plan).toMatchObject({ exercise: 'shoulder_abduction', side: 'right', reps: 12 })
+      expect(res.body).toMatchObject({ done: true, offline: false, reply: 'Great, your week is ready, Ada.' })
+      // Days counted from the days themselves; a skipped height is left out.
+      expect(res.body.intake).toMatchObject({ trainingDays: [2, 4], daysPerWeek: 2, weightKg: 70 })
+      expect(res.body.intake).not.toHaveProperty('heightCm')
+      // Gemini's week failed, so Arc built its own: strength, regular, the top of 2-4 sets and 2-6 reps.
+      expect(res.body.program.source).toBe('arc')
+      expect(res.body.plan).toMatchObject({ exercise: 'shoulder_abduction', side: 'right', sets: 4, reps: 6, restSeconds: 120 })
       const [call] = calls
       expect(call!.url).toMatch(/generativelanguage\.googleapis\.com/)
       expect(call!.url).not.toContain('g-secret')
@@ -86,6 +129,41 @@ describe('Arc, the coach', () => {
       const body = JSON.parse(String(call!.init.body))
       expect(body.systemInstruction.parts[0].text).toMatch(/Your name is Arc/)
       expect(JSON.stringify(body.contents)).toContain('raise my right arm overhead')
+    })
+
+    it("with Gemini, Gemini writes the week, held to the member's days, the catalog and the goal's ranges", async () => {
+      process.env.GEMINI_API_KEY = 'g-secret'
+      const intake = { goals: 'Bend my elbow fully', trainingGoal: 'endurance', focus: 'elbow_flexion', side: 'left', limitations: 'none', experience: 'some', trainingDays: [1, 3, 5], daysPerWeek: 3 }
+      const week = {
+        summary: 'Three light days, lots of reps.',
+        days: [
+          { weekday: 1, title: 'Elbow and shoulder', items: [{ exercise: 'elbow_flexion', side: 'left', sets: 3, reps: 40, restSeconds: 5 }, { exercise: 'shoulder_abduction', side: 'left', sets: 2, reps: 15, restSeconds: 45 }] },
+          { weekday: 2, title: 'Not a training day', items: [{ exercise: 'elbow_flexion', side: 'left', sets: 3, reps: 15, restSeconds: 45 }] },
+          { weekday: 3, title: 'Made up', items: [{ exercise: 'deadlift', side: 'left', sets: 3, reps: 15, restSeconds: 45 }] },
+        ],
+      }
+      const calls = stubOutside((call) => (isWeekCall(call) ? gemini(week) : gemini({ reply: 'All set.', done: true, intake })))
+      const c = await signup()
+      const res = await c.post('/api/coach/onboarding').send({ messages: [{ role: 'user', text: 'Ready' }] })
+      const program = res.body.program
+      expect(program).toMatchObject({ source: 'gemini', summary: 'Three light days, lots of reps.' })
+      expect(program.days.map((d: { weekday: number }) => d.weekday)).toEqual([1, 3, 5])
+      // Out-of-range numbers pulled back into stamina's 13-25 reps and 30-60 s; the goal angle from the catalog.
+      expect(program.days[0]).toMatchObject({ title: 'Elbow and shoulder', items: [{ exercise: 'elbow_flexion', reps: 25, restSeconds: 30, targetDeg: 140 }, { exercise: 'shoulder_abduction' }] })
+      // Wednesday held only an unknown movement and Friday was missing: both filled from Arc's own week.
+      expect(program.days[1].items[0]).toMatchObject({ exercise: 'elbow_flexion', side: 'left' })
+      expect(program.days[2].items[0]).toMatchObject({ exercise: 'elbow_flexion', side: 'left' })
+      const weekCall = calls.find(isWeekCall)!
+      expect(String(weekCall.init.body)).toMatch(/13 to 25 reps/)
+      expect(weekCall.url).not.toContain('g-secret')
+    })
+
+    it('tells the page which topic Gemini is asking about', async () => {
+      process.env.GEMINI_API_KEY = 'g-secret'
+      stubOutside(() => gemini({ reply: 'Left or right?', done: false, topic: 'side', intake: null }))
+      const c = await signup()
+      const res = await c.post('/api/coach/onboarding').send({ messages: [{ role: 'user', text: 'My knee' }] })
+      expect(res.body).toMatchObject({ done: false, topic: 'side', reply: 'Left or right?' })
     })
 
     it('falls back to its scripted questions when Gemini fails', async () => {

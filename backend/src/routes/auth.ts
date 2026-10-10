@@ -5,6 +5,7 @@ import { authenticate, requireUser, signToken } from '../auth.ts'
 import { HttpError, validate } from '../http.ts'
 import { CoachMessage } from '../models/CoachMessage.ts'
 import { Plan } from '../models/Plan.ts'
+import { Program } from '../models/Program.ts'
 import { Profile } from '../models/Profile.ts'
 import { Session } from '../models/Session.ts'
 import { toUserDto, User, type UserShape } from '../models/User.ts'
@@ -70,6 +71,7 @@ authRouter.post('/account/delete', authenticate, async (req, res) => {
   await CoachMessage.deleteMany({ ownerId: userId })
   await Session.deleteMany({ profileId: { $in: profileIds } })
   await Plan.deleteMany({ profileId: { $in: profileIds } })
+  await Program.deleteMany({ profileId: { $in: profileIds } })
   await Profile.deleteMany({ ownerId: userId })
   await User.deleteOne({ _id: userId })
   failures.delete(key)
