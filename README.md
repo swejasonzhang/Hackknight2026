@@ -149,7 +149,7 @@ Base URL in development: `http://localhost:8787`. All bodies are JSON. Validatio
 | `GET /api/profiles/:id/sessions?exercise=` | | sessions, newest first, optional exercise filter |
 | `GET /api/sessions/:id` | | one session |
 | `GET /api/profiles/:id/progress?exercise=` | | dashboard series: peak/mean/fatigue per session (oldest first), sessions per week, latest session rep by rep, plan goal |
-| `POST /api/dev/seed` | | `201`/`200` `{ profileId, sessions, created }`; your demo profile; dev only |
+| `POST /api/dev/seed` | | `201`/`200` `{ profileId, sessions, created }`; your demo profile with six weeks of random sessions (a new seed per account); signed-in accounts only, in every environment |
 
 Exercise ids: `elbow_flexion`, `shoulder_abduction`, `seated_knee_extension`. Sides: `left`, `right`.
 
