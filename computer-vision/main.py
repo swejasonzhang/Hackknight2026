@@ -2,7 +2,7 @@ import os
 import sys
 import time
 
-from arc_routine import build_routine, plan_from_arguments, routine_spec
+from arc_routine import align_catalog, build_routine, plan_from_arguments, routine_spec
 from arc_upload import UploadError, post_session, session_from_export, upload_target
 
 
@@ -15,6 +15,9 @@ def main(argv=None):
     target = upload_target(args, os.environ) if plan else None
 
     from movements import ExerciseTracker, RoutineExercise
+
+    # Reps count at Arc's thresholds either way, the same angles as in the browser.
+    align_catalog(ExerciseTracker.get_exercise_by_id)
 
     if plan is None:
         app = ExerciseTracker()

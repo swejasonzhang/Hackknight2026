@@ -44,7 +44,7 @@ Demo script (the live site, about three minutes):
 | Owner | Stories |
 |---|---|
 | AI | D8: set `GEMINI_API_KEY` and `ELEVENLABS_API_KEY` on `getarc-api` and rehearse Arc's lines |
-| CV + FS | D7: agree one set of rep thresholds between the camera app and the browser |
+| CV + FS | D7: one set of rep thresholds between the camera app and the browser (done, ADR-0029); CV tries each movement on camera |
 | FS | D6 faster first load, D4 API-down handling; D3 CSV export and D5 password reset if time allows |
 
 ## Sprint 5: pitch

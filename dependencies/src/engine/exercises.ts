@@ -13,10 +13,12 @@ const inner = (innerDeg: number) => innerDeg
 const bend = (innerDeg: number) => 180 - innerDeg
 
 /**
- * Every movement Arc tracks: the camera app's catalog (computer-vision/movements.py; landmarks
- * and thresholds from there, eased a little where the browser's smoothing needs room) and the
- * seated knee extension. Each cue says how to face the camera so the measured joint stays in the
- * picture plane, where a webcam angle is most accurate. The metric always rises into the rep.
+ * Every movement Arc tracks: the camera app's catalog (computer-vision/movements.py, whose
+ * landmarks these are) and the seated knee extension. The thresholds and goals here are the only
+ * ones: the camera app counts with them too, from computer-vision/arc_catalog.json, which
+ * cameraCatalog.test.ts keeps in step (`npm run catalog -w dependencies` after a change). Each
+ * cue says how to face the camera so the measured joint stays in the picture plane, where a
+ * webcam angle is most accurate. The metric always rises into the rep.
  */
 export const EXERCISES: Record<ExerciseId, ExerciseConfig> = {
   // ---- upper body ----

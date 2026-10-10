@@ -1,11 +1,13 @@
 """Tests for turning Arc's plan into the camera app's routine: python3 -m unittest test_arc_routine."""
 
+import ast
+import math
 import re
 import unittest
 from pathlib import Path
 
 import arc_routine
-from arc_routine import PlanError, build_routine, routine_spec, validate_plan
+from arc_routine import ARC_CATALOG, PlanError, align_catalog, arc_thresholds, build_routine, routine_spec, validate_plan
 
 PLAN = {"exercise": "elbow_flexion", "side": "right", "sets": 3, "reps": 8, "restSeconds": 45}
 
@@ -51,6 +53,32 @@ class RoutineSpecTest(unittest.TestCase):
         self.assertEqual(definition["left_indices"], (24, 26, 28))
         self.assertTrue(definition["invert_logic"])  # a rep counts when the knee straightens
         self.assertLess(definition["flex_threshold"], definition["extend_threshold"])
+
+
+def movements_function(name: str):
+    """One of movements.py's own functions, compiled on its own (the module imports OpenCV)."""
+    tree = ast.parse((Path(__file__).parent / "movements.py").read_text())
+    node = next(n for n in ast.walk(tree) if isinstance(n, ast.FunctionDef) and n.name == name)
+    node.decorator_list = []
+    scope: dict = {"math": math}
+    exec(compile(ast.Module(body=[node], type_ignores=[]), "movements.py", "exec"), scope)
+    return scope[name]
+
+
+def camera_reps(angles, flex_threshold, extend_threshold, invert_logic, **_):
+    """Reps as movements.py's process_reps counts them: armed past one threshold, counted at the other."""
+    armed, reps = False, 0
+    for angle in angles:
+        if (angle < flex_threshold) if invert_logic else (angle > extend_threshold):
+            armed = True
+        if armed and ((angle > extend_threshold) if invert_logic else (angle < flex_threshold)):
+            armed, reps = False, reps + 1
+    return reps
+
+
+def camera_angles(exercise, metrics):
+    """The angles the camera app reads for a run of Arc's numbers for the movement."""
+    return [180 - m if ARC_CATALOG[exercise]["metric"] == "bend" else m for m in metrics]
 
 
 def catalog_names() -> dict[str, str]:
@@ -100,12 +128,22 @@ class BuildRoutineTest(unittest.TestCase):
     def build(self, plan):
         return build_routine(routine_spec(plan), self.CATALOG.get, lambda **kwargs: kwargs)
 
+    CATALOG["5"] = {"name": "Front Raise", "type": "arm_dual", "right_indices": (23, 11, 13), "left_indices": (24, 12, 14), "flex_threshold": 25.0, "extend_threshold": 135.0, "invert_logic": True, "max_allowed_extension": 160.0}
+
     def test_builds_one_exercise_from_the_catalog_with_the_plans_sets_and_reps(self):
         [exercise] = self.build(PLAN)
         self.assertEqual(exercise["name"], "Bicep Curls (Right)")
         self.assertEqual(exercise["primary_joint_indices"], (11, 13, 15))
         self.assertEqual((exercise["target_sets"], exercise["target_reps"]), (3, 8))
-        self.assertEqual(exercise["flex_threshold"], 40.0)
+        # Arc's thresholds, not the catalog's 40/150: armed with the elbow open past 140 degrees
+        # (40 of bend), counted once it closes under 90 (90 of bend).
+        self.assertEqual((exercise["flex_threshold"], exercise["extend_threshold"], exercise["invert_logic"]), (90.0, 140.0, False))
+
+    def test_a_front_raise_counts_at_arcs_angles_not_135(self):
+        [exercise] = self.build({**PLAN, "exercise": "front_raise"})
+        self.assertEqual((exercise["flex_threshold"], exercise["extend_threshold"], exercise["invert_logic"]), (30.0, 80.0, True))
+        # The catalog's own form limit stays.
+        self.assertEqual(exercise["max_allowed_extension"], 160.0)
 
     def test_a_whole_body_movement_uses_the_catalogs_own_landmarks_on_either_side(self):
         for side in ("right", "left"):
@@ -117,6 +155,50 @@ class BuildRoutineTest(unittest.TestCase):
         [exercise] = self.build({**PLAN, "exercise": "seated_knee_extension", "side": "left"})
         self.assertEqual(exercise["name"], "Seated Knee Extension (Left)")
         self.assertEqual(exercise["primary_joint_indices"], (24, 26, 28))
+
+
+class ArcThresholdsTest(unittest.TestCase):
+    def test_every_arc_movement_is_in_the_catalog_file(self):
+        self.assertEqual(set(ARC_CATALOG), set(arc_routine.EXERCISES))
+
+    def test_every_movement_counts_a_rep_exactly_where_the_browser_does(self):
+        for exercise, arc in ARC_CATALOG.items():
+            thresholds = arc_thresholds(exercise)
+            rest, enter = arc["restDeg"], arc["enterDeg"]
+            reached = camera_angles(exercise, [rest, enter + 1, rest, enter + 1, rest])
+            short = camera_angles(exercise, [rest, enter - 1, rest])
+            self.assertEqual(camera_reps(reached, **thresholds), 2, exercise)
+            self.assertEqual(camera_reps(short, **thresholds), 0, exercise)
+
+    def test_a_rep_needs_the_return_to_arcs_exit_angle_before_the_next(self):
+        for exercise, arc in ARC_CATALOG.items():
+            hovering = camera_angles(exercise, [arc["restDeg"], arc["enterDeg"] + 1, arc["exitDeg"] + 1, arc["enterDeg"] + 1])
+            self.assertEqual(camera_reps(hovering, **arc_thresholds(exercise)), 1, exercise)
+
+    def test_the_interactive_builder_gets_arcs_thresholds_too(self):
+        catalog = {cid: {"name": e, "flex_threshold": 25.0, "extend_threshold": 135.0, "invert_logic": True} for e, cid in arc_routine.CATALOG_IDS.items()}
+        align_catalog(catalog.get)
+        for exercise, cid in arc_routine.CATALOG_IDS.items():
+            self.assertEqual({k: catalog[cid][k] for k in ("flex_threshold", "extend_threshold", "invert_logic")}, arc_thresholds(exercise), exercise)
+        self.assertEqual(catalog["5"]["extend_threshold"], 80.0)  # the front raise
+        self.assertEqual((catalog["13"]["flex_threshold"], catalog["13"]["extend_threshold"]), (8.0, 22.0))  # the ab twist
+
+    def test_the_knee_extension_counts_at_arcs_angles(self):
+        knee = arc_routine.KNEE_EXTENSION
+        self.assertEqual((knee["flex_threshold"], knee["extend_threshold"], knee["invert_logic"]), (110.0, 150.0, True))
+
+
+class TwistAngleTest(unittest.TestCase):
+    twist = staticmethod(movements_function("calculate_torso_twist_angle"))
+
+    def test_a_level_shoulder_line_reads_zero_whichever_shoulder_is_on_the_left(self):
+        self.assertAlmostEqual(self.twist((100, 200), (300, 200)), 0.0)
+        self.assertAlmostEqual(self.twist((300, 200), (100, 200)), 0.0)
+
+    def test_a_tilt_reads_the_same_either_way_as_arcs_shoulder_tilt(self):
+        rise = 200 * math.tan(math.radians(20))
+        for ls, rs in (((100, 200), (300, 200 - rise)), ((100, 200), (300, 200 + rise)), ((300, 200), (100, 200 - rise)), ((300, 200), (100, 200 + rise))):
+            self.assertAlmostEqual(self.twist(ls, rs), 20.0, places=6)
 
 
 class CommandLineTest(unittest.TestCase):
