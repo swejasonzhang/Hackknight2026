@@ -10,6 +10,7 @@ import { ProfilesPage } from './pages/ProfilesPage'
 import { RecordPage } from './pages/RecordPage'
 import { SessionDetailPage } from './pages/SessionDetailPage'
 import { SignupPage } from './pages/SignupPage'
+import { WelcomePage } from './pages/WelcomePage'
 import { ProfilesProvider } from './profiles/ProfilesContext'
 
 /**
@@ -20,6 +21,7 @@ import { ProfilesProvider } from './profiles/ProfilesContext'
  *   /dashboard      progress for the selected profile, every chart folded behind a plus
  *   /plan           the plan beside the log, one day at a time (?day=YYYY-MM-DD)
  *   /record         record a session in the browser: webcam, pose tracking, reps, save
+ *   /welcome        the chat with Arc after sign-up: goals, area, side, limits -> first plan
  *   /profiles       household profiles
  *   /sessions/:id   one session, set by set
  */
@@ -51,6 +53,7 @@ export default function App() {
         <Route path="/dashboard" element={<DashboardPage />} />
         <Route path="/plan" element={<PlanPage />} />
         <Route path="/record" element={<RecordPage />} />
+        <Route path="/welcome" element={<WelcomePage />} />
         <Route path="/profiles" element={<ProfilesPage />} />
         <Route path="/sessions/:id" element={<SessionDetailPage />} />
       </Route>

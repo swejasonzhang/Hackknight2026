@@ -207,6 +207,11 @@ export function DashboardPage() {
             {data ? ` · ${data.sessions.length} sessions` : ''}
             {first ? ` · since ${formatDate(first.date)}` : ''}
           </p>
+          {selected && !selected.intake && (
+            <Link to={`/welcome?profile=${selected.id}`} className="t-label mt-3 inline-block text-cobalt">
+              Tell Arc what you want from your body →
+            </Link>
+          )}
         </header>
 
         {error && (

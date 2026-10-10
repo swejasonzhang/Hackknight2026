@@ -216,6 +216,12 @@ function WorkoutRow({ session: s, sessions, day }: { session: SessionDto; sessio
           </div>
         </div>
       </div>
+      {s.coachSummary && (
+        <p className="mt-4 max-w-[78ch] text-[14px] leading-[1.55] text-ink-2 sm:pl-[80px]">
+          <span className="t-label mr-2 text-cobalt">Arc</span>
+          {s.coachSummary.text}
+        </p>
+      )}
     </article>
   )
 }

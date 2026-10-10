@@ -42,6 +42,25 @@ describe('api client', () => {
     expect(JSON.parse(init.body)).toEqual(input)
   })
 
+  it("fetches Arc's voice for a message with the member's token", async () => {
+    setToken('abc.def.ghi')
+    const fetchMock = vi.fn().mockResolvedValue(new Response(new Uint8Array([0x49, 0x44, 0x33]), { status: 200, headers: { 'content-type': 'audio/mpeg' } }))
+    vi.stubGlobal('fetch', fetchMock)
+    const blob = await api.coach.audio('m1')
+    expect(blob.size).toBe(3)
+    const [url, init] = fetchMock.mock.calls[0]!
+    expect(url).toBe('/api/coach/messages/m1/audio')
+    expect(init.headers.authorization).toBe('Bearer abc.def.ghi')
+  })
+
+  it("sends the onboarding chat to Arc", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse({ reply: 'Hi, I am Arc.', messageId: 'm1', done: false, offline: true }))
+    vi.stubGlobal('fetch', fetchMock)
+    const reply = await api.coach.onboarding({ messages: [] })
+    expect(reply.reply).toBe('Hi, I am Arc.')
+    expect(fetchMock.mock.calls[0]![0]).toBe('/api/coach/onboarding')
+  })
+
   it('builds query strings for progress', async () => {
     const fetchMock = vi.fn().mockResolvedValue(jsonResponse({ sessions: [] }))
     vi.stubGlobal('fetch', fetchMock)

@@ -89,3 +89,74 @@ describe('SessionRecorder', () => {
     expect(rec.toSessionInput('p')!.sets[0]!.reps).toHaveLength(2)
   })
 })
+
+describe('SessionRecorder voice commands', () => {
+  const plan: SessionPlan = { sets: 2, reps: 3, restSeconds: 10, targetDeg: 140 }
+
+  it('"start" begins the first set at once, without waiting for the joint to settle', () => {
+    const rec = new SessionRecorder({ exercise: 'elbow_flexion', side: 'right', plan })
+    rec.command('start', T0)
+    expect(rec.view.phase).toBe('active')
+  })
+
+  it('"pause" stops counting until "resume"', () => {
+    const rec = new SessionRecorder({ exercise: 'elbow_flexion', side: 'right', plan })
+    let t = run(rec, T0, READY_MS + 100, () => 10)
+    rec.command('pause', t)
+    expect(rec.view.paused).toBe(true)
+    t = run(rec, t, 2 * 2000 + 400, (x) => curl(x))
+    expect(rec.view.totalReps).toBe(0)
+    rec.command('resume', t)
+    t = run(rec, t, 2 * 2000 + 400, (x) => curl(x))
+    expect(rec.view.paused).toBe(false)
+    expect(rec.view.totalReps).toBe(2)
+  })
+
+  it('"pause" during the rest freezes the countdown', () => {
+    const rec = new SessionRecorder({ exercise: 'elbow_flexion', side: 'right', plan })
+    let t = run(rec, T0, READY_MS + 100, () => 10)
+    t = run(rec, t, 3 * 2000 + 400, (x) => curl(x))
+    expect(rec.view.phase).toBe('rest')
+    const left = rec.view.restLeftMs
+    rec.command('pause', t)
+    t = run(rec, t, 30_000, () => 10)
+    expect(rec.view.phase).toBe('rest')
+    rec.command('resume', t)
+    expect(rec.view.restLeftMs).toBeCloseTo(left, -2)
+  })
+
+  it('"skip" ends a set early into the rest, and skips the rest into the next set', () => {
+    const rec = new SessionRecorder({ exercise: 'elbow_flexion', side: 'right', plan })
+    let t = run(rec, T0, READY_MS + 100, () => 10)
+    t = run(rec, t, 1 * 2000 + 400, (x) => curl(x))
+    rec.command('skip', t)
+    expect(rec.view.phase).toBe('rest')
+    rec.command('skip', t + 100)
+    expect(rec.view.phase).toBe('active')
+    expect(rec.view.setNumber).toBe(2)
+    t = run(rec, t + 200, 3 * 2000 + 400, (x) => curl(x))
+    const input = rec.toSessionInput('p')!
+    expect(input.sets.map((s) => [s.reps.length, s.endedEarly])).toEqual([[1, true], [3, false]])
+  })
+
+  it('"rest" starts the rest now; "stop" finishes and saves', () => {
+    const rec = new SessionRecorder({ exercise: 'elbow_flexion', side: 'right', plan })
+    let t = run(rec, T0, READY_MS + 100, () => 10)
+    t = run(rec, t, 2 * 2000 + 400, (x) => curl(x))
+    rec.command('rest', t)
+    expect(rec.view.phase).toBe('rest')
+    rec.command('stop', t + 500)
+    expect(rec.view.phase).toBe('done')
+  })
+
+  it('keeps every command with its time, saved with the session', () => {
+    const rec = new SessionRecorder({ exercise: 'elbow_flexion', side: 'right', plan })
+    let t = run(rec, T0, READY_MS + 100, () => 10)
+    rec.command('status', t)
+    t = run(rec, t, 2 * 2000 + 400, (x) => curl(x))
+    rec.command('stop', t)
+    const input = rec.toSessionInput('p')!
+    expect(input.events!.map((e) => e.command)).toEqual(['status', 'stop'])
+    expect(CreateSessionSchema.safeParse(input).success).toBe(true)
+  })
+})

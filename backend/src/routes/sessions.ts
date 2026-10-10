@@ -23,6 +23,7 @@ sessionsRouter.post('/', async (req, res) => {
     sets,
     summary: summarizeSets(sets),
     demo: input.demo ?? false,
+    ...(input.events?.length ? { events: input.events } : {}),
   })
   res.status(201).json(toSessionDto(session))
 })

@@ -27,3 +27,17 @@ if (!Element.prototype.hasPointerCapture) {
   Element.prototype.releasePointerCapture = () => {}
 }
 if (!Element.prototype.scrollIntoView) Element.prototype.scrollIntoView = () => {}
+
+// jsdom has no IntersectionObserver; Motion's whileInView (the sections' reveal) needs one.
+if (!('IntersectionObserver' in window)) {
+  class StubIntersectionObserver {
+    observe() {}
+    unobserve() {}
+    disconnect() {}
+    takeRecords() {
+      return []
+    }
+  }
+  Object.assign(window, { IntersectionObserver: StubIntersectionObserver })
+  Object.assign(globalThis, { IntersectionObserver: StubIntersectionObserver })
+}

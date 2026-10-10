@@ -22,10 +22,11 @@ export function RequireAuth({ children }: { children: ReactNode }) {
   return children
 }
 
-/** Wraps the signup and login pages: a signed-in user goes straight to the app. */
+/** Wraps the signup and login pages: a signed-in user goes straight to the app (straight after sign-up, to Arc). */
 export function PublicOnly({ children }: { children: ReactNode }) {
   const { status } = useAuth()
+  const location = useLocation()
   if (status === 'loading') return <Checking />
-  if (status === 'signedIn') return <Navigate to="/dashboard" replace />
+  if (status === 'signedIn') return <Navigate to={location.pathname === '/signup' ? '/welcome' : '/dashboard'} replace />
   return children
 }

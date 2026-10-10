@@ -1,6 +1,9 @@
 import {
   EXERCISE_IDS,
+  VOICE_COMMANDS,
+  type CoachSummary,
   type ExerciseId,
+  type SessionEvent,
   type SessionDto,
   type SessionPlan,
   type SessionSummary,
@@ -20,6 +23,8 @@ export interface SessionShape {
   sets: SetRecord[]
   summary: SessionSummary
   demo: boolean
+  events?: SessionEvent[]
+  coachSummary?: CoachSummary | null
 }
 
 const RepSchema = new Schema(
@@ -76,6 +81,24 @@ const SummarySchema = new Schema(
   { _id: false },
 )
 
+const EventSchema = new Schema<SessionEvent>(
+  {
+    at: { type: Number, required: true },
+    command: { type: String, enum: [...VOICE_COMMANDS], required: true },
+  },
+  { _id: false },
+)
+
+const CoachSummarySchema = new Schema<CoachSummary>(
+  {
+    text: { type: String, required: true, maxlength: 4000 },
+    messageId: { type: String, required: true },
+    createdAt: { type: Number, required: true },
+    offline: { type: Boolean, required: true },
+  },
+  { _id: false },
+)
+
 const SessionSchema = new Schema<SessionShape>({
   profileId: { type: Schema.Types.ObjectId, ref: 'Profile', required: true },
   exercise: { type: String, enum: [...EXERCISE_IDS], required: true },
@@ -86,6 +109,8 @@ const SessionSchema = new Schema<SessionShape>({
   sets: { type: [SetSchema], required: true },
   summary: { type: SummarySchema, required: true },
   demo: { type: Boolean, required: true, default: false },
+  events: { type: [EventSchema], default: undefined },
+  coachSummary: { type: CoachSummarySchema },
 })
 SessionSchema.index({ profileId: 1, startedAt: -1 })
 SessionSchema.index({ profileId: 1, exercise: 1, startedAt: 1 })
@@ -129,5 +154,7 @@ export function toSessionDto(s: SessionShape): SessionDto {
       fatigueIndex: s.summary.fatigueIndex,
     },
     demo: s.demo,
+    ...(s.events?.length ? { events: s.events.map((e) => ({ at: e.at, command: e.command })) } : {}),
+    ...(s.coachSummary ? { coachSummary: { text: s.coachSummary.text, messageId: s.coachSummary.messageId, createdAt: s.coachSummary.createdAt, offline: s.coachSummary.offline } } : {}),
   }
 }

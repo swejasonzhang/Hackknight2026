@@ -1,5 +1,10 @@
 import type {
   AuthResponse,
+  CoachMessageDto,
+  CoachStatus,
+  OnboardingInput,
+  OnboardingReply,
+  SetFeedbackInput,
   CreateSessionInput,
   CreateProfileInput,
   ExerciseId,
@@ -92,6 +97,20 @@ export const api = {
   },
   progress: (profileId: string, exercise: ExerciseId) =>
     request<ProgressDto>(`/api/profiles/${profileId}/progress?exercise=${exercise}`),
+  /** Arc, the coach: onboarding chat, reads after a set and a session, and Arc's voice. */
+  coach: {
+    status: () => request<CoachStatus>('/api/coach/status'),
+    onboarding: (input: OnboardingInput) => request<OnboardingReply>('/api/coach/onboarding', { method: 'POST', body: input }),
+    setFeedback: (input: SetFeedbackInput) => request<CoachMessageDto>('/api/coach/sets', { method: 'POST', body: input }),
+    summary: (sessionId: string) => request<CoachMessageDto>(`/api/coach/sessions/${sessionId}/summary`, { method: 'POST' }),
+    /** Arc's line as MP3 (ElevenLabs), fetched with the member's token. */
+    audio: async (messageId: string): Promise<Blob> => {
+      const token = getToken()
+      const res = await fetch(`/api/coach/messages/${messageId}/audio`, { headers: token ? { authorization: `Bearer ${token}` } : {} })
+      if (!res.ok) throw new ApiRequestError(res.status, `HTTP ${res.status}`)
+      return res.blob()
+    },
+  },
   dev: {
     seed: () => request<SeedResult>('/api/dev/seed', { method: 'POST', body: { tzOffsetMinutes: new Date().getTimezoneOffset() } }),
   },
