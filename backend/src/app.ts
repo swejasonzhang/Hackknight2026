@@ -1,5 +1,5 @@
 import cors from 'cors'
-import express, { type Express } from 'express'
+import express, { type Express, type RequestHandler } from 'express'
 import mongoose from 'mongoose'
 import { authenticate } from './auth.ts'
 import { errorHandler, notFound } from './http.ts'
@@ -15,6 +15,24 @@ export interface AppOptions {
   allowDevRoutes?: boolean
   /** Allowed browser origins. Defaults to reflecting any origin (fine behind the Vite proxy). */
   corsOrigins?: string[]
+  /** Reports whether MongoDB is connected. Defaults to Mongoose's connection state; injectable for tests. */
+  isDbConnected?: () => boolean
+}
+
+const mongooseConnected = () => mongoose.connection.readyState === 1
+
+/**
+ * Data routes answer 503 at once while the database is unreachable, instead of letting Mongoose
+ * buffer the query until its server-selection timeout and failing with a 500 ten seconds later.
+ */
+function requireDb(isConnected: () => boolean): RequestHandler {
+  return (_req, res, next) => {
+    if (isConnected()) {
+      next()
+      return
+    }
+    res.status(503).json({ error: 'Database unavailable', detail: 'The API is not connected to MongoDB; it retries every 10 seconds.' })
+  }
 }
 
 /** Builds the Express app. Connecting to MongoDB is the caller's job (see db.ts and test/setup.ts). */
@@ -24,10 +42,13 @@ export function createApp(opts: AppOptions = {}): Express {
   app.use(cors({ origin: opts.corsOrigins && opts.corsOrigins.length ? opts.corsOrigins : true }))
   app.use(express.json({ limit: '2mb' }))
 
+  const isConnected = opts.isDbConnected ?? mongooseConnected
+
   // Open routes
   app.get('/api/health', (_req, res) => {
-    res.json({ ok: true, db: mongoose.connection.readyState === 1 ? 'connected' : 'disconnected', uptime: process.uptime() })
+    res.json({ ok: true, db: isConnected() ? 'connected' : 'disconnected', uptime: process.uptime() })
   })
+  app.use('/api', requireDb(isConnected))
   app.use('/api/auth', authRouter)
 
   // Everything below needs a signed-in user or the CV module's API key
