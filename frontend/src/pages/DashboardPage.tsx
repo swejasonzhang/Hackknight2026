@@ -211,7 +211,7 @@ export function DashboardPage() {
           </div>
         )}
 
-        <CameraLauncher />
+        <CameraLauncher plan={plan} exercise={exercise} />
 
         {noProfiles && (
           <Strip index="00" title="Setup">

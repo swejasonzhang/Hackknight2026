@@ -6,15 +6,18 @@ Run it once, in a terminal, on the laptop or desktop with the webcam:
     uv run launcher.py        # or: python3 launcher.py
 
 It listens on http://127.0.0.1:8765, this computer only. The dashboard's "Open the camera app"
-button asks it to start the camera app in a new terminal window; the camera app then asks for the
-routine there and opens the webcam window. Only standard-library Python, no extra dependencies.
+button sends the selected profile's plan, and the launcher starts the camera app straight into it:
+the webcam window opens and counting begins, with no questions asked. Only standard-library
+Python, no extra dependencies. The camera app's output goes to camera.log beside this file.
 
 What it accepts, and from whom:
   GET  /status   is the launcher running (any Arc page, or curl)
-  POST /open     open the camera app; only from an Arc page (checked by the Origin header) that
-                 also sends "X-Arc-Launcher: 1", which forces the browser's CORS preflight, so no
-                 other website can trigger it. It runs one fixed command and nothing it is sent,
-                 and at most once every few seconds.
+  POST /open     start the camera app with a plan {exercise, side, sets, reps, restSeconds}; only
+                 from an Arc page (checked by the Origin header) that also sends
+                 "X-Arc-Launcher: 1", which forces the browser's CORS preflight, so no other
+                 website can trigger it. The plan is checked field by field against Arc's plan
+                 schema (arc_routine.validate_plan) and passed on as enums and whole numbers only;
+                 at most one start every few seconds.
 Add more allowed origins with ARC_LAUNCHER_ORIGINS (comma separated); change the port with
 ARC_LAUNCHER_PORT (the web app reads VITE_CAMERA_LAUNCHER_URL to match).
 """
@@ -24,7 +27,6 @@ from __future__ import annotations
 import json
 import os
 import platform
-import shlex
 import shutil
 import subprocess
 import threading
@@ -32,6 +34,8 @@ import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Callable
+
+from arc_routine import PlanError, plan_arguments, validate_plan
 
 HERE = Path(__file__).resolve().parent
 DEFAULT_PORT = 8765
@@ -55,28 +59,24 @@ def camera_command(here: Path = HERE, which: Callable[[str], str | None] = shuti
     return ["python" if platform.system() == "Windows" else "python3", "main.py"]
 
 
-def open_camera_app(here: Path = HERE) -> None:
-    """Start the camera app in a new terminal window, where it can ask for the routine."""
-    command = camera_command(here)
-    system = platform.system()
-    if system == "Darwin":
-        line = f"cd {shlex.quote(str(here))} && {shlex.join(command)}"
-        script = line.replace("\\", "\\\\").replace('"', '\\"')
-        subprocess.Popen(["osascript", "-e", f'tell application "Terminal" to do script "{script}"', "-e", 'tell application "Terminal" to activate'])
-        return
-    if system == "Windows":
-        line = f'cd /d "{here}" && ' + subprocess.list2cmdline(command)
-        subprocess.Popen(["cmd", "/c", "start", "Arc camera", "cmd", "/k", line])
-        return
-    line = f"cd {shlex.quote(str(here))} && {shlex.join(command)}; exec bash"
-    for terminal in (["x-terminal-emulator", "-e"], ["gnome-terminal", "--"], ["konsole", "-e"], ["xterm", "-e"]):
-        if shutil.which(terminal[0]):
-            subprocess.Popen([*terminal, "bash", "-lc", line])
-            return
-    raise RuntimeError("No terminal emulator found to open the camera app in.")
+def launch_command(plan: dict, here: Path = HERE, which: Callable[[str], str | None] = shutil.which, exists: Callable[[Path], bool] = Path.exists) -> list[str]:
+    """The camera app with the plan on its command line, so it starts without prompting."""
+    return [*camera_command(here, which, exists), *plan_arguments(plan)]
 
 
-def make_server(port: int = DEFAULT_PORT, opener: Callable[[], None] = open_camera_app, cooldown: float = 5.0, origins: set[str] = ALLOWED_ORIGINS) -> ThreadingHTTPServer:
+def open_camera_app(plan: dict, here: Path = HERE) -> None:
+    """Start the camera app straight into the plan: no terminal, no prompts, the webcam window opens.
+    Its output goes to camera.log; stdin is closed, so it can never sit waiting for input."""
+    log = open(here / "camera.log", "ab")
+    kwargs: dict = {"cwd": here, "stdin": subprocess.DEVNULL, "stdout": log, "stderr": subprocess.STDOUT}
+    if platform.system() == "Windows":
+        kwargs["creationflags"] = getattr(subprocess, "CREATE_NO_WINDOW", 0)
+    else:
+        kwargs["start_new_session"] = True
+    subprocess.Popen(launch_command(plan, here), **kwargs)
+
+
+def make_server(port: int = DEFAULT_PORT, opener: Callable[[dict], None] = open_camera_app, cooldown: float = 5.0, origins: set[str] = ALLOWED_ORIGINS) -> ThreadingHTTPServer:
     """The launcher's HTTP server, bound to 127.0.0.1 (port 0 picks a free one, for tests)."""
     lock = threading.Lock()
     last_open = [float("-inf")]
@@ -135,6 +135,14 @@ def make_server(port: int = DEFAULT_PORT, opener: Callable[[], None] = open_came
             if self._origin() not in origins or self.headers.get(HEADER) != "1":
                 self._send(403, {"error": "only Arc's pages can open the camera app"})
                 return
+            try:
+                length = int(self.headers.get("Content-Length") or 0)
+                if not 0 < length <= 2048:
+                    raise PlanError("send the plan as a small JSON object")
+                plan = validate_plan(json.loads(self.rfile.read(length)))
+            except (PlanError, ValueError) as err:
+                self._send(400, {"error": str(err)})
+                return
             with lock:
                 now = time.monotonic()
                 if now - last_open[0] < cooldown:
@@ -142,11 +150,11 @@ def make_server(port: int = DEFAULT_PORT, opener: Callable[[], None] = open_came
                     return
                 last_open[0] = now
             try:
-                opener()
+                opener(plan)
             except Exception as err:  # report it to the page rather than crash the launcher
                 self._send(500, {"error": str(err)})
                 return
-            print(f"Opened the camera app (asked by {self._origin()}).", flush=True)
+            print(f"Started the camera app: {plan['exercise']}, {plan['side']}, {plan['sets']} x {plan['reps']}, {plan['restSeconds']} s rest (asked by {self._origin()}).", flush=True)
             self._send(202, {"opened": True})
 
         def log_message(self, format: str, *args: object) -> None:  # keep the terminal quiet
@@ -158,8 +166,8 @@ def make_server(port: int = DEFAULT_PORT, opener: Callable[[], None] = open_came
 def main() -> None:
     port = int(os.environ.get("ARC_LAUNCHER_PORT", DEFAULT_PORT))
     server = make_server(port=port)
-    print(f"Arc camera launcher on http://127.0.0.1:{port}. Leave this window open, then press")
-    print('"Open the camera app" on the dashboard. Ctrl+C stops the launcher.', flush=True)
+    print(f"Arc camera launcher on http://127.0.0.1:{port}. Leave it running; the dashboard's")
+    print('"Open the camera app" starts the camera straight into your plan. Ctrl+C stops it.', flush=True)
     try:
         server.serve_forever()
     except KeyboardInterrupt:

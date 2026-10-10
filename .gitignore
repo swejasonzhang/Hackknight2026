@@ -27,3 +27,6 @@ __pycache__/
 # macOS Finder duplicate copies ("name 2.ext") must never be committed
 * 2
 * 2.*
+
+# Camera app output when started from the dashboard (computer-vision/launcher.py)
+computer-vision/camera.log

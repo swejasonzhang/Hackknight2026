@@ -1,3 +1,4 @@
+import { EXERCISES, type ExerciseId, type PlanInput } from '@arc/dependencies'
 import { useCallback, useEffect, useId, useState } from 'react'
 import { Lamp, type Tone } from './ui'
 
@@ -6,6 +7,10 @@ export const LAUNCHER_URL = (import.meta.env.VITE_CAMERA_LAUNCHER_URL as string 
 const START_COMMAND = 'cd computer-vision && uv run launcher.py'
 
 type Launcher = 'checking' | 'connected' | 'offline'
+/** What the camera app starts into: the plan's fields the launcher accepts. */
+type CameraPlan = Pick<PlanInput, 'exercise' | 'side' | 'sets' | 'reps' | 'restSeconds'>
+/** Without a saved plan: the movement on screen, right side, 3 sets of 8, 45 s rest. */
+const DEFAULTS = { side: 'right', sets: 3, reps: 8, restSeconds: 45 } as const
 type Attempt = { kind: 'idle' } | { kind: 'opening' } | { kind: 'opened' } | { kind: 'failed'; message: string }
 
 const STATUS: Record<Launcher, { text: string; tone: Tone }> = {
@@ -39,11 +44,13 @@ function useIsPhone(): boolean {
 /**
  * The dashboard's way into the camera app. The camera app is the Python program in
  * computer-vision/ that runs on the computer with the webcam; a web page cannot start a program
- * by itself, so a small launcher (computer-vision/launcher.py) listens on 127.0.0.1 and opens the
- * camera app in a new terminal window when this button asks. When the launcher is not running,
- * the panel shows the one command that starts it. On a phone it explains where to open it instead.
+ * by itself, so a small launcher (computer-vision/launcher.py) listens on 127.0.0.1 and, when this
+ * button sends the plan, starts the camera app straight into it: no prompts, the webcam window
+ * opens and counting begins. Without a saved plan it starts the movement on screen at 3 × 8.
+ * When the launcher is not running, the panel shows the one command that starts it. On a phone it
+ * explains where to open it instead.
  */
-export function CameraLauncher() {
+export function CameraLauncher({ plan, exercise }: { plan: CameraPlan | null; exercise: ExerciseId }) {
   const titleId = useId()
   const phone = useIsPhone()
   const [launcher, setLauncher] = useState<Launcher>('checking')
@@ -68,10 +75,13 @@ export function CameraLauncher() {
     return () => window.removeEventListener('focus', onFocus)
   }, [check, phone])
 
+  const start: CameraPlan = plan ? { exercise: plan.exercise, side: plan.side, sets: plan.sets, reps: plan.reps, restSeconds: plan.restSeconds } : { exercise, ...DEFAULTS }
+  const summary = `${EXERCISES[start.exercise].name} · ${start.side} · ${start.sets} × ${start.reps} · ${start.restSeconds} s rest`
+
   const open = async () => {
     setAttempt({ kind: 'opening' })
     try {
-      const res = await launcherFetch('/open', { method: 'POST', headers: { 'X-Arc-Launcher': '1' } })
+      const res = await launcherFetch('/open', { method: 'POST', headers: { 'X-Arc-Launcher': '1', 'Content-Type': 'application/json' }, body: JSON.stringify(start) })
       setLauncher('connected')
       if (res.ok || res.status === 429) setAttempt({ kind: 'opened' })
       else {
@@ -98,7 +108,10 @@ export function CameraLauncher() {
             Record a session
           </h2>
           <p className="t-desc mt-1 max-w-[62ch]">
-            Arc's camera app runs on the laptop or desktop with the webcam. It opens your webcam, finds the joints of the movement (shoulder, elbow and wrist, or hip, knee and ankle), measures every rep in degrees and counts your sets against the plan.
+            Arc's camera app runs on the laptop or desktop with the webcam. One press starts it straight into your plan, with nothing to answer: it opens your webcam, finds the joints of the movement (shoulder, elbow and wrist, or hip, knee and ankle), measures every rep in degrees, counts your sets and times the rest.
+          </p>
+          <p className="t-meta mt-3 text-navy">
+            {plan ? 'Plan' : 'No plan yet'} · <span className="normal-case">{summary}</span>
           </p>
           {phone && <p className="t-desc mt-2 max-w-[62ch]">Open Arc on that computer to start it from here.</p>}
           {!phone && launcher === 'offline' && (
@@ -109,7 +122,7 @@ export function CameraLauncher() {
           )}
           {attempt.kind === 'opened' && (
             <p role="status" className="t-mono mt-3 flex items-center gap-2 text-ok">
-              <Lamp tone="good" /> OK · Opening in a new terminal window. Pick the exercise there, then the webcam window opens.
+              <Lamp tone="good" /> OK · Starting. The webcam window opens in a moment and counting begins.
             </p>
           )}
           {attempt.kind === 'failed' && (
