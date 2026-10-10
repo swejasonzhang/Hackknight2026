@@ -121,7 +121,7 @@ export function SessionDetailPage() {
         </div>
         <aside className={AREA.stage} aria-hidden="true">
           <div className="panel">
-            <div className="stage h-[220px] lg:h-[300px]" />
+            <div className="stage h-[280px] lg:h-[340px]" />
           </div>
         </aside>
         <div className={AREA.readouts} aria-hidden="true">
@@ -201,15 +201,17 @@ export function SessionDetailPage() {
       {/* Stage column: the limb posed at the best rep on the blueprint grid, then the spec list. */}
       <aside ref={stageRef} className={`${AREA.stage} grid gap-5 sm:grid-cols-2 lg:grid-cols-1`} style={{ top: stageTop }} aria-label="Session stage">
         <div className="panel">
-          <div className="stage h-[220px] sm:h-[260px] lg:h-[300px]">
-            <LazyJointScene
-              exercise={session.exercise}
-              angle={best}
-              goalDeg={goal}
-              className="h-full w-full"
-              label={`${exercise.name} posed at ${deg(best)}, the best rep of this session`}
-              fallback={<div aria-hidden="true" className="hatch absolute inset-8" />}
-            />
+          <div className="stage h-[280px] sm:h-[300px] lg:h-[340px]">
+            <div className="absolute inset-x-0 top-11 bottom-0">
+              <LazyJointScene
+                exercise={session.exercise}
+                angle={best}
+                goalDeg={goal}
+                className="h-full w-full"
+                label={`${exercise.name} posed at ${deg(best)}, the best rep of this session`}
+                fallback={<div aria-hidden="true" className="hatch absolute inset-8" />}
+              />
+            </div>
             <span className="callout pointer-events-none top-3 left-3">Best rep · {exercise.metricLabel}</span>
             <span className="callout pointer-events-none top-3 right-3">Goal {deg(goal)}</span>
           </div>

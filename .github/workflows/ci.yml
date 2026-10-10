@@ -24,3 +24,9 @@ jobs:
       - run: npm run typecheck
       - run: npm test
       - run: npm run build
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Camera launcher tests
+        working-directory: computer-vision
+        run: python -m unittest test_launcher

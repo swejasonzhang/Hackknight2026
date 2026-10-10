@@ -2,6 +2,7 @@ import { EXERCISE_LIST, EXERCISES, type ExerciseId, type PlanDto, type ProgressD
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { api } from '../api/client'
+import { CameraLauncher } from '../components/CameraLauncher'
 import { Folds, type FoldItem } from '../components/Folds'
 import { IconActivity, IconCalendar, IconFlame, IconTarget } from '../components/icons'
 import { AnimatedNumber, Item, Page, Stagger } from '../components/motion'
@@ -109,9 +110,12 @@ export function DashboardPage() {
           <Segmented label="Exercise" options={EXERCISE_OPTIONS} value={exercise} onChange={setExercise} />
         </div>
 
-        <div className="stage mt-4 h-[260px] overflow-hidden sm:h-[320px]">
+        <div className="stage mt-4 h-[300px] overflow-hidden sm:h-[340px]">
           {latest ? (
-            <LazyJointScene exercise={exercise} angle={latest.bestPeakDeg} goalDeg={goal ?? undefined} className="h-full w-full" label={`${cfg.name} posed at the latest session's best rep, ${deg(latest.bestPeakDeg)}`} fallback={<div className="hatch absolute inset-8" aria-hidden="true" />} />
+            // The figure starts below the two callouts, so a label never covers the head.
+            <div className="absolute inset-x-0 top-11 bottom-0">
+              <LazyJointScene exercise={exercise} angle={latest.bestPeakDeg} goalDeg={goal ?? undefined} className="h-full w-full" label={`${cfg.name} posed at the latest session's best rep, ${deg(latest.bestPeakDeg)}`} fallback={<div className="hatch absolute inset-8" aria-hidden="true" />} />
+            </div>
           ) : firstLoad ? (
             <div className="hatch absolute inset-8" aria-hidden="true" />
           ) : (
@@ -195,6 +199,8 @@ export function DashboardPage() {
             <Alert tone="bad">{error}</Alert>
           </div>
         )}
+
+        <CameraLauncher />
 
         {noProfiles && (
           <Strip index="00" title="Setup">
