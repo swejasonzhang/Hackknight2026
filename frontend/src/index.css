@@ -435,6 +435,17 @@
   .btn-block:active {
     background: var(--navy-3);
   }
+  /* The filled danger action (delete account): a red block with white type. */
+  .btn-block.btn-danger {
+    background: var(--bad);
+    border-color: var(--bad);
+    color: #fff;
+    box-shadow: inset 3px 0 0 rgb(0 0 0 / 0.25);
+  }
+  .btn-block.btn-danger:hover:not(:disabled) {
+    background: color-mix(in srgb, var(--bad) 86%, #000);
+    border-color: color-mix(in srgb, var(--bad) 86%, #000);
+  }
   .btn-block:disabled,
   .btn-block[aria-disabled='true'] {
     background: var(--vellum-2);
@@ -458,7 +469,7 @@
     border-color: var(--bad);
     color: var(--bad);
   }
-  .btn-danger:hover {
+  .btn-danger:hover:not(:disabled) {
     background: var(--bad);
     color: #fff;
   }
@@ -882,6 +893,25 @@
     box-shadow: inset 0 2px 0 var(--cobalt);
   }
   .bar-link:focus-visible {
+    outline-offset: -4px;
+  }
+  /* The account tag: on the rail above log out, and the phone bar's last cell. */
+  .rail-account,
+  .bar-account {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    text-decoration: none;
+    outline-offset: 3px;
+  }
+  .rail-account[aria-current='page'] .avatar-tag,
+  .bar-account[aria-current='page'] .avatar-tag {
+    box-shadow: 0 0 0 2px var(--navy), 0 0 0 4px var(--cobalt);
+  }
+  .bar-account {
+    border-left: 1px solid rgb(255 255 255 / 0.1);
+  }
+  .bar-account:focus-visible {
     outline-offset: -4px;
   }
   .masthead {

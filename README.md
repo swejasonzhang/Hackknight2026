@@ -153,16 +153,21 @@ Gemini and ElevenLabs run only on the server (`backend/src/services/gemini.ts`, 
 
 ## 5. API reference
 
-Base URL in development: `http://localhost:8787`. All bodies are JSON. Validation errors return `400 { error: "Invalid request", issues: [...] }`; unknown or foreign ids return `404`; missing credentials return `401`.
+Base URL in development: `http://localhost:8787`. All bodies are JSON. Validation errors return `400 { error: "Invalid request", issues: [...] }`; unknown or foreign ids return `404`; missing credentials, or a token for an account that has been deleted, return `401`.
 
 **Credentials.** Browser requests send `Authorization: Bearer <token>` (from signup or login, valid 7 days). The camera app sends `x-api-key: <CV_API_KEY>` instead and may access every profile. Users only ever see their own profiles.
+
+**Names and emails.** One rule, shared by every form and the API (`dependencies/src/fields.ts`): a name is letters (any alphabet), spaces, apostrophes, hyphens or periods, at least one letter, up to 80 characters; an email is a real address like `name@example.com`, up to 254 characters. Each field states its requirement under it, names the exact problem once it is left, and the submit button waits until every field passes.
+
+**Deleting an account.** The account tag (the avatar on the rail, or the last cell of the phone bar) opens `/account`: who is signed in, Log out, and Delete account. Deleting asks for the account's email and password again and for `DELETE` typed out; the server checks the pair, removes the account with every profile, plan, session and Arc message, and the old token stops working at once. A wrong pair answers `403` (not `401`, so a typo does not sign the member out) and five wrong tries in 15 minutes lock the form for the rest of that window. The password is never logged or echoed back.
 
 | Method & path | Body | Returns |
 |---|---|---|
 | `GET /api/health` | | `{ ok, db: "connected" \| "disconnected", uptime }` (open) |
-| `POST /api/auth/signup` | `{ name, email, password (≥ 8) }` | `201 { token, user }`; `409` if the email exists (open) |
+| `POST /api/auth/signup` | `{ name, email, password (≥ 8) }`, name and email by the rule above | `201 { token, user }`; `409` if the email exists (open) |
 | `POST /api/auth/login` | `{ email, password }` | `{ token, user }`; `401` on a bad pair (open) |
 | `GET /api/auth/me` | | the signed-in user |
+| `POST /api/auth/account/delete` | `{ email, password, confirm: "DELETE" }` | `204`; the account and all of its data are gone. `403` on a wrong pair, `429` after five wrong tries in 15 minutes (users only) |
 | `GET /api/profiles` | | your profiles, newest first (API key: all profiles) |
 | `POST /api/profiles` | `{ name, email?, notes? }` | `201` profile (users only) |
 | `GET /api/profiles/:id` | | profile |
@@ -187,8 +192,9 @@ dependencies/  @arc/dependencies  pure TypeScript shared by both sides: domain t
                progress builder, zod API schemas
 backend/       @arc/backend       Express 5 + Mongoose: models (User, Profile, Plan, Session), auth,
                routes, services; src/app.ts builds the app, src/index.ts connects and listens, test/ = API tests
-frontend/      @arc/frontend      Vite + React 19 + Tailwind + Motion: pages (Landing, Signup, Login, Dashboard,
-               Profiles, SessionDetail), auth (token, context, route guards), api/client.ts (typed fetch wrapper)
+frontend/      @arc/frontend      Vite + React 19 + Tailwind + Motion: pages (Landing, Signup, Login, Welcome, Dashboard,
+               Plan, Record, Profiles, SessionDetail, Account), auth (token, context, route guards),
+               api/client.ts (typed fetch wrapper)
 computer-vision/  Python camera app (OpenCV + MediaPipe, uv): tracks the joint, counts reps, times rest
 docs/          backlog, sprint plan, definition of done, architecture decision records
 .github/       CI workflow and issue / PR templates
@@ -200,9 +206,9 @@ The three JavaScript packages are npm workspaces; the camera app is a separate P
 
 The project is developed **test-first**: write the failing test, make it pass, then clean up. `npm test` must be green before a pull request is opened, and CI (`.github/workflows/ci.yml`) runs typecheck, tests and the build on every push and PR.
 
-- `dependencies/src/**/*.test.ts`: engine behaviour (rep counting, hysteresis, jitter rejection, fatigue arithmetic, summaries, schema validation), the demo generator (repeatable per seed, upward trends, local training hours) and the progress builder.
-- `backend/test/*.test.ts`: every API route through supertest against a throwaway in-memory MongoDB, including sign-up, login, token checks, API-key access and profile isolation between accounts, and Arc (onboarding with and without Gemini and its fallback when Gemini fails, the profile and plan it saves, set and session reads stored once, ElevenLabs audio only for the owner, keys only in headers, the rate limit, voice commands stored with sessions; Gemini and ElevenLabs are stubbed, never called). Tests never touch the cluster in `.env`.
-- `frontend/src/**/*.test.ts(x)`: the API wrapper (token header, 401 handling, saving a recorded session), browser recording (reading the joint from pose landmarks with aspect correction and visibility, the session recorder's sets, rests, early finish and whole-millisecond times, the simulated person, the camera-blocked and insecure-page messages, the dashboard's record panel), the route guards (app pages send visitors to `/login`, sign-up and log-in send signed-in users to `/dashboard`), the app logo leading to the landing page and the landing page's buttons for visitors and signed-in users, the sign-up / login form, Arc (the onboarding chat page, the session read, the API calls), voice commands (every gym word, negations, addressing Arc), the recorder's pause, resume, skip, rest and stop with the saved command log, UI primitives, the themed dropdown and the plan form that uses it, the 3D body's skeleton (every part present, the tracked landmarks on its joints, the joint angle equal to the reading, no limb stretching, the rest of the body still, feet on the floor, every pose in frame), the sticky columns that never scroll on their own, the dashboard's chart folds, the plan page's day log (stepping, rest days, progress against the previous session and the goal) and its local-calendar day arithmetic, and the hero's rep detector.
+- `dependencies/src/**/*.test.ts`: engine behaviour (rep counting, hysteresis, jitter rejection, fatigue arithmetic, summaries, schema validation), the name and email rules (accents, other alphabets, apostrophes and hyphens accepted; digits, symbols, blanks and over-long values refused with a reason), the demo generator (repeatable per seed, upward trends, local training hours) and the progress builder.
+- `backend/test/*.test.ts`: every API route through supertest against a throwaway in-memory MongoDB, including sign-up, login, token checks, API-key access and profile isolation between accounts, account deletion (signed-in members only, a wrong or another account's pair refused without echoing the password and without ending the session, `DELETE` required, everything of the account removed and nothing of anyone else's, the old token refused afterwards, the lockout after five wrong tries), and Arc (onboarding with and without Gemini and its fallback when Gemini fails, the profile and plan it saves, set and session reads stored once, ElevenLabs audio only for the owner, keys only in headers, the rate limit, voice commands stored with sessions; Gemini and ElevenLabs are stubbed, never called). Tests never touch the cluster in `.env`.
+- `frontend/src/**/*.test.ts(x)`: the API wrapper (token header, 401 handling, saving a recorded session), browser recording (reading the joint from pose landmarks with aspect correction and visibility, the session recorder's sets, rests, early finish and whole-millisecond times, the simulated person, the camera-blocked and insecure-page messages, the dashboard's record panel), the route guards (app pages send visitors to `/login`, sign-up and log-in send signed-in users to `/dashboard`), the app logo leading to the landing page and the landing page's buttons for visitors and signed-in users, the sign-up / login form and the requirement line under every name and email field (the profiles page included), the account page (details, log out, deletion held until the email, password and `DELETE` are right, the server's refusal shown without the password, the landing-page notice afterwards), new pages opening at the top, Arc (the onboarding chat page, the session read, the API calls), voice commands (every gym word, negations, addressing Arc), the recorder's pause, resume, skip, rest and stop with the saved command log, UI primitives, the themed dropdown and the plan form that uses it, the 3D body's skeleton (every part present, the tracked landmarks on its joints, the joint angle equal to the reading, no limb stretching, the rest of the body still, feet on the floor, every pose in frame), the sticky columns that never scroll on their own, the dashboard's chart folds, the plan page's day log (stepping, rest days, progress against the previous session and the goal) and its local-calendar day arithmetic, and the hero's rep detector.
 
 - `computer-vision/test_arc_routine.py`: the plan-to-routine mapping for running the Python app from a plan (elbow flexion to the bicep curl, shoulder abduction to the lateral raise, a seated knee extension definition, mirrored landmarks, plan validation, command-line round trip). `cd computer-vision && python3 -m unittest`; CI runs it too.
 

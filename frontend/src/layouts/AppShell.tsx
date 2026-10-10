@@ -84,9 +84,9 @@ export function AppShell() {
           <ApiLamp state={apiState} />
           {user && (
             <Hint label={`${user.name} · ${user.email}`} side="right">
-              <span tabIndex={0} role="img" aria-label={`Signed in as ${user.name}`} className="inline-flex">
+              <NavLink to="/account" aria-label={`Account: ${user.name}`} className="rail-account">
                 <Avatar name={user.name} size={32} />
-              </span>
+              </NavLink>
             </Hint>
           )}
           <button type="button" onClick={logout} aria-label="Log out" className="inline-flex h-9 w-9 cursor-pointer items-center justify-center text-rail-muted transition-colors hover:text-white">
@@ -116,9 +116,10 @@ export function AppShell() {
             {label}
           </NavLink>
         ))}
-        <button type="button" onClick={logout} aria-label="Log out" className="flex cursor-pointer items-center justify-center border-l border-white/10 text-rail-muted">
-          <IconLogOut size={18} />
-        </button>
+        {/* No room for a sixth cell on a phone: the account tag leads to /account, where Log out lives. */}
+        <NavLink to="/account" aria-label={user ? `Account: ${user.name}` : 'Account'} className="bar-account">
+          {user && <Avatar name={user.name} size={28} />}
+        </NavLink>
       </nav>
     </div>
   )

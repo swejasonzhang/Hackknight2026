@@ -2,8 +2,10 @@ import { motion, useReducedMotion } from 'motion/react'
 import { useId, useState, type FormEvent } from 'react'
 import { Link } from 'react-router-dom'
 import { api } from '../api/client'
+import { emailProblem, EMAIL_REQUIREMENT, nameProblem, NAME_REQUIREMENT } from '@arc/dependencies'
 import { IconPlus } from '../components/icons'
 import { ease, Page } from '../components/motion'
+import { FieldMessage, useFieldRule } from '../components/TextField'
 import { Alert, Avatar, EmptyState, Lamp, PageHeader, Skeleton } from '../components/ui'
 import { formatDate } from '../format'
 import { useProfiles } from '../hooks/useProfiles'
@@ -29,7 +31,10 @@ export function ProfilesPage() {
   const [message, setMessage] = useState<{ text: string; tone: 'good' | 'bad' } | null>(null)
   const formId = useId()
   const reduce = useReducedMotion()
-  const ids = { name: `${formId}-name`, email: `${formId}-email` }
+  const ids = { name: `${formId}-name`, nameMsg: `${formId}-name-msg`, email: `${formId}-email`, emailMsg: `${formId}-email-msg` }
+  const nameRule = useFieldRule({ value: name, problem: nameProblem })
+  const emailRule = useFieldRule({ value: email, problem: emailProblem, optional: true })
+  const canAdd = nameRule.valid && emailRule.valid
 
   const run = async (work: () => Promise<string>) => {
     setBusy(true)
@@ -45,8 +50,9 @@ export function ProfilesPage() {
 
   const create = (e: FormEvent) => {
     e.preventDefault()
+    if (!canAdd) return
     void run(async () => {
-      const p = await api.profiles.create({ name, email: email || undefined })
+      const p = await api.profiles.create({ name: name.trim(), email: email.trim() || undefined })
       setName('')
       setEmail('')
       await reload()
@@ -194,21 +200,48 @@ export function ProfilesPage() {
                 <label htmlFor={ids.name} className="sr-only">
                   Name
                 </label>
-                <input id={ids.name} form={formId} className="input" type="text" required placeholder="Name" autoComplete="off" value={name} onChange={(e) => setName(e.target.value)} />
+                <input
+                  id={ids.name}
+                  form={formId}
+                  className="input"
+                  type="text"
+                  required
+                  placeholder="Name"
+                  autoComplete="off"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  onBlur={nameRule.touch}
+                  aria-invalid={nameRule.bad ? 'true' : undefined}
+                  aria-describedby={ids.nameMsg}
+                />
+                <FieldMessage id={ids.nameMsg} rule={nameRule} requirement={NAME_REQUIREMENT} />
               </div>
             </td>
             <td className={`${STACKED} sm:border-b-0 sm:pr-4`}>
               <label htmlFor={ids.email} className="sr-only">
                 Email (optional)
               </label>
-              <input id={ids.email} form={formId} className="input" type="email" placeholder="Email (optional)" autoComplete="off" value={email} onChange={(e) => setEmail(e.target.value)} />
+              <input
+                id={ids.email}
+                form={formId}
+                className="input"
+                type="email"
+                placeholder="Email (optional)"
+                autoComplete="off"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                onBlur={emailRule.touch}
+                aria-invalid={emailRule.bad ? 'true' : undefined}
+                aria-describedby={ids.emailMsg}
+              />
+              <FieldMessage id={ids.emailMsg} rule={emailRule} requirement={EMAIL_REQUIREMENT} optional />
             </td>
             <td className="hidden lg:table-cell lg:border-b-0">
               <span className="t-meta">New entry</span>
             </td>
             <td className="hidden sm:table-cell sm:border-b-0" />
             <td className={`${STACKED} sm:border-b-0`}>
-              <button className="btn btn-block w-full sm:w-auto" type="submit" form={formId} disabled={busy || !name.trim()}>
+              <button className="btn btn-block w-full sm:w-auto" type="submit" form={formId} disabled={busy || !canAdd}>
                 Add profile
               </button>
             </td>

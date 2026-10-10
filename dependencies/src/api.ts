@@ -3,6 +3,7 @@
  * validates with them; the client gets the types for free) and the response DTO shapes.
  */
 import { z } from 'zod'
+import { EmailSchema, NameSchema } from './fields.ts'
 import { VOICE_COMMANDS, type ExerciseId, type SessionPlan, type SessionRecord, type Side } from './engine/types.ts'
 
 export const ExerciseIdSchema = z.enum(['elbow_flexion', 'shoulder_abduction', 'seated_knee_extension'])
@@ -11,17 +12,26 @@ export const SideSchema = z.enum(['left', 'right'])
 // ---- accounts ----
 
 export const SignupSchema = z.object({
-  name: z.string().trim().min(1).max(80),
-  email: z.email().transform((e) => e.toLowerCase()),
+  name: NameSchema,
+  email: EmailSchema.transform((e) => e.toLowerCase()),
   password: z.string().min(8).max(200),
 })
 export type SignupInput = z.infer<typeof SignupSchema>
 
 export const LoginSchema = z.object({
-  email: z.email().transform((e) => e.toLowerCase()),
+  email: EmailSchema.transform((e) => e.toLowerCase()),
   password: z.string().min(1).max(200),
 })
 export type LoginInput = z.infer<typeof LoginSchema>
+
+/** What deleting an account takes: the account's own email and password, and DELETE typed out. */
+export const DELETE_CONFIRMATION = 'DELETE'
+export const DeleteAccountSchema = z.object({
+  email: EmailSchema.transform((e) => e.toLowerCase()),
+  password: z.string().min(1).max(200),
+  confirm: z.literal(DELETE_CONFIRMATION),
+})
+export type DeleteAccountInput = z.input<typeof DeleteAccountSchema>
 
 export interface UserDto {
   id: string
@@ -39,8 +49,8 @@ export interface AuthResponse {
 // ---- profiles, plans, sessions ----
 
 export const CreateProfileSchema = z.object({
-  name: z.string().trim().min(1).max(80),
-  email: z.email().optional(),
+  name: NameSchema,
+  email: EmailSchema.optional(),
   notes: z.string().max(500).optional(),
 })
 export type CreateProfileInput = z.infer<typeof CreateProfileSchema>

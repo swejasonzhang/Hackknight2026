@@ -1,6 +1,8 @@
+import { emailProblem, EMAIL_REQUIREMENT, nameProblem, NAME_REQUIREMENT } from '@arc/dependencies'
 import { useId, useState, type FormEvent } from 'react'
 import { Lamp } from './ui'
 import { PasswordField } from './PasswordField'
+import { TextField } from './TextField'
 
 export type AuthFormValues = { name?: string; email: string; password: string }
 
@@ -9,11 +11,10 @@ interface Props {
   onSubmit: (values: AuthFormValues) => Promise<void>
 }
 
-const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 /** Matches the API's SignupSchema (password min 8). */
 export const MIN_PASSWORD = 8
 
-type Field = 'name' | 'email' | 'password' | 'confirm'
+type Field = 'password' | 'confirm'
 
 /**
  * The account datasheet: ruled rows with a mono label and a status lamp in the left cell, the
@@ -27,12 +28,13 @@ export function AuthForm({ mode, onSubmit }: Props) {
   const [password, setPassword] = useState('')
   const [confirm, setConfirm] = useState('')
   const [touched, setTouched] = useState<Partial<Record<Field, boolean>>>({})
+  const [attempted, setAttempted] = useState(false)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const ids = { name: useId(), email: useId(), emailError: useId(), passwordHint: useId(), passwordError: useId(), confirmMsg: useId() }
+  const ids = { passwordHint: useId(), confirmMsg: useId() }
 
-  const nameOk = !signup || name.trim().length > 0
-  const emailOk = EMAIL.test(email.trim())
+  const nameOk = !signup || nameProblem(name) === null
+  const emailOk = emailProblem(email) === null
   const passwordOk = signup ? password.length >= MIN_PASSWORD : password.length > 0
   const mismatch = signup && confirm.length > 0 && confirm !== password
   const matched = signup && confirm.length > 0 && confirm === password
@@ -40,14 +42,14 @@ export function AuthForm({ mode, onSubmit }: Props) {
   const valid = nameOk && emailOk && passwordOk && confirmOk
 
   const touch = (field: Field) => setTouched((t) => ({ ...t, [field]: true }))
-  const emailError = touched.email && email.length > 0 && !emailOk
   const passwordError = signup && touched.password && password.length > 0 && !passwordOk
 
   const submit = async (e: FormEvent) => {
     e.preventDefault()
     if (busy) return
     if (!valid) {
-      setTouched({ name: true, email: true, password: true, confirm: true })
+      setAttempted(true)
+      setTouched({ password: true, confirm: true })
       return
     }
     setBusy(true)
@@ -62,47 +64,12 @@ export function AuthForm({ mode, onSubmit }: Props) {
   }
 
   const label = busy ? (signup ? 'Creating account…' : 'Logging in…') : signup ? 'Create account' : 'Log in'
-  const lampFor = (bad: boolean | undefined, ok: boolean, filled: boolean) => (bad ? 'lamp lamp-bad' : ok ? 'lamp lamp-ok' : filled ? 'lamp lamp-on' : 'lamp')
 
   return (
     <form className="datasheet" onSubmit={submit} noValidate aria-busy={busy || undefined}>
-      {signup && (
-        <div className="field-row">
-          <label htmlFor={ids.name} className="field-label">
-            Name
-            <span aria-hidden="true" className={lampFor(false, name.trim().length > 0, false)} />
-          </label>
-          <div className="field-cell">
-            <input id={ids.name} className="input" type="text" autoComplete="name" required value={name} onChange={(e) => setName(e.target.value)} onBlur={() => touch('name')} />
-          </div>
-        </div>
-      )}
+      {signup && <TextField label="Name" value={name} onChange={setName} requirement={NAME_REQUIREMENT} problem={nameProblem} autoComplete="name" showErrors={attempted} />}
 
-      <div className="field-row">
-        <label htmlFor={ids.email} className="field-label">
-          Email
-          <span aria-hidden="true" className={lampFor(emailError, emailOk, email.length > 0)} />
-        </label>
-        <div className="field-cell">
-          <input
-            id={ids.email}
-            className="input"
-            type="email"
-            autoComplete="email"
-            required
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            onBlur={() => touch('email')}
-            aria-invalid={emailError ? 'true' : undefined}
-            aria-describedby={emailError ? ids.emailError : undefined}
-          />
-          {emailError && (
-            <span id={ids.emailError} className="field-msg field-msg-bad" data-tag="ERR">
-              Enter a valid email address.
-            </span>
-          )}
-        </div>
-      </div>
+      <TextField label="Email" type="email" value={email} onChange={setEmail} requirement={EMAIL_REQUIREMENT} problem={emailProblem} autoComplete="email" showErrors={attempted} />
 
       <PasswordField
         label="Password"
