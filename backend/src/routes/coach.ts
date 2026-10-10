@@ -5,10 +5,11 @@ import { requireUser } from '../auth.ts'
 import { HttpError, toObjectId, validate } from '../http.ts'
 import { CoachMessage, toCoachMessageDto } from '../models/CoachMessage.ts'
 import { Plan, toPlanDto } from '../models/Plan.ts'
+import { Program, toProgramDto } from '../models/Program.ts'
 import { Profile, type ProfileShape } from '../models/Profile.ts'
 import { Session, toSessionDto, type SessionShape } from '../models/Session.ts'
 import { User } from '../models/User.ts'
-import { onboardingTurn, planFromIntake, sessionSummary, setFeedback } from '../services/arc.ts'
+import { onboardingTurn, planFromProgram, sessionSummary, setFeedback } from '../services/arc.ts'
 import { geminiConfigured } from '../services/gemini.ts'
 import { requireProfile } from '../services/profiles.ts'
 import { speak, voiceConfigured } from '../services/voice.ts'
@@ -60,15 +61,19 @@ coachRouter.post('/onboarding', limit, async (req, res) => {
   const arcLine = await CoachMessage.create({ ownerId: userId, profileId: existing?._id, kind: 'onboarding', role: 'arc', text: turn.reply, offline: turn.offline, createdAt: now })
 
   const reply: OnboardingReply = { reply: turn.reply, messageId: arcLine._id.toString(), done: turn.done, offline: turn.offline }
-  if (turn.done && turn.intake) {
+  if (turn.topic) reply.topic = turn.topic
+  if (turn.done && turn.intake && turn.program) {
     // Arc saves what it learned: on the profile it was given, or on a new one named after the member.
     const profile: ProfileShape = existing
       ? (await Profile.findByIdAndUpdate(existing._id, { $set: { intake: turn.intake, notes: turn.intake.goals.slice(0, 500) } }, { new: true }).lean<ProfileShape>())!
       : (await Profile.create({ ownerId: userId, name, notes: turn.intake.goals.slice(0, 500), intake: turn.intake, createdAt: now })).toObject()
+    // The week, and the active plan Record starts from: the week's first movement.
+    await Program.updateMany({ profileId: profile._id, active: true }, { $set: { active: false } })
+    const program = await Program.create({ ...turn.program, source: turn.programSource ?? 'arc', profileId: profile._id, active: true, createdAt: now })
     await Plan.updateMany({ profileId: profile._id, active: true }, { $set: { active: false } })
-    const plan = await Plan.create({ ...planFromIntake(turn.intake), profileId: profile._id, active: true, createdAt: now })
+    const plan = await Plan.create({ ...planFromProgram(turn.program), profileId: profile._id, active: true, createdAt: now })
     await CoachMessage.updateMany({ ownerId: userId, kind: 'onboarding', profileId: { $exists: false } }, { $set: { profileId: profile._id } })
-    Object.assign(reply, { intake: turn.intake, profileId: profile._id.toString(), plan: toPlanDto(plan) })
+    Object.assign(reply, { intake: turn.intake, profileId: profile._id.toString(), plan: toPlanDto(plan), program: toProgramDto(program.toObject()) })
   }
   res.json(reply)
 })

@@ -3,6 +3,7 @@ import { Router } from 'express'
 import { principalOf, requireUser } from '../auth.ts'
 import { validate } from '../http.ts'
 import { Plan } from '../models/Plan.ts'
+import { Program } from '../models/Program.ts'
 import { Profile, toProfileDto, type ProfileShape } from '../models/Profile.ts'
 import { Session } from '../models/Session.ts'
 import { ownerFilter, requireProfile } from '../services/profiles.ts'
@@ -31,6 +32,7 @@ profilesRouter.delete('/:id', async (req, res) => {
   await Promise.all([
     Session.deleteMany({ profileId: profile._id }),
     Plan.deleteMany({ profileId: profile._id }),
+    Program.deleteMany({ profileId: profile._id }),
     Profile.deleteOne({ _id: profile._id }),
   ])
   res.status(204).end()

@@ -9,6 +9,7 @@ export const EXERCISES: Record<ExerciseId, ExerciseConfig> = {
   elbow_flexion: {
     id: 'elbow_flexion',
     name: 'Elbow flexion',
+    short: 'Elbow',
     cue: 'Turn so the camera sees your arm from the side. Keep the upper arm still and bend the elbow to bring your hand toward your shoulder, then lower slowly.',
     joints: {
       left: [LM.LEFT_SHOULDER, LM.LEFT_ELBOW, LM.LEFT_WRIST],
@@ -25,6 +26,7 @@ export const EXERCISES: Record<ExerciseId, ExerciseConfig> = {
   shoulder_abduction: {
     id: 'shoulder_abduction',
     name: 'Shoulder abduction',
+    short: 'Shoulder',
     cue: 'Face the camera with your arm straight at your side. Raise the arm out to the side as high as is comfortable, then lower slowly.',
     // Hip - shoulder - elbow: the angle between the torso and the upper arm. Using the
     // elbow instead of the wrist keeps the number right even if the elbow bends.
@@ -42,6 +44,7 @@ export const EXERCISES: Record<ExerciseId, ExerciseConfig> = {
   seated_knee_extension: {
     id: 'seated_knee_extension',
     name: 'Seated knee extension',
+    short: 'Knee',
     cue: 'Sit side-on to the camera so your hip, knee and ankle are all in frame. Straighten the knee, hold for a moment, then lower slowly.',
     joints: {
       left: [LM.LEFT_HIP, LM.LEFT_KNEE, LM.LEFT_ANKLE],

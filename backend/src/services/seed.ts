@@ -2,8 +2,9 @@ import { randomInt } from 'node:crypto'
 import type { Types } from 'mongoose'
 import { Plan } from '../models/Plan.ts'
 import { Profile } from '../models/Profile.ts'
+import { Program } from '../models/Program.ts'
 import { Session } from '../models/Session.ts'
-import { generateDemoSessions } from '@arc/dependencies'
+import { generateDemoSessions, programFromIntake } from '@arc/dependencies'
 
 export const DEMO_PROFILE_NAME = 'Demo Profile'
 
@@ -22,7 +23,8 @@ export interface SeedOptions {
 }
 
 /**
- * Creates the account's demo profile, its plan and six weeks of random demo sessions.
+ * Creates the account's demo profile, its plan, a Monday-Wednesday-Friday week for the calendar
+ * and six weeks of random demo sessions.
  * Idempotent per account.
  */
 export async function seedDemoData(ownerId: Types.ObjectId, { now = Date.now(), seed = randomInt(0, 2 ** 31 - 1), tzOffsetMinutes = 0 }: SeedOptions = {}): Promise<SeedResult> {
@@ -43,6 +45,8 @@ export async function seedDemoData(ownerId: Types.ObjectId, { now = Date.now(), 
     active: true,
     createdAt: now,
   })
+  const week = programFromIntake({ goals: 'Demo', focus: 'elbow_flexion', side: 'right', limitations: 'none', experience: 'some', daysPerWeek: 3, trainingGoal: 'hypertrophy', trainingDays: [1, 3, 5] })
+  await Program.create({ ...week, source: 'demo', profileId: profile._id, active: true, createdAt: now })
   const docs = generateDemoSessions(profile._id.toString(), now, seed, tzOffsetMinutes).map((s) => ({ ...s, profileId: profile._id }))
   await Session.insertMany(docs)
   return { profileId: profile._id.toString(), sessions: docs.length, created: true }
