@@ -2,7 +2,7 @@
 
 **Range of motion is an arc.** Arc is a webcam goniometer for home use, for anyone at any age, live at [getarc.health](https://getarc.health). A separate **camera app** (built by the computer-vision teammates) watches you exercise, measures joint range of motion (ROM) in degrees, counts reps and sets, and stores each session in MongoDB. **This repository is the web app and API around that data**: accounts, one profile per person in the household, and dashboards that show progress over weeks. It is a personal tool, not a clinical one: no doctor or therapist sees the data.
 
-Stack: MongoDB Atlas · Express 5 · React 19 · Node 20 (MERN), TypeScript everywhere, Vite, Tailwind CSS 4, Motion, Vitest. Hosted on Render, domain at Porkbun. Visual identity: white and blue, Manrope, Lucide icons (ADR-0006).
+Stack: MongoDB Atlas · Express 5 · React 19 · Node 20 (MERN), TypeScript everywhere, Vite, Tailwind CSS 4, Motion, Vitest. Hosted on Render, domain at Porkbun. Visual identity: neon black, Bayon display type, electric blue, Lucide icons (ADR-0008).
 
 ---
 

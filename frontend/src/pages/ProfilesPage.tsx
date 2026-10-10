@@ -86,7 +86,7 @@ export function ProfilesPage() {
                       <div className="flex items-center gap-3.5">
                         <Avatar name={p.name} size={52} />
                         <div className="min-w-0">
-                          <div className="flex items-center gap-1 text-[17px] font-extrabold tracking-[-0.01em] text-ink">
+                          <div className="flex items-center gap-1 text-[17px] font-semibold tracking-[-0.01em] text-ink">
                             <span className="truncate">{p.name}</span>
                             {isSelected && <span className="badge bg-primary-soft text-primary">viewing</span>}
                           </div>

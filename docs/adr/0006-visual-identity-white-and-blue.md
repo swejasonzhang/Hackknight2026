@@ -1,7 +1,7 @@
 # ADR-0006: Visual identity: white and blue, one primary typeface
 
 - Date: 2026-10-09
-- Status: accepted (supersedes ADR-0005)
+- Status: superseded by ADR-0008 (neon black, 2026-10-09)
 
 ## Context
 

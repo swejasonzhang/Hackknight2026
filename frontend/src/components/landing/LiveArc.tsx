@@ -26,7 +26,7 @@ const TICKS = [0, 30, 60, 90, 120, 150, 180]
 /**
  * An arc that performs reps on a loop, the readout tracking the angle, and a live-set card
  * that counts reps, draws each peak and nudges when the range shrinks. Colours come from the
- * surrounding tokens, so it works on white and inside `.on-navy` panels.
+ * surrounding tokens, so it works on black, inside glowing cards and on light sections.
  */
 export function LiveArc({ compact = false }: { compact?: boolean }) {
   const reduce = useReducedMotion()
@@ -89,7 +89,7 @@ export function LiveArc({ compact = false }: { compact?: boolean }) {
       <div className="rounded-[16px] border border-line bg-surface/90 p-4 shadow-card backdrop-blur">
         <div className="flex items-baseline justify-between">
           <span className="text-[11px] font-bold tracking-[0.12em] text-muted uppercase">Live set</span>
-          <span className="text-[13px] font-extrabold text-ink tabular-nums">
+          <span className="text-[13px] font-semibold text-ink tabular-nums">
             Rep {peaks.length} <span className="font-semibold text-muted">/ {PEAKS.length}</span>
           </span>
         </div>
