@@ -1,6 +1,8 @@
 """Tests for turning Arc's plan into the camera app's routine: python3 -m unittest test_arc_routine."""
 
+import re
 import unittest
+from pathlib import Path
 
 import arc_routine
 from arc_routine import PlanError, build_routine, routine_spec, validate_plan
@@ -51,10 +53,49 @@ class RoutineSpecTest(unittest.TestCase):
         self.assertLess(definition["flex_threshold"], definition["extend_threshold"])
 
 
+def catalog_names() -> dict[str, str]:
+    """The camera app's catalog ids and names, read from movements.py's source (it imports OpenCV)."""
+    source = (Path(__file__).parent / "movements.py").read_text()
+    return dict(re.findall(r'"(\d+)": \{\s*"name": "([^"]+)"', source))
+
+
+class CatalogTest(unittest.TestCase):
+    def test_every_arc_exercise_maps_onto_the_camera_app(self):
+        names = catalog_names()
+        self.assertEqual(len(arc_routine.EXERCISES), 15)
+        mapped = [arc_routine.CATALOG_IDS[e] for e in arc_routine.EXERCISES if e in arc_routine.CATALOG_IDS]
+        # All fourteen catalog movements, each once; the knee extension is defined alongside.
+        self.assertEqual(sorted(mapped, key=int), sorted(names, key=int))
+        self.assertEqual(set(arc_routine.EXERCISES) - set(arc_routine.CATALOG_IDS), {"seated_knee_extension"})
+
+    def test_the_names_match_the_catalog(self):
+        names = catalog_names()
+        expected = {
+            "elbow_flexion": "Bicep Curls",
+            "tricep_extension": "Tricep Extension (Down)",
+            "shoulder_press": "Shoulder Press",
+            "shoulder_abduction": "Lateral Raise",
+            "front_raise": "Front Raise",
+            "chest_press": "Chest Press",
+            "pec_fly": "Pec Fly",
+            "lat_pulldown": "Lat Pulldown",
+            "bent_over_row": "Bent-Over Rows",
+            "deadlift": "Deadlift",
+            "squat": "Squats",
+            "lunge": "Lunges",
+            "ab_twist": "Ab Twist",
+            "crunch": "Crunches",
+        }
+        for exercise, name in expected.items():
+            self.assertEqual(names[arc_routine.CATALOG_IDS[exercise]], name, exercise)
+
+
 class BuildRoutineTest(unittest.TestCase):
     CATALOG = {
         "1": {"name": "Bicep Curls", "type": "arm_dual", "right_indices": (11, 13, 15), "left_indices": (12, 14, 16), "flex_threshold": 40.0, "extend_threshold": 150.0, "invert_logic": False, "max_allowed_extension": 175.0},
     }
+
+    CATALOG["11"] = {"name": "Squats", "type": "standard", "indices": (23, 25, 27), "flex_threshold": 90.0, "extend_threshold": 160.0, "invert_logic": False, "max_allowed_extension": 180.0}
 
     def build(self, plan):
         return build_routine(routine_spec(plan), self.CATALOG.get, lambda **kwargs: kwargs)
@@ -65,6 +106,12 @@ class BuildRoutineTest(unittest.TestCase):
         self.assertEqual(exercise["primary_joint_indices"], (11, 13, 15))
         self.assertEqual((exercise["target_sets"], exercise["target_reps"]), (3, 8))
         self.assertEqual(exercise["flex_threshold"], 40.0)
+
+    def test_a_whole_body_movement_uses_the_catalogs_own_landmarks_on_either_side(self):
+        for side in ("right", "left"):
+            [exercise] = self.build({**PLAN, "exercise": "squat", "side": side})
+            self.assertEqual(exercise["name"], "Squats")
+            self.assertEqual(exercise["primary_joint_indices"], (23, 25, 27))
 
     def test_builds_the_knee_extension_without_the_catalog(self):
         [exercise] = self.build({**PLAN, "exercise": "seated_knee_extension", "side": "left"})

@@ -5,9 +5,33 @@
 
 export type Side = 'left' | 'right'
 
-export type ExerciseId = 'elbow_flexion' | 'shoulder_abduction' | 'seated_knee_extension'
+/**
+ * Every movement Arc tracks: the camera app's fourteen catalog exercises (movements.py) plus the
+ * seated knee extension, in the order the dashboard lists them. The first three ids predate the
+ * catalog; they keep their ids so stored sessions stay valid, under the catalog's names.
+ */
+export const EXERCISE_IDS = [
+  'elbow_flexion',
+  'tricep_extension',
+  'shoulder_press',
+  'shoulder_abduction',
+  'front_raise',
+  'chest_press',
+  'pec_fly',
+  'lat_pulldown',
+  'bent_over_row',
+  'deadlift',
+  'squat',
+  'lunge',
+  'seated_knee_extension',
+  'crunch',
+  'ab_twist',
+] as const
 
-export const EXERCISE_IDS: readonly ExerciseId[] = ['elbow_flexion', 'shoulder_abduction', 'seated_knee_extension']
+export type ExerciseId = (typeof EXERCISE_IDS)[number]
+
+/** The dashboard's four tabs. */
+export type BodyArea = 'upper' | 'back' | 'legs' | 'core'
 
 /** Indices into MediaPipe's 33-landmark pose model. The CV module uses these; nothing else does. */
 export const LM = {
@@ -33,10 +57,16 @@ export interface ExerciseConfig {
   name: string
   /** A word or two for tight spots: tabs, calendar cells. */
   short: string
+  area: BodyArea
   /** One-line instruction for the user, including how to face the camera. */
   cue: string
-  /** Which landmarks the CV module measures the angle at, per side. */
+  /**
+   * Which landmarks the CV module measures the angle at, per side. With `measure: 'tilt'` the
+   * metric is instead the slope of the line from the first landmark to the second against the
+   * horizontal (the third repeats the second).
+   */
   joints: Record<Side, JointTriple>
+  measure?: 'angle' | 'tilt'
   /** Label for the number we display and count, e.g. "Elbow flexion" or "Knee angle". */
   metricLabel: string
   /**
@@ -50,6 +80,9 @@ export interface ExerciseConfig {
   exitDeg: number
   /** Default goal for the metric, drawn on the dashboard. */
   targetDeg: number
+  /** The metric in the start position, and the furthest the 3D figure shows. */
+  restDeg: number
+  maxDeg: number
   /** Reps shorter than this are treated as jitter and ignored. */
   minRepMs: number
 }

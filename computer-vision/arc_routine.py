@@ -12,8 +12,23 @@ from __future__ import annotations
 import argparse
 from typing import Any, Callable
 
-# Arc's three movements, mapped onto the camera app's catalog in movements.py.
-CATALOG_IDS = {"elbow_flexion": "1", "shoulder_abduction": "4"}  # Bicep Curls, Lateral Raise
+# Arc's movements, mapped onto the camera app's catalog in movements.py (all fourteen of it).
+CATALOG_IDS = {
+    "elbow_flexion": "1",  # Bicep Curls
+    "tricep_extension": "2",  # Tricep Extension (Down)
+    "shoulder_press": "3",  # Shoulder Press
+    "shoulder_abduction": "4",  # Lateral Raise
+    "front_raise": "5",  # Front Raise
+    "chest_press": "6",  # Chest Press
+    "pec_fly": "7",  # Pec Fly
+    "lat_pulldown": "8",  # Lat Pulldown
+    "bent_over_row": "9",  # Bent-Over Rows
+    "deadlift": "10",  # Deadlift
+    "squat": "11",  # Squats
+    "lunge": "12",  # Lunges
+    "ab_twist": "13",  # Ab Twist
+    "crunch": "14",  # Crunches
+}
 
 # MediaPipe Pose landmark numbers (a fixed standard).
 LEFT_HIP, RIGHT_HIP = 23, 24
@@ -33,7 +48,7 @@ KNEE_EXTENSION = {
     "max_allowed_extension": 185.0,
 }
 
-EXERCISES = ("elbow_flexion", "shoulder_abduction", "seated_knee_extension")
+EXERCISES = (*CATALOG_IDS, "seated_knee_extension")
 SIDES = ("right", "left")
 # The same limits as Arc's plan schema (dependencies/src/api.ts, PlanInputSchema).
 LIMITS = {"sets": (1, 10), "reps": (1, 50), "restSeconds": (10, 600)}
@@ -78,10 +93,12 @@ def build_routine(spec: dict, lookup: Callable[[str], dict | None], make_exercis
     if data is None:
         raise PlanError(f"the camera app has no exercise {spec.get('catalog_id')}")
     side = spec["side"]
-    indices = data[f"{side}_indices"] if data.get("type") == "arm_dual" else data["indices"]
+    # One-sided movements follow the chosen side; whole-body ones use the catalog's own landmarks.
+    sided = data.get("type") == "arm_dual"
+    indices = data[f"{side}_indices"] if sided else data["indices"]
     return [
         make_exercise(
-            name=f"{data['name']} ({side.capitalize()})",
+            name=f"{data['name']} ({side.capitalize()})" if sided else data["name"],
             primary_joint_indices=indices,
             flex_threshold=data["flex_threshold"],
             extend_threshold=data["extend_threshold"],

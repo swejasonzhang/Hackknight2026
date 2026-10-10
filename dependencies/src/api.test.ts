@@ -34,7 +34,7 @@ describe('API schemas', () => {
     const ok = { exercise: 'elbow_flexion', side: 'right', sets: 3, reps: 8, restSeconds: 45, targetDeg: 140 }
     expect(PlanInputSchema.safeParse(ok).success).toBe(true)
     expect(PlanInputSchema.safeParse({ ...ok, reps: 0 }).success).toBe(false)
-    expect(PlanInputSchema.safeParse({ ...ok, exercise: 'squat' }).success).toBe(false)
+    expect(PlanInputSchema.safeParse({ ...ok, exercise: 'jumping_jacks' }).success).toBe(false)
     expect(UpdatePlanSchema.safeParse({ reps: 10 }).success).toBe(true)
   })
 

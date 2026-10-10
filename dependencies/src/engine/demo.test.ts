@@ -1,4 +1,5 @@
 import { summarizeSets } from './summary.ts'
+import { EXERCISES } from './exercises.ts'
 import { EXERCISE_IDS } from './types.ts'
 import { describe, expect, it } from 'vitest'
 import { generateDemoSessions } from './demo.ts'
@@ -39,7 +40,9 @@ describe('generateDemoSessions', () => {
         const mine = sessions.filter((s) => s.exercise === exercise).sort((x, y) => x.startedAt - y.startedAt)
         const first = mine.slice(0, 4).reduce((sum, s) => sum + s.summary.bestPeakDeg, 0) / 4
         const last = mine.slice(-4).reduce((sum, s) => sum + s.summary.bestPeakDeg, 0) / 4
-        expect(last).toBeGreaterThan(first + 8)
+        // At least 6% of the movement's range better: 8 degrees on a curl, 2 on a twist.
+        const range = EXERCISES[exercise].targetDeg - EXERCISES[exercise].restDeg
+        expect(last, exercise).toBeGreaterThan(first + range * 0.06)
       }
       for (const s of sessions) {
         expect(s.demo).toBe(true)

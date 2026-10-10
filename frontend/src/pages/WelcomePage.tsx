@@ -1,4 +1,4 @@
-import { EXERCISES, ONBOARDING_TOPICS, WEEKDAY_NAMES, type ChatTurn, type CoachStatus, type OnboardingReply, type OnboardingTopic, type ProgramDto } from '@arc/dependencies'
+import { catalogByArea, EXERCISES, ONBOARDING_TOPICS, WEEKDAY_NAMES, type CatalogGroup, type ChatTurn, type CoachStatus, type OnboardingReply, type OnboardingTopic, type ProgramDto } from '@arc/dependencies'
 import { motion, useReducedMotion } from 'motion/react'
 import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
@@ -26,7 +26,8 @@ export const TOPIC_LABELS: Record<OnboardingTopic, string> = {
 export const QUICK_REPLIES: Record<OnboardingTopic, string[]> = {
   goals: ['Get stronger', 'Move more freely', 'Come back from an injury'],
   trainingGoal: ['Get stronger', 'Build muscle', 'Build stamina'],
-  focus: ['My elbow', 'My shoulder', 'My knee'],
+  // Where to start shows the whole catalog Arc sends with the question, by area (see `choices`).
+  focus: [],
   side: ['Left', 'Right'],
   limitations: ['None', 'A bit stiff', 'Recovering from surgery'],
   experience: ['New to it', 'Some', 'Regularly'],
@@ -53,6 +54,7 @@ export function WelcomePage() {
   const reduce = useReducedMotion()
   const [messages, setMessages] = useState<ChatTurn[]>([])
   const [topic, setTopic] = useState<OnboardingTopic | null>(null)
+  const [choices, setChoices] = useState<CatalogGroup[] | null>(null)
   const [draft, setDraft] = useState('')
   const [thinking, setThinking] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -76,6 +78,7 @@ export function WelcomePage() {
       const reply = await api.coach.onboarding(profileId ? { messages: next, profileId } : { messages: next })
       setMessages([...next, { role: 'arc', text: reply.reply }])
       setTopic(reply.topic ?? null)
+      setChoices(reply.topic === 'focus' ? (reply.choices ?? catalogByArea()) : null)
       if (voiceOnRef.current) void speaker.say({ id: reply.messageId, text: reply.reply })
       if (reply.done) {
         setDone(reply)
@@ -200,6 +203,27 @@ export function WelcomePage() {
                 )}
               </motion.li>
             ))}
+            {topic === 'focus' && choices && !thinking && (
+              <li className="sm:pl-12">
+                <div className="panel p-3 sm:p-4" role="group" aria-label="Where to start: every exercise Arc can track">
+                  <div className="t-label mb-3">Every exercise Arc can track</div>
+                  <div className="grid gap-3 sm:grid-cols-[96px_minmax(0,1fr)] sm:gap-x-4">
+                    {choices.map((g) => (
+                      <div key={g.area} className="contents">
+                        <span className="t-meta text-navy sm:pt-2.5">{g.area}</span>
+                        <div className="flex flex-wrap gap-2">
+                          {g.exercises.map((e) => (
+                            <button key={e.id} type="button" className="chip" onClick={() => send(e.name)}>
+                              {e.name}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </li>
+            )}
             {thinking && (
               <li className="t-meta flex items-center gap-3 pl-12">
                 <Lamp tone="primary" blink /> Arc is thinking…
@@ -244,7 +268,7 @@ export function WelcomePage() {
         <footer className="sticky bottom-0 z-10 border-t border-rule-strong bg-paper pb-[env(safe-area-inset-bottom)]">
           <div className="mx-auto w-full max-w-[1180px] px-4 py-3 sm:px-6 lg:grid lg:grid-cols-[minmax(0,1fr)_280px] lg:gap-10">
             <div className="min-w-0">
-              {topic && !thinking && (
+              {topic && !thinking && QUICK_REPLIES[topic].length > 0 ? (
                 <div className="mb-3 flex flex-wrap gap-2" role="group" aria-label="Quick answers">
                   {QUICK_REPLIES[topic].map((r) => (
                     <button key={r} type="button" className="chip" onClick={() => send(r)}>
@@ -252,7 +276,7 @@ export function WelcomePage() {
                     </button>
                   ))}
                 </div>
-              )}
+              ) : null}
               <form onSubmit={onSubmit} className="flex items-stretch gap-2">
                 <label htmlFor="arc-answer" className="sr-only">
                   Your answer

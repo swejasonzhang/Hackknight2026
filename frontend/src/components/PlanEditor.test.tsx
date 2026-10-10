@@ -14,9 +14,9 @@ describe('PlanEditor', () => {
     render(<PlanEditor profileId="p1" plan={null} onSaved={() => {}} />)
 
     const exercise = screen.getByRole('combobox', { name: 'Exercise' })
-    expect(exercise).toHaveTextContent('Elbow flexion')
+    expect(exercise).toHaveTextContent('Bicep curl')
     fireEvent.keyDown(exercise, { key: 'Enter' })
-    fireEvent.click(screen.getByRole('option', { name: 'Shoulder abduction' }))
+    fireEvent.click(screen.getByRole('option', { name: 'Lateral raise' }))
 
     fireEvent.keyDown(screen.getByRole('combobox', { name: 'Side' }), { key: 'Enter' })
     fireEvent.click(screen.getByRole('option', { name: 'Left' }))

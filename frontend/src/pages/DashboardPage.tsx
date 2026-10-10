@@ -1,7 +1,8 @@
-import { EXERCISE_LIST, EXERCISES, type ExerciseId, type PlanDto, type ProgressDto } from '@arc/dependencies'
-import { useEffect, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { EXERCISE_IDS, EXERCISES, prescriptionFor, type ExerciseId, type PlanDto, type ProgramDto, type ProgressDto } from '@arc/dependencies'
+import { useEffect, useRef, useState } from 'react'
+import { Link, useSearchParams } from 'react-router-dom'
 import { api } from '../api/client'
+import { ExercisePicker } from '../components/ExercisePicker'
 import { Folds, type FoldItem } from '../components/Folds'
 import { RecordPanel } from '../components/RecordPanel'
 import { IconActivity, IconCalendar, IconFlame, IconTarget } from '../components/icons'
@@ -11,43 +12,72 @@ import { FatigueChart, PeakChart, RepChart, WeeklyChart } from '../components/Pr
 import { LazyJointScene, LazyProgressScene } from '../components/three/lazy'
 import { restFor } from '../components/three/skeleton'
 import { useRepLoop } from '../components/three/useRepLoop'
-import { Alert, EmptyState, Lamp, Segmented, Skeleton, StatTile, Strip } from '../components/ui'
+import { Alert, EmptyState, Lamp, Skeleton, StatTile, Strip } from '../components/ui'
 import { deg, fatigueLabel, formatDate, weekStartIso } from '../format'
 import { useStickyTop } from '../components/useStickyTop'
 import { useProfiles } from '../hooks/useProfiles'
 import { PlanCalendar } from '../plan/PlanCalendar'
 
-/** The switch carries short labels; the full exercise name is printed on the stage beneath it. */
-const EXERCISE_OPTIONS = EXERCISE_LIST.map((e) => ({ value: e.id, label: e.short }))
+const isExercise = (v: string | null): v is ExerciseId => EXERCISE_IDS.includes(v as ExerciseId)
 
 /**
  * The dashboard as an instrument: a sticky measurement panel (who, which movement, the 3D
- * specimen posed at the latest best rep, a ledger of readings, the plan in one line linking to
- * the plan page) beside the readout column, where every chart is folded behind a plus with its
- * latest reading on the row. The plan and the log live on /plan.
+ * specimen posed at the latest best rep, a ledger of readings, the prescription in one line
+ * linking to the plan page) beside the readout column, where every chart is folded behind a plus
+ * with its latest reading on the row. The movement is picked from four body-area tabs and kept in
+ * ?exercise=; everything follows it: the figure, the readings, the charts, Record and the calendar.
  */
 export function DashboardPage() {
   const { profiles, selected, selectedId, setSelectedId, reload, loading: profilesLoading } = useProfiles()
-  const [exercise, setExercise] = useState<ExerciseId>('elbow_flexion')
+  const [params, setParams] = useSearchParams()
+  const picked = params.get('exercise')
+  const pickedRef = useRef(picked)
+  pickedRef.current = picked
+  const exercise: ExerciseId = isExercise(picked) ? picked : 'elbow_flexion'
+  const setExercise = (next: ExerciseId) =>
+    setParams(
+      (p) => {
+        p.set('exercise', next)
+        return p
+      },
+      { replace: true },
+    )
   const [progress, setProgress] = useState<ProgressDto | null>(null)
   const [plan, setPlan] = useState<PlanDto | null>(null)
+  const [program, setProgram] = useState<ProgramDto | null>(null)
   const [loading, setLoading] = useState(false)
   const [seeding, setSeeding] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [panelRef, panelTop] = useStickyTop<HTMLElement>(32)
 
+  // The plan and the week, once per profile; a freshly picked profile opens on its plan's movement.
+  useEffect(() => {
+    if (!selectedId) return
+    let cancelled = false
+    setPlan(null)
+    setProgram(null)
+    Promise.all([api.plan.get(selectedId).catch(() => null), api.plan.program(selectedId).catch(() => null)]).then(([pl, pr]) => {
+      if (cancelled) return
+      setPlan(pl)
+      setProgram(pr)
+      if (pl && !isExercise(pickedRef.current)) setExercise(pl.exercise)
+    })
+    return () => {
+      cancelled = true
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedId])
+
+  // The readings for the movement picked.
   useEffect(() => {
     if (!selectedId) return
     let cancelled = false
     setLoading(true)
     setError(null)
-    Promise.all([api.progress(selectedId, exercise), api.plan.get(selectedId).catch(() => null)])
-      .then(([p, pl]) => {
-        if (cancelled) return
-        setProgress(p)
-        setPlan(pl)
-        // Follow the plan's exercise the first time a profile is picked.
-        if (pl && p.sessions.length === 0 && pl.exercise !== exercise) setExercise(pl.exercise)
+    api
+      .progress(selectedId, exercise)
+      .then((p) => {
+        if (!cancelled) setProgress(p)
       })
       .catch((err: unknown) => {
         if (!cancelled) setError(err instanceof Error ? err.message : 'Could not load progress')
@@ -58,7 +88,6 @@ export function DashboardPage() {
     return () => {
       cancelled = true
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedId, exercise])
 
   const seedDemo = async () => {
@@ -80,7 +109,8 @@ export function DashboardPage() {
   const data = noProfiles ? null : progress
   const latest = data?.sessions.at(-1) ?? null
   const first = data?.sessions[0] ?? null
-  const goal = data?.targetDeg ?? (plan && plan.exercise === exercise ? plan.targetDeg : null)
+  const prescription = prescriptionFor(exercise, { plan, program, intake: selected?.intake })
+  const goal = data?.targetDeg ?? (prescription.source === 'default' ? null : prescription.targetDeg)
   const bestAll = data && data.sessions.length ? Math.max(...data.sessions.map((s) => s.bestPeakDeg)) : null
   const thisWeek = data?.sessionsPerWeek.find((w) => w.weekStart === weekStartIso(Date.now()))?.count ?? 0
   const fatigue = latest ? fatigueLabel(latest.fatigueIndex) : null
@@ -114,7 +144,7 @@ export function DashboardPage() {
         </div>
 
         <div className="mt-4">
-          <Segmented label="Exercise" options={EXERCISE_OPTIONS} value={exercise} onChange={setExercise} />
+          <ExercisePicker value={exercise} onChange={setExercise} />
         </div>
 
         <div className="stage mt-4 h-[300px] overflow-hidden sm:h-[340px]">
@@ -191,8 +221,10 @@ export function DashboardPage() {
 
         {!noProfiles && !firstLoad && (
           <Link to="/plan" className="t-meta mt-4 flex items-center justify-between gap-3 text-ink-2 hover:no-underline">
-            <span>{plan ? `Plan ${plan.sets} × ${plan.reps} · ${plan.restSeconds} s · ${plan.targetDeg}°` : 'No plan yet'}</span>
-            <span className="text-cobalt">{plan ? 'Plan & log →' : 'Set one →'}</span>
+            <span>
+              {{ plan: 'Plan', week: 'This week', default: 'Suggested' }[prescription.source]} {prescription.sets} × {prescription.reps} · {prescription.restSeconds} s · {prescription.targetDeg}°
+            </span>
+            <span className="text-cobalt">{plan ? 'Plan & log →' : 'Set a plan →'}</span>
           </Link>
         )}
       </section>
@@ -220,9 +252,9 @@ export function DashboardPage() {
           </div>
         )}
 
-        <RecordPanel plan={plan} exercise={exercise} />
+        <RecordPanel prescription={prescription} />
 
-        {selected && !noProfiles && <PlanCalendar profileId={selected.id} />}
+        {selected && !noProfiles && <PlanCalendar profileId={selected.id} exercise={exercise} />}
 
         {noProfiles && (
           <Strip index="00" title="Setup">

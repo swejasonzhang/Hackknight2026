@@ -11,7 +11,7 @@ export interface Landmark {
 export interface JointReading {
   /** False when a landmark of the joint is missing or the model cannot see it well enough. */
   tracked: boolean
-  /** The exercise's metric (elbow flexion, shoulder abduction, knee angle), degrees. */
+  /** The exercise's metric (elbow flexion, shoulder abduction, knee angle, shoulder tilt...), degrees. */
   metricDeg: number
   /** The raw angle at the joint, 180 = straight. */
   innerDeg: number
@@ -30,6 +30,12 @@ export function innerAngleDeg(a: [number, number], b: [number, number], c: [numb
   return (Math.acos(Math.max(-1, Math.min(1, cos))) * 180) / Math.PI
 }
 
+/** How far the line from `a` to `b` slopes off the level, either way, in degrees (0..90). */
+export function tiltDeg(a: [number, number], b: [number, number]): number {
+  const slope = Math.abs((Math.atan2(b[1] - a[1], b[0] - a[0]) * 180) / Math.PI)
+  return slope > 90 ? 180 - slope : slope
+}
+
 const UNTRACKED: JointReading = { tracked: false, metricDeg: 0, innerDeg: 0, points: null }
 
 /**
@@ -45,6 +51,6 @@ export function readJoint(landmarks: readonly Landmark[] | null | undefined, exe
   if (marks.some((m) => !m || (m.visibility ?? 1) < MIN_VISIBILITY)) return UNTRACKED
   const points = marks.map((m) => [m!.x, m!.y]) as JointReading['points'] & object
   const [a, b, c] = points.map(([x, y]) => [x * aspect, y] as [number, number]) as [[number, number], [number, number], [number, number]]
-  const innerDeg = innerAngleDeg(a, b, c)
+  const innerDeg = cfg.measure === 'tilt' ? tiltDeg(a, b) : innerAngleDeg(a, b, c)
   return { tracked: true, innerDeg, metricDeg: cfg.metricFromInnerAngle(innerDeg), points }
 }

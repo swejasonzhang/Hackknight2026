@@ -51,14 +51,14 @@ describe('DayLog', () => {
   it("lists the day's workouts with progress against the previous session and the goal", () => {
     render(<Harness start="2026-10-09" />)
     expect(screen.getByRole('heading', { level: 3, name: /October 9/ })).toBeInTheDocument()
-    const elbow = screen.getByRole('article', { name: /Elbow flexion/ })
+    const elbow = screen.getByRole('article', { name: /Bicep curl/ })
     expect(within(elbow).getByText('132°')).toBeInTheDocument()
     expect(within(elbow).getByText(/\+5° vs Oct 6/)).toBeInTheDocument()
     expect(within(elbow).getByText(/\+32° since Sep 1/)).toBeInTheDocument()
     expect(within(elbow).getByText(/8° to the 140° goal/)).toBeInTheDocument()
     expect(within(elbow).getByRole('link', { name: /open session/i })).toHaveAttribute('href', '/sessions/c')
-    expect(screen.getByRole('article', { name: /Shoulder abduction/ })).toBeInTheDocument()
-    expect(screen.getByText(/first shoulder abduction session/i)).toBeInTheDocument()
+    expect(screen.getByRole('article', { name: /Lateral raise/ })).toBeInTheDocument()
+    expect(screen.getByText(/first lateral raise session/i)).toBeInTheDocument()
   })
 
   it('steps a day at a time and stops at today', () => {

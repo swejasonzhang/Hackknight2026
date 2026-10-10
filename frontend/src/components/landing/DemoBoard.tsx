@@ -1,4 +1,4 @@
-import { buildProgress, EXERCISE_LIST, EXERCISES, generateDemoSessions, type ExerciseId } from '@arc/dependencies'
+import { buildProgress, EXERCISES, generateDemoSessions, type ExerciseId } from '@arc/dependencies'
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react'
 import { useMemo, useState } from 'react'
 import { fatigueLabel, formatDate } from '../../format'
@@ -9,7 +9,9 @@ import { Lamp, Segmented, Tag, type SegmentedOption } from '../ui'
 
 type View = 'trend' | 'reps' | 'fatigue' | 'weekly' | '3d'
 
-const EXERCISE_OPTIONS = EXERCISE_LIST.map((e) => ({ value: e.id, label: e.id === 'elbow_flexion' ? 'Elbow' : e.id === 'shoulder_abduction' ? 'Shoulder' : 'Knee' }))
+/** The board shows three of the movements, one from each kind of joint. */
+const FEATURED: ExerciseId[] = ['elbow_flexion', 'shoulder_abduction', 'seated_knee_extension']
+const EXERCISE_OPTIONS = FEATURED.map((id) => ({ value: id, label: EXERCISES[id].short }))
 const VIEWS: SegmentedOption<View>[] = [
   { value: 'trend', label: 'Trend' },
   { value: 'reps', label: 'Rep by rep', short: 'Reps' },

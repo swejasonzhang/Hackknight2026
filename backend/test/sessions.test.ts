@@ -49,7 +49,7 @@ describe('sessions', () => {
     expect(knee.body).toHaveLength(1)
     expect(knee.body[0].exercise).toBe('seated_knee_extension')
 
-    const bad = await c.get(`/api/profiles/${profileId}/sessions?exercise=squat`)
+    const bad = await c.get(`/api/profiles/${profileId}/sessions?exercise=jumping_jacks`)
     expect(bad.status).toBe(400)
   })
 

@@ -1,20 +1,19 @@
-import { EXERCISES, type ExerciseId, type PlanInput } from '@arc/dependencies'
+import { EXERCISES, type Prescription } from '@arc/dependencies'
 import { useId } from 'react'
 import { Link } from 'react-router-dom'
 import { Lamp } from './ui'
 
-type RecordPlan = Pick<PlanInput, 'exercise' | 'side' | 'sets' | 'reps' | 'restSeconds'>
-/** Without a saved plan: the movement on screen, right side, 3 sets of 8, 45 s rest. */
-const DEFAULTS = { side: 'right', sets: 3, reps: 8, restSeconds: 45 } as const
+const SOURCE: Record<Prescription['source'], string> = { plan: 'Plan', week: 'This week', default: 'Suggested' }
 
 /**
  * The dashboard's way into recording: Arc tracks the body through the webcam, in the browser,
- * straight into the profile's plan. Nothing to install; the video stays on the device.
+ * for the movement picked on the dashboard, at its prescription (the plan, the week Arc built, or
+ * the goal's ranges). Nothing to install; the video stays on the device.
  */
-export function RecordPanel({ plan, exercise }: { plan: RecordPlan | null; exercise: ExerciseId }) {
+export function RecordPanel({ prescription }: { prescription: Prescription }) {
   const titleId = useId()
-  const start: RecordPlan = plan ?? { exercise, ...DEFAULTS }
-  const summary = `${EXERCISES[start.exercise].name} · ${start.side} · ${start.sets} × ${start.reps} · ${start.restSeconds} s rest`
+  const p = prescription
+  const summary = `${EXERCISES[p.exercise].name} · ${p.side} · ${p.sets} × ${p.reps} · ${p.restSeconds} s rest`
   return (
     <section aria-labelledby={titleId} className="panel mb-6 p-4 sm:p-5">
       <div className="grid gap-4 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-start sm:gap-6">
@@ -29,10 +28,10 @@ export function RecordPanel({ plan, exercise }: { plan: RecordPlan | null; exerc
             Arc tracks your body through the webcam right here, with nothing to install. It finds the joints of the movement, measures every rep in degrees, counts your sets and times the rest, then saves the session to this dashboard. The video never leaves this device; only the angles are saved.
           </p>
           <p className="t-meta mt-3 text-navy">
-            {plan ? 'Plan' : 'No plan yet'} · <span className="normal-case">{summary}</span>
+            {SOURCE[p.source]} · <span className="normal-case">{summary}</span>
           </p>
         </div>
-        <Link to={plan ? '/record' : `/record?exercise=${exercise}`} className="btn btn-block justify-self-start">
+        <Link to={`/record?exercise=${p.exercise}`} className="btn btn-block justify-self-start">
           <Lamp tone="primary" />
           Start recording
         </Link>

@@ -4,10 +4,11 @@
  */
 import { z } from 'zod'
 import { EmailSchema, NameSchema } from './fields.ts'
+import type { CatalogGroup } from './engine/exercises.ts'
 import type { ProgramDto } from './program.ts'
-import { VOICE_COMMANDS, type ExerciseId, type SessionPlan, type SessionRecord, type Side } from './engine/types.ts'
+import { EXERCISE_IDS, VOICE_COMMANDS, type ExerciseId, type SessionPlan, type SessionRecord, type Side } from './engine/types.ts'
 
-export const ExerciseIdSchema = z.enum(['elbow_flexion', 'shoulder_abduction', 'seated_knee_extension'])
+export const ExerciseIdSchema = z.enum(EXERCISE_IDS)
 export const SideSchema = z.enum(['left', 'right'])
 
 // ---- accounts ----
@@ -190,6 +191,8 @@ export interface OnboardingReply {
   offline: boolean
   /** What Arc's line asks about; absent once Arc is done. */
   topic?: OnboardingTopic
+  /** With the "where to start" question: every movement Arc can track, by body area. */
+  choices?: CatalogGroup[]
   intake?: CoachIntake
   profileId?: string
   plan?: PlanDto

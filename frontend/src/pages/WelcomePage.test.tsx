@@ -1,3 +1,4 @@
+import { catalogByArea, EXERCISE_IDS } from '@arc/dependencies'
 import { fireEvent, render, screen, within } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
@@ -62,6 +63,21 @@ describe('WelcomePage', () => {
     expect(await screen.findByText('Any injuries?')).toBeInTheDocument()
     expect(onboarding).toHaveBeenLastCalledWith({ messages: [{ role: 'arc', text: 'Left side or right side?' }, { role: 'user', text: 'Left' }] })
     expect(within(screen.getByRole('group', { name: /quick answers/i })).getByRole('button', { name: 'None' })).toBeInTheDocument()
+  })
+
+  it('offers every exercise in the catalog, by area, when Arc asks where to start', async () => {
+    onboarding
+      .mockResolvedValueOnce({ reply: 'Where should we start?', messageId: 'm1', done: false, offline: true, topic: 'focus', choices: catalogByArea() })
+      .mockResolvedValueOnce({ reply: 'Left side or right side?', messageId: 'm2', done: false, offline: true, topic: 'side' })
+    renderPage()
+    await screen.findByText('Where should we start?')
+    const start = screen.getByRole('group', { name: /where to start/i })
+    for (const area of ['Upper body', 'Back', 'Legs', 'Core']) expect(within(start).getByText(area)).toBeInTheDocument()
+    expect(within(start).getAllByRole('button')).toHaveLength(EXERCISE_IDS.length)
+    fireEvent.click(within(start).getByRole('button', { name: 'Lat pulldown' }))
+    expect(await screen.findByText('Left side or right side?')).toBeInTheDocument()
+    expect(onboarding).toHaveBeenLastCalledWith({ messages: [{ role: 'arc', text: 'Where should we start?' }, { role: 'user', text: 'Lat pulldown' }] })
+    expect(screen.queryByRole('group', { name: /where to start/i })).not.toBeInTheDocument()
   })
 
   it('can be skipped at any point, straight to the dashboard', async () => {

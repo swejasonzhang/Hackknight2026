@@ -1,3 +1,4 @@
+import { EXERCISE_IDS, EXERCISES } from '@arc/dependencies'
 import { describe, expect, it } from 'vitest'
 import { innerAngleDeg, readJoint, type Landmark } from './angle'
 
@@ -39,6 +40,15 @@ describe('readJoint', () => {
     expect(knee.metricDeg).toBeCloseTo(90, 6)
   })
 
+  it('reads the ab twist as the shoulder line against the level, whichever way it leans', () => {
+    const level = readJoint(pose({ 11: [0.6, 0.3], 12: [0.4, 0.3] }), 'ab_twist', 'right')
+    expect(level.metricDeg).toBeCloseTo(0, 6)
+    const run = 0.2
+    const rise = Math.tan((25 * Math.PI) / 180) * run
+    expect(readJoint(pose({ 11: [0.6, 0.3 - rise], 12: [0.4, 0.3] }), 'ab_twist', 'left').metricDeg).toBeCloseTo(25, 6)
+    expect(readJoint(pose({ 11: [0.6, 0.3 + rise], 12: [0.4, 0.3] }), 'ab_twist', 'right').metricDeg).toBeCloseTo(25, 6)
+  })
+
   it('is not tracked when a joint is hidden or there is nobody in view', () => {
     expect(readJoint(pose({ 12: [0.5, 0.2], 14: [0.5, 0.4], 16: [0.7, 0.4] }, 0.2), 'elbow_flexion', 'right').tracked).toBe(false)
     expect(readJoint(pose({ 12: [0.5, 0.2], 14: [0.5, 0.4] }), 'elbow_flexion', 'right').tracked).toBe(false)
@@ -49,9 +59,14 @@ describe('readJoint', () => {
 describe('the simulated person (development only)', () => {
   it('produces landmarks that read back as the reading it was given, for every exercise and side', async () => {
     const { simulatedLandmarks } = await import('./simulated')
-    for (const [exercise, deg] of [['elbow_flexion', 120], ['shoulder_abduction', 150], ['seated_knee_extension', 165]] as const) {
-      for (const side of ['left', 'right'] as const) {
-        expect(readJoint(simulatedLandmarks(exercise, side, deg), exercise, side, 16 / 9).metricDeg).toBeCloseTo(deg, 6)
+    for (const exercise of EXERCISE_IDS) {
+      const { restDeg, targetDeg } = EXERCISES[exercise]
+      for (const deg of [restDeg, (restDeg + targetDeg) / 2, targetDeg]) {
+        for (const side of ['left', 'right'] as const) {
+          const reading = readJoint(simulatedLandmarks(exercise, side, deg), exercise, side, 16 / 9)
+          expect(reading.tracked, `${exercise} ${side}`).toBe(true)
+          expect(reading.metricDeg, `${exercise} ${side} ${deg}°`).toBeCloseTo(deg, 4)
+        }
       }
     }
   })

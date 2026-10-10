@@ -4,8 +4,9 @@
  * it as a calendar, and every prescription stays inside the training goal's ranges.
  */
 import { z } from 'zod'
-import { PlanInputSchema, WeekdaySchema, type CoachIntake, type PlanInput, type TrainingGoal } from './api.ts'
+import { PlanInputSchema, WeekdaySchema, type CoachIntake, type PlanDto, type PlanInput, type TrainingGoal } from './api.ts'
 import { EXERCISE_LIST, EXERCISES } from './engine/exercises.ts'
+import type { ExerciseId } from './engine/types.ts'
 
 type Range = readonly [number, number]
 
@@ -174,7 +175,7 @@ const LEVEL = { new: 0, some: 0.5, regular: 1 } as const
 /**
  * Arc's own week from the answers, used whenever Gemini is off or sends something unusable.
  * Every day opens with the focus movement on the member's side; anyone past "new" gets a second,
- * rotating movement for variety. Sets and reps sit higher in the goal's range with experience,
+ * rotating movement for variety from the focus's own body area. Sets and reps sit higher in the goal's range with experience,
  * rest lower.
  */
 export function programFromIntake(intake: CoachIntake): ProgramInput {
@@ -188,7 +189,9 @@ export function programFromIntake(intake: CoachIntake): ProgramInput {
   const item = (exercise: PlanInput['exercise']): PlanInput => ({ exercise, side: intake.side, sets, reps, restSeconds, targetDeg: EXERCISES[exercise].targetDeg })
 
   const weekdays = (intake.trainingDays?.length ? [...new Set(intake.trainingDays)] : spreadDays(intake.daysPerWeek)).sort(mondayFirst)
-  const others = EXERCISE_LIST.map((e) => e.id).filter((id) => id !== intake.focus)
+  // Variety comes from the focus's own body area (a squat week adds lunges and knee extensions).
+  const area = EXERCISES[intake.focus].area
+  const others = EXERCISE_LIST.filter((e) => e.area === area && e.id !== intake.focus).map((e) => e.id)
   const days: ProgramDay[] = weekdays.map((weekday, i) => {
     const items = [item(intake.focus)]
     if (intake.experience !== 'new' && others.length) items.push(item(others[i % others.length]!))
@@ -203,4 +206,36 @@ export function programFromIntake(intake: CoachIntake): ProgramInput {
 /** The training day that falls on `date` (by its local weekday), or undefined on a rest day. */
 export function programDayOn(program: Pick<ProgramInput, 'days'>, date: Date): ProgramDay | undefined {
   return program.days.find((d) => d.weekday === date.getDay())
+}
+
+export type PrescriptionSource = 'plan' | 'week' | 'default'
+export interface Prescription extends PlanInput {
+  /** Where the numbers came from: the saved plan, the week Arc built, or the goal's ranges. */
+  source: PrescriptionSource
+}
+
+/**
+ * What Record runs for the movement picked on the dashboard: the saved plan when it is for that
+ * movement; else the week's prescription for it (the one on `date` first, else its first day);
+ * else the member's goal ranges on their side (3 x 8 with 45 s rest without an intake), always
+ * with the movement's own goal angle unless a plan or the week sets one.
+ */
+export function prescriptionFor(
+  exercise: ExerciseId,
+  { plan, program, intake, date = new Date() }: { plan?: Pick<PlanDto, keyof PlanInput> | null; program?: Pick<ProgramInput, 'days'> | null; intake?: CoachIntake | null; date?: Date },
+): Prescription {
+  if (plan && plan.exercise === exercise) {
+    const { side, sets, reps, restSeconds, targetDeg } = plan
+    return { exercise, side, sets, reps, restSeconds, targetDeg, source: 'plan' }
+  }
+  if (program) {
+    const today = programDayOn(program, date)?.items.find((i) => i.exercise === exercise)
+    const any = program.days.flatMap((d) => d.items).find((i) => i.exercise === exercise)
+    const item = today ?? any
+    if (item) return { ...item, source: 'week' }
+  }
+  const targetDeg = EXERCISES[exercise].targetDeg
+  if (!intake) return { exercise, side: 'right', sets: 3, reps: 8, restSeconds: 45, targetDeg, source: 'default' }
+  const own = programFromIntake({ ...intake, focus: exercise }).days[0]!.items[0]!
+  return { ...own, source: 'default' }
 }

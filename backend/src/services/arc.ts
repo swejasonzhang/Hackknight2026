@@ -1,4 +1,6 @@
 import {
+  BODY_AREAS,
+  catalogByArea,
   clampToRanges,
   CoachIntakeSchema,
   estimateFatigue,
@@ -39,6 +41,8 @@ import { generate, geminiConfigured } from './gemini.ts'
 const PERSONA = `Your name is Arc. You are a gym coach with a physical therapist's eye, speaking through voice inside the Arc app, which measures range of motion in degrees through the member's webcam. Always call yourself Arc. Speak to the member directly, warmly and briefly: short spoken sentences, no markdown, no bullet points, no headers, no emoji. Use only the numbers you are given and never invent a measurement. This is a personal fitness tool, not medical care: never diagnose, and if the member mentions sharp or worsening pain, suggest they check with a professional.`
 
 const firstName = (name: string) => name.trim().split(/\s+/)[0] || 'there'
+/** "upper body, back, legs and core". */
+const listOf = (items: string[]) => (items.length <= 1 ? (items[0] ?? '') : `${items.slice(0, -1).join(', ')} and ${items.at(-1)}`)
 const lower = (exercise: ExerciseId) => EXERCISES[exercise].name.toLowerCase()
 const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`
 
@@ -49,7 +53,7 @@ const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`
 export const ONBOARDING_QUESTIONS: Record<OnboardingTopic, (name: string) => string> = {
   goals: (name) => `Hi ${firstName(name)}, I'm Arc, your coach. What would you like to do with your body? Get stronger, move more freely, come back from an injury, something else?`,
   trainingGoal: () => 'Love that. Would you rather get stronger, build muscle, or build stamina?',
-  focus: () => 'Which part should we work on first: your elbow, your shoulder or your knee?',
+  focus: () => `Where should we start? Every exercise I can track is on your screen, across ${listOf(BODY_AREAS.map((a) => a.name.toLowerCase()))}. Tap one, name it, or just tell me the area.`,
   side: () => 'Left side or right side?',
   limitations: () => 'Any injuries, pain or limits I should know about?',
   experience: () => 'How much have you trained before: new to it, some, or regularly?',
@@ -60,18 +64,38 @@ export const ONBOARDING_QUESTIONS: Record<OnboardingTopic, (name: string) => str
 /** Gemini gets this many answers to finish; after that Arc wraps up with what it has. */
 const MAX_ANSWERS = 12
 
+/**
+ * Words for a place to start, most specific first: a named exercise, then a joint, then an area.
+ * "Back" counts only as the body's back, never "come back from an injury".
+ */
+const FOCUS_WORDS: [RegExp, ExerciseId][] = [
+  // A movement named as the catalog names it, from the quick replies or typed out.
+  ...EXERCISE_LIST.map((e): [RegExp, ExerciseId] => [new RegExp(`\\b${e.name.toLowerCase().replace(/[-\s]+/g, '[-\\s]?')}`), e.id]),
+  [/dead ?lifts?|hinge|hamstrings?/, 'deadlift'],
+  [/squats?/, 'squat'],
+  [/lunges?/, 'lunge'],
+  [/\bknees?\b/, 'seated_knee_extension'],
+  [/\b(legs?|quads?|thighs?|glutes?)\b/, 'squat'],
+  [/crunch|\babs\b|stomach|sit ?ups?/, 'crunch'],
+  [/twist|obliques?|rotat/, 'ab_twist'],
+  [/\bcore\b/, 'crunch'],
+  [/pull ?downs?|pull ?ups?|\blats?\b/, 'lat_pulldown'],
+  [/\brows?\b|rowing/, 'bent_over_row'],
+  [/^\s*back\s*$|\b(my|upper|lower|the) back\b|\bback (muscles?|area|day)\b/, 'lat_pulldown'],
+  [/\bfl(y|ys|ies|yes)\b|\bpecs?\b/, 'pec_fly'],
+  [/chest|bench|push ?ups?|press ?ups?/, 'chest_press'],
+  [/triceps?/, 'tricep_extension'],
+  [/front raises?/, 'front_raise'],
+  [/overhead|shoulder press|\bpress(es)?\b/, 'shoulder_press'],
+  [/lateral|side raises?|shoulders?|delts?|raises?/, 'shoulder_abduction'],
+  [/elbows?|biceps?|curls?|\barms?\b|forearms?/, 'elbow_flexion'],
+]
+
 /** The intake from the scripted answers, one per topic, read with plain keyword rules. */
 export function extractIntake(answers: string[]): CoachIntake {
   const at = (topic: OnboardingTopic) => answers[ONBOARDING_TOPICS.indexOf(topic)] ?? ''
   const all = answers.join(' ').toLowerCase()
-  const focusOf = (text: string): ExerciseId | null =>
-    /\b(knee|knees|leg|legs|quad|quads|hamstring|thigh)\b/.test(text)
-      ? 'seated_knee_extension'
-      : /\b(shoulder|shoulders|overhead|raise|lateral|delt|delts)\b/.test(text)
-        ? 'shoulder_abduction'
-        : /\b(elbow|elbows|bicep|biceps|curl|curls|arm|arms|forearm)\b/.test(text)
-          ? 'elbow_flexion'
-          : null
+  const focusOf = (text: string): ExerciseId | null => FOCUS_WORDS.find(([re]) => re.test(text))?.[1] ?? null
   const sideOf = (text: string): Side | null => (/\bleft\b/.test(text) ? 'left' : /\bright\b/.test(text) ? 'right' : null)
   const limits = at('limitations').trim()
   const exp = at('experience').toLowerCase()
@@ -131,7 +155,12 @@ const EXERCISE_ENUM = EXERCISE_LIST.map((e) => e.id)
 
 const ONBOARDING_SYSTEM = `${PERSONA}
 
-You are welcoming a new member who just signed up, in a short chat. One question at a time, in this order, learn: goals, what they want to do with their body and physique; trainingGoal, whether they would rather get stronger (strength), build muscle (hypertrophy) or build stamina (endurance), asked in plain words; focus, which movement matters most, mapped to exactly one of ${EXERCISE_LIST.map((e) => `${e.id} (${e.name.toLowerCase()})`).join(', ')}; side, left or right; limitations, any injuries, pain or limits; experience, new, some or regular; days, which days of the week they can train (weekday numbers, 0 is Sunday; if they give only a count, spread the days through the week with rest days between); height and weight, which they may skip (then null; convert feet and inches to centimetres and pounds to kilograms). Briefly react to what they said before asking the next thing. Keep each reply to one or two short spoken sentences and ask exactly one question; set topic to what that question asks about. Start, if the conversation is empty, by introducing yourself as Arc. When you know everything, set done to true, thank them by first name, tell them their week is ready on the dashboard's calendar, and fill intake with daysPerWeek equal to the number of trainingDays. Until then set done to false and intake to null. Reply only with the JSON object.`
+You are welcoming a new member who just signed up, in a short chat. One question at a time, in this order, learn: goals, what they want to do with their body and physique; trainingGoal, whether they would rather get stronger (strength), build muscle (hypertrophy) or build stamina (endurance), asked in plain words; focus, where to start, mapped to exactly one exercise id from the catalog below; when you ask it, name the four areas (${listOf(BODY_AREAS.map((a) => a.name.toLowerCase()))}) and tell them every exercise is listed on their screen to tap, and never offer only a few; side, left or right; limitations, any injuries, pain or limits; experience, new, some or regular; days, which days of the week they can train (weekday numbers, 0 is Sunday; if they give only a count, spread the days through the week with rest days between); height and weight, which they may skip (then null; convert feet and inches to centimetres and pounds to kilograms). Briefly react to what they said before asking the next thing. Keep each reply to one or two short spoken sentences and ask exactly one question; set topic to what that question asks about. Start, if the conversation is empty, by introducing yourself as Arc. When you know everything, set done to true, thank them by first name, tell them their week is ready on the dashboard's calendar, and fill intake with daysPerWeek equal to the number of trainingDays. Until then set done to false and intake to null. Reply only with the JSON object.
+
+The catalog, every exercise Arc can track, by area:
+${catalogByArea()
+  .map((g) => `${g.area}: ${g.exercises.map((e) => `${e.id} (${e.name.toLowerCase()})`).join(', ')}`)
+  .join('\n')}`
 
 const ONBOARDING_SCHEMA = {
   type: 'OBJECT',
