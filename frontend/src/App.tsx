@@ -12,7 +12,8 @@ import { ProfilesProvider } from './profiles/ProfilesContext'
 
 /**
  * URL map
- *   /               landing page (visitors; signed-in users go to /dashboard)
+ *   /               landing page, for everyone; the app's logo leads here, and a signed-in
+ *                   user's buttons lead back into the app
  *   /signup, /login account pages
  *   /dashboard      progress for the selected profile
  *   /profiles       household profiles
@@ -21,14 +22,7 @@ import { ProfilesProvider } from './profiles/ProfilesContext'
 export default function App() {
   return (
     <Routes>
-      <Route
-        path="/"
-        element={
-          <PublicOnly>
-            <LandingPage />
-          </PublicOnly>
-        }
-      />
+      <Route path="/" element={<LandingPage />} />
 
       <Route
         element={

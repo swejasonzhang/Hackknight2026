@@ -69,7 +69,7 @@ describe('route guards', () => {
     expect(await screen.findByText('landing page')).toBeInTheDocument()
   })
 
-  it('takes a signed-in user from the landing page to /dashboard', async () => {
+  it('takes a signed-in user from a public-only page (sign-up, log in) to /dashboard', async () => {
     setToken('valid')
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse({ id: 'u1', name: 'Ada', email: 'ada@example.com', createdAt: 1 })))
     app('/')

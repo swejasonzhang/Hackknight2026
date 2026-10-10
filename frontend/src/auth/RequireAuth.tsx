@@ -22,7 +22,7 @@ export function RequireAuth({ children }: { children: ReactNode }) {
   return children
 }
 
-/** Wraps the landing, signup and login pages: a signed-in user goes straight to the app. */
+/** Wraps the signup and login pages: a signed-in user goes straight to the app. */
 export function PublicOnly({ children }: { children: ReactNode }) {
   const { status } = useAuth()
   if (status === 'loading') return <Checking />

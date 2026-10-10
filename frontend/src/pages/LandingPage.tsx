@@ -8,6 +8,7 @@ import { Logo } from '../components/icons'
 import { DemoBoard } from '../components/landing/DemoBoard'
 import { LiveJoint } from '../components/landing/LiveJoint'
 import { Sparkline } from '../components/landing/Sparkline'
+import { useAccountLinks } from '../components/landing/accountLinks'
 import { useScrollSpy } from '../components/landing/useScrollSpy'
 import { ease, Item, MaskLines, Page, parentVariants, Reveal, riseVariants, RuleDraw } from '../components/motion'
 import { Strip } from '../components/ui'
@@ -98,6 +99,7 @@ function Scale({ active }: { active: string | null }) {
 }
 
 function TitleBlock({ active }: { active: string | null }) {
+  const account = useAccountLinks()
   return (
     <header className="border-b border-rule-strong lg:sticky lg:top-0 lg:flex lg:h-screen lg:flex-col lg:border-r lg:border-b-0 lg:border-rule lg:px-6 lg:py-8">
       <div className="flex items-start justify-between gap-4 px-4 py-4 sm:px-6 sm:py-5 lg:block lg:p-0">
@@ -109,12 +111,11 @@ function TitleBlock({ active }: { active: string | null }) {
           <span className="t-label mt-3 block text-muted">Range-of-motion readout</span>
         </Link>
         <div className="hidden gap-2 sm:flex lg:hidden">
-          <Link to="/signup" className="btn btn-block">
-            Create account
-          </Link>
-          <Link to="/login" className="btn">
-            Log in
-          </Link>
+          {account.map((l) => (
+            <Link key={l.to} to={l.to} className={l.primary ? 'btn btn-block' : 'btn'}>
+              {l.label}
+            </Link>
+          ))}
         </div>
       </div>
 
@@ -135,12 +136,11 @@ function TitleBlock({ active }: { active: string | null }) {
       <Scale active={active} />
 
       <div className="hidden flex-col gap-2 lg:flex">
-        <Link to="/signup" className="btn btn-block btn-wide">
-          Create account
-        </Link>
-        <Link to="/login" className="btn btn-wide">
-          Log in
-        </Link>
+        {account.map((l) => (
+          <Link key={l.to} to={l.to} className={l.primary ? 'btn btn-block btn-wide' : 'btn btn-wide'}>
+            {l.label}
+          </Link>
+        ))}
       </div>
     </header>
   )
@@ -148,6 +148,7 @@ function TitleBlock({ active }: { active: string | null }) {
 
 export function LandingPage() {
   const active = useScrollSpy(SECTION_IDS)
+  const account = useAccountLinks()
   const reduce = useReducedMotion()
   const sparkline = useMemo(
     () =>
@@ -180,12 +181,11 @@ export function LandingPage() {
                 <LiveJoint />
                 <p className="t-lead mt-6">A camera app tracks your shoulder, elbow and wrist and measures every rep like a goniometer. Arc shows the trend, so progress is a number you can watch, not a feeling you have to trust.</p>
                 <div className="mt-6 flex flex-col gap-2 sm:hidden">
-                  <Link to="/signup" className="btn btn-block btn-lg btn-wide">
-                    Create account
-                  </Link>
-                  <Link to="/login" className="btn btn-lg btn-wide">
-                    Log in
-                  </Link>
+                  {account.map((l) => (
+                    <Link key={l.to} to={l.to} className={l.primary ? 'btn btn-block btn-lg btn-wide' : 'btn btn-lg btn-wide'}>
+                      {l.label}
+                    </Link>
+                  ))}
                 </div>
               </motion.div>
 
@@ -306,16 +306,13 @@ export function LandingPage() {
                 <span className="t-meta">Week 01 of many</span>
                 <MaskLines id="foot-title" className="t-display-sm mt-4 text-white" lines={['Start the', 'first week.']} />
                 <Reveal className="mt-8 flex flex-wrap gap-3">
-                  <Item>
-                    <Link to="/signup" className="btn btn-block btn-lg">
-                      Create account
-                    </Link>
-                  </Item>
-                  <Item>
-                    <Link to="/login" className="btn btn-lg">
-                      Log in
-                    </Link>
-                  </Item>
+                  {account.map((l) => (
+                    <Item key={l.to}>
+                      <Link to={l.to} className={l.primary ? 'btn btn-block btn-lg' : 'btn btn-lg'}>
+                        {l.label}
+                      </Link>
+                    </Item>
+                  ))}
                 </Reveal>
               </div>
               <Reveal className="lg:col-span-5">
@@ -341,8 +338,11 @@ export function LandingPage() {
             </span>
             <span>© 2026 {APP_NAME} · Built at Hackknight · a personal tool, not a clinical one</span>
             <nav aria-label="Footer" className="flex gap-5 sm:ml-auto">
-              <Link to="/login">Log in</Link>
-              <Link to="/signup">Create account</Link>
+              {[...account].reverse().map((l) => (
+                <Link key={l.to} to={l.to}>
+                  {l.label}
+                </Link>
+              ))}
             </nav>
           </footer>
         </main>
