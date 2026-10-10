@@ -475,6 +475,13 @@
   .btn-wide {
     width: 100%;
   }
+  .btn-icon {
+    width: 44px;
+    padding: 0;
+    flex: none;
+    font-size: 16px;
+    letter-spacing: 0;
+  }
   .on-navy .btn {
     background: transparent;
     border-color: rgb(255 255 255 / 0.4);
@@ -593,6 +600,19 @@
   @media (min-width: 40rem) {
     .field-cell {
       padding: 8px 0 8px 16px;
+    }
+  }
+  /* In the plan page's 30% column (desktop only), each label sits over its control. */
+  @media (min-width: 64rem) {
+    .field-row.field-row-stacked {
+      grid-template-columns: minmax(0, 1fr);
+    }
+    .field-row-stacked .field-label {
+      padding: 14px 0 4px;
+      border-right: 0;
+    }
+    .field-row-stacked .field-cell {
+      padding: 4px 0 12px;
     }
   }
   .field-input {
@@ -834,7 +854,7 @@
     background: var(--navy);
     color: #fff;
     display: grid;
-    grid-template-columns: 56px 1fr 1fr 56px;
+    grid-template-columns: 52px repeat(3, minmax(0, 1fr)) 52px;
     z-index: 30;
   }
   .bar-link {
@@ -952,6 +972,61 @@
   border-bottom: 1px solid rgb(255 255 255 / 0.1);
 }
 
+/* ---- the plan page's week: seven equal day cells, the chosen one energised ---- */
+.week-strip {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  border: 1px solid var(--rule-strong);
+  background: var(--paper);
+}
+.week-cell {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 10px 0 9px;
+  border-right: 1px solid var(--rule);
+  background: transparent;
+  color: var(--navy);
+  cursor: pointer;
+  transition: background-color var(--t-fast) var(--ease);
+}
+.week-cell:last-child {
+  border-right: 0;
+}
+.week-cell:hover:not(:disabled) {
+  background: var(--vellum);
+}
+.week-cell[aria-pressed='true'] {
+  background: var(--vellum);
+}
+.week-cell:disabled {
+  color: var(--lamp-off);
+  cursor: not-allowed;
+}
+.week-cell:disabled .t-meta {
+  color: var(--lamp-off);
+}
+.week-cell:focus-visible {
+  outline-offset: -4px;
+}
+.week-date {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 20px;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---- the dashboard's chart folds open and close like the FAQ ---- */
+.fold-content[data-state='open'] {
+  animation: accordion-down 0.32s var(--ease);
+}
+.fold-content[data-state='closed'] {
+  animation: accordion-up 0.22s var(--ease);
+}
+
 /* ---- datasheet rows settle in one after another (auth, plan) ---- */
 @keyframes row-in {
   from {
@@ -998,6 +1073,7 @@
   }
   .lamp-blink,
   .faq-content,
+  .fold-content,
   .datasheet > .field-row {
     animation: none;
   }
