@@ -5,7 +5,8 @@ import { AuthForm, type AuthFormValues } from '../components/AuthForm'
 export function SignupPage() {
   const { signup } = useAuth()
   const navigate = useNavigate()
-  const from = (useLocation().state as { from?: string } | null)?.from ?? '/dashboard'
+  // A new member meets Arc first.
+  const from = (useLocation().state as { from?: string } | null)?.from ?? '/welcome'
 
   const onSubmit = async (v: AuthFormValues) => {
     await signup({ name: v.name ?? '', email: v.email, password: v.password })

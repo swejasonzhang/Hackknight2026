@@ -19,7 +19,11 @@ uv run example.py            # prints Arc's answer, writes arc_answer.mp3 if Ele
 - `ai_coach/analytics.py` - turns raw `{set_number, reps: [{peak_rom_degrees, tempo_seconds}]}` data into the `FatigueSetSummary` Gemini reasons over (ROM decline %, tempo slowdown %, a 0-100 fatigue score).
 - `example.py` - runnable end-to-end demo against a sample session, no backend or database needed.
 
-## Not wired up yet
+## Wired into the app (2026-10-10)
+
+The prompt, model and voice settings are ported to TypeScript in `backend/src/services/` (`arc.ts`, `gemini.ts`, `voice.ts`) and exposed as `/api/coach/*`: Arc runs the onboarding chat after sign-up, reads each set and each session back, and speaks with ElevenLabs (root README, section 4b; ADR-0018). The notes below describe the module as it was before that port.
+
+## Not wired up yet (historical)
 
 This module is self-contained and doesn't talk to the backend or MongoDB. Two things
 would need to happen to put it behind an endpoint teammates can call from the dashboard:

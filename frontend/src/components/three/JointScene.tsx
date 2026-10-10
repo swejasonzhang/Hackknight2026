@@ -192,7 +192,9 @@ function Body({ exercise, angle, goalDeg, rangeDeg, idle, reduce }: Pick<JointSc
   }, [band, exercise, rangeDeg, rest, objects, invalidate])
 
   // Reduced motion renders on demand: draw again whenever the reading or the movement changes.
-  useEffect(() => invalidate(), [invalidate, exercise, angle, goalDeg])
+  useEffect(() => {
+    invalidate()
+  }, [invalidate, exercise, angle, goalDeg])
 
   const apply = (s: Skeleton, deg: number) => {
     const j = s.joints

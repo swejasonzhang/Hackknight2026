@@ -31,7 +31,8 @@ export function useRepLoop(exercise: ExerciseId, peakDeg: number | null): Motion
       repeatDelay: PAUSE,
     })
     return () => controls.stop()
-  }, [angle, rest, peakDeg, reduce])
+    // A new movement always starts from its own rest, even when its rest angle matches the last one's.
+  }, [angle, exercise, rest, peakDeg, reduce])
 
   if (peakDeg == null) return null
   return reduce ? peakDeg : angle

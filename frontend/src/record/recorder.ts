@@ -1,4 +1,4 @@
-import { estimateFatigue, EXERCISES, OneEuroFilter, RepCounter, type CreateSessionInput, type ExerciseId, type RepPhase, type RepRecord, type SessionPlan, type SetRecord, type Side } from '@arc/dependencies'
+import { estimateFatigue, EXERCISES, OneEuroFilter, RepCounter, type CreateSessionInput, type ExerciseId, type RepPhase, type RepRecord, type SessionEvent, type SessionPlan, type SetRecord, type Side, type VoiceCommand } from '@arc/dependencies'
 
 /** How long the joint must stay in view before the first set starts. */
 export const READY_MS = 600
@@ -20,6 +20,8 @@ export interface RecorderView {
   repsPlanned: number
   totalReps: number
   restLeftMs: number
+  /** Paused by voice: nothing counts and the rest countdown is frozen. */
+  paused: boolean
   tracked: boolean
   /** The smoothed metric now, or null before the joint has been seen. */
   metricDeg: number | null
@@ -59,6 +61,9 @@ export class SessionRecorder {
   private best: number | null = null
   private lastRep: RepRecord | null = null
   private lastT = 0
+  private paused = false
+  private pausedRestLeft: number | null = null
+  private readonly events: SessionEvent[] = []
 
   constructor(cfg: Config) {
     this.cfg = cfg
@@ -85,11 +90,80 @@ export class SessionRecorder {
     this.reps = []
   }
 
+  /** The set is over (its reps are in, or it was cut short): rest, or done after the last one. */
+  private endSet(tMs: number, endedEarly: boolean): void {
+    this.closeSet(tMs, endedEarly)
+    if (this.setNumber >= this.cfg.plan.sets) {
+      this.phase = 'done'
+      this.endedAt = tMs
+    } else {
+      this.phase = 'rest'
+      this.restEndsAt = tMs + this.cfg.plan.restSeconds * 1000
+    }
+  }
+
+  /**
+   * A voice command (or its button): start counting now, pause and resume (the rest countdown
+   * freezes too), skip (cut the set short, or skip the rest), rest (end the set now), stop (finish).
+   * Every command is kept with its time and saved with the session.
+   */
+  command(command: VoiceCommand, rawT: number): RecorderView {
+    const tMs = Math.round(rawT)
+    this.events.push({ at: tMs, command })
+    if (this.phase === 'done') return this.view
+    switch (command) {
+      case 'start':
+        if (this.paused) this.resume(tMs)
+        else if (this.phase === 'waiting') this.startSet(tMs)
+        break
+      case 'pause':
+        if (this.paused) break
+        this.paused = true
+        if (this.phase === 'rest') this.pausedRestLeft = Math.max(0, this.restEndsAt - tMs)
+        break
+      case 'resume':
+        this.resume(tMs)
+        break
+      case 'skip':
+        this.paused = false
+        if (this.phase === 'active') this.endSet(tMs, true)
+        else if (this.phase === 'rest') {
+          this.setNumber++
+          this.startSet(tMs)
+        } else if (this.phase === 'waiting') this.startSet(tMs)
+        break
+      case 'rest':
+        if (this.phase === 'active') {
+          this.paused = false
+          this.endSet(tMs, true)
+        }
+        break
+      case 'stop':
+        this.finish(tMs)
+        break
+      case 'status':
+      case 'repeat':
+        break
+    }
+    return this.view
+  }
+
+  private resume(tMs: number): void {
+    if (!this.paused) return
+    this.paused = false
+    if (this.phase === 'rest' && this.pausedRestLeft != null) this.restEndsAt = tMs + this.pausedRestLeft
+    this.pausedRestLeft = null
+    // A rep half-done before the pause should not count after it.
+    this.counter = this.newCounter()
+    this.filter = new OneEuroFilter()
+  }
+
   feed({ tracked, metricDeg, tMs: rawT }: RecorderSample): RecorderView {
     // The browser clock has fractions of a millisecond; sessions store whole milliseconds.
     const tMs = Math.round(rawT)
     this.lastT = tMs
     this.tracked = tracked
+    if (this.paused) return this.view
     if (tracked) this.smoothed = this.filter.filter(metricDeg, tMs)
 
     switch (this.phase) {
@@ -105,15 +179,7 @@ export class SessionRecorder {
         this.reps.push(rep)
         this.lastRep = rep
         this.best = Math.max(this.best ?? -Infinity, rep.peakDeg)
-        if (this.reps.length < this.cfg.plan.reps) break
-        this.closeSet(tMs, false)
-        if (this.setNumber >= this.cfg.plan.sets) {
-          this.phase = 'done'
-          this.endedAt = tMs
-        } else {
-          this.phase = 'rest'
-          this.restEndsAt = tMs + this.cfg.plan.restSeconds * 1000
-        }
+        if (this.reps.length >= this.cfg.plan.reps) this.endSet(tMs, false)
         break
       }
       case 'rest':
@@ -146,13 +212,19 @@ export class SessionRecorder {
       repsInSet: this.phase === 'rest' || this.phase === 'done' ? (this.sets.at(-1)?.reps.length ?? 0) : this.reps.length,
       repsPlanned: this.cfg.plan.reps,
       totalReps: counted,
-      restLeftMs: this.phase === 'rest' ? Math.max(0, this.restEndsAt - this.lastT) : 0,
+      restLeftMs: this.phase === 'rest' ? (this.paused && this.pausedRestLeft != null ? this.pausedRestLeft : Math.max(0, this.restEndsAt - this.lastT)) : 0,
+      paused: this.paused,
       tracked: this.tracked,
       metricDeg: this.smoothed,
       repPhase: this.counter.snapshot.phase,
       bestDeg: this.best,
       lastRep: this.lastRep,
     }
+  }
+
+  /** The sets finished so far, in order. */
+  get completedSets(): readonly SetRecord[] {
+    return this.sets
   }
 
   /** The body for POST /api/sessions, or null when no rep was counted. */
@@ -166,6 +238,7 @@ export class SessionRecorder {
       endedAt: this.endedAt ?? this.lastT,
       plan: this.cfg.plan,
       sets: this.sets,
+      ...(this.events.length ? { events: this.events } : {}),
     }
   }
 }

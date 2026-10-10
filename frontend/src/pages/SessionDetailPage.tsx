@@ -5,6 +5,7 @@ import { Bar, BarChart, CartesianGrid, ReferenceLine, ResponsiveContainer, Toolt
 import { api } from '../api/client'
 import { AnimatedNumber, Page } from '../components/motion'
 import { axisTick, tooltipStyle } from '../components/ProgressCharts'
+import { ArcRead } from '../components/ArcRead'
 import { LazyJointScene } from '../components/three/lazy'
 import { useRepLoop } from '../components/three/useRepLoop'
 import { Alert, Lamp, Skeleton, StatTile, Strip, Tag } from '../components/ui'
@@ -75,6 +76,8 @@ function BackLink() {
 export function SessionDetailPage() {
   const { id = '' } = useParams()
   const back = useBack()
+  // Straight after a recording, Arc reads the session aloud.
+  const arcRead = Boolean((useLocation().state as { arcRead?: boolean } | null)?.arcRead)
   const [stageRef, stageTop] = useStickyTop<HTMLElement>(24)
   const [session, setSession] = useState<SessionDto | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -238,6 +241,7 @@ export function SessionDetailPage() {
       </div>
 
       <div className={AREA.strips}>
+        <ArcRead session={session} autoSpeak={arcRead} />
         <Strip index="01" title="Rep by rep, by set" aside={`Peak ${exercise.metricLabel.toLowerCase()} · ${reps.length} reps`}>
           <div className="h-[240px] sm:h-[280px]">
             <ResponsiveContainer width="100%" height="100%">

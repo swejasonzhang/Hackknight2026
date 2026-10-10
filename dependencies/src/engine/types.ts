@@ -118,4 +118,27 @@ export interface SessionRecord {
   summary: SessionSummary
   /** Seeded demo data, labelled on the dashboard. */
   demo: boolean
+  /** Voice commands the member gave while recording, in order. */
+  events?: SessionEvent[]
+  /** Arc's plain-English read of the session (Gemini, or a template when Gemini is off). */
+  coachSummary?: CoachSummary | null
+}
+
+/** What a member can say to Arc while recording, hands-free. */
+export const VOICE_COMMANDS = ['start', 'pause', 'resume', 'skip', 'rest', 'stop', 'status', 'repeat'] as const
+export type VoiceCommand = (typeof VOICE_COMMANDS)[number]
+
+export interface SessionEvent {
+  /** ms since epoch */
+  at: number
+  command: VoiceCommand
+}
+
+export interface CoachSummary {
+  text: string
+  /** The stored coach message, for its audio. */
+  messageId: string
+  createdAt: number
+  /** True when Gemini was not configured and the summary came from Arc's template. */
+  offline: boolean
 }

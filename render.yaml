@@ -24,6 +24,16 @@ services:
         generateValue: true # copy from the dashboard and give it to the camera app
       - key: CORS_ORIGINS
         value: https://getarc.health,https://www.getarc.health
+      # Arc, the coach. Optional: without them Arc uses its own questions and templates and the
+      # browser's voice. Pasted once in the dashboard; never sent to the browser.
+      - key: GEMINI_API_KEY
+        sync: false # https://aistudio.google.com/apikey
+      - key: GEMINI_MODEL
+        value: gemini-3.8-flash
+      - key: ELEVENLABS_API_KEY
+        sync: false # https://elevenlabs.io/app/settings/api-keys
+      - key: ELEVENLABS_VOICE_ID
+        value: 21m00Tcm4TlvDq8ikWAM
 
   # Web app: static files from frontend/dist. /api/* is rewritten to the API, so the browser keeps
   # same-origin calls and no CORS is involved. Render adds the www → root redirect automatically.

@@ -1,4 +1,4 @@
-import { EXERCISES, type ExerciseId, type SessionPlan, type Side } from '@arc/dependencies'
+import { EXERCISES, type CoachStatus, type ExerciseId, type SessionPlan, type Side, type VoiceCommand } from '@arc/dependencies'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { api } from '../api/client'
@@ -7,6 +7,9 @@ import { deg } from '../format'
 import { readJoint, type JointReading, type Landmark } from './angle'
 import type { PoseTracker } from './pose'
 import { SessionRecorder, type RecorderView } from './recorder'
+import { COMMAND_LABEL, parseCommand } from '../voice/commands'
+import { createListener, type Listener, type ListenerState } from '../voice/listener'
+import { createSpeaker, type Speaker, type SpokenLine } from '../voice/speaker'
 
 export interface RecordConfig {
   exercise: ExerciseId
@@ -24,6 +27,24 @@ const JOINT_NAMES: Record<ExerciseId, string> = {
   elbow_flexion: 'shoulder, elbow and wrist',
   shoulder_abduction: 'hip, shoulder and elbow',
   seated_knee_extension: 'hip, knee and ankle',
+}
+
+/** Short spoken acknowledgements, so a hands-free member knows Arc heard them. */
+const ACK: Partial<Record<VoiceCommand, string>> = { start: 'Starting.', pause: 'Paused.', resume: 'Back to it.', skip: 'Skipping.', rest: 'Rest.', stop: 'Finishing up.' }
+const HANDS_FREE_KEY = 'arc.handsFree'
+const readHandsFree = () => {
+  try {
+    return localStorage.getItem(HANDS_FREE_KEY) !== 'off'
+  } catch {
+    return true
+  }
+}
+
+function statusText(view: RecorderView | null, cfg: RecordConfig): string {
+  if (!view || view.phase === 'waiting') return `Waiting for your ${JOINT_NAMES[cfg.exercise]} to be in view.`
+  if (view.phase === 'rest') return `Resting. Set ${view.setNumber + 1} of ${view.setsPlanned} starts in ${Math.ceil(view.restLeftMs / 1000)} seconds.`
+  const best = view.bestDeg != null ? ` Best rep ${Math.round(view.bestDeg)} degrees.` : ''
+  return `Set ${view.setNumber} of ${view.setsPlanned}. ${view.repsInSet} of ${view.repsPlanned} reps.${best}${view.paused ? ' Paused.' : ''}`
 }
 
 function cameraError(err: unknown): string {
@@ -118,6 +139,65 @@ export function LiveRecorder({ profileId, config, simulate = false }: { profileI
   const [attempt, setAttempt] = useState(0)
   const cfg = EXERCISES[config.exercise]
 
+  // Arc: hands-free listening, and Arc's voice for set reads and quick replies.
+  const coachRef = useRef<CoachStatus | null>(null)
+  const speakerRef = useRef<Speaker | null>(null)
+  const listenerRef = useRef<Listener | null>(null)
+  const lastLineRef = useRef<SpokenLine | null>(null)
+  const viewRef = useRef<RecorderView | null>(null)
+  const [handsFree, setHandsFree] = useState(readHandsFree)
+  const [listenState, setListenState] = useState<ListenerState>('off')
+  const [heard, setHeard] = useState<VoiceCommand | null>(null)
+  const [arcLine, setArcLine] = useState<SpokenLine | null>(null)
+  const [arcSpeaking, setArcSpeaking] = useState(false)
+
+  const say = useCallback((line: SpokenLine, remember = true) => {
+    if (remember) {
+      lastLineRef.current = line
+      setArcLine(line)
+    }
+    void speakerRef.current?.say(line)
+  }, [])
+
+  const runCommand = useCallback(
+    (command: VoiceCommand) => {
+      const recorder = recorderRef.current
+      if (!recorder) return
+      setHeard(command)
+      if (command === 'status') return say({ text: statusText(viewRef.current, config) }, false)
+      if (command === 'repeat') return lastLineRef.current && say(lastLineRef.current, false)
+      const next = recorder.command(command, performance.timeOrigin + performance.now())
+      viewRef.current = next
+      setView(next)
+      if (ACK[command] && command !== 'stop') void speakerRef.current?.say({ text: ACK[command]! })
+    },
+    [config, say],
+  )
+
+  useEffect(() => {
+    let cancelled = false
+    api.coach
+      .status()
+      .then((s) => !cancelled && (coachRef.current = s))
+      .catch(() => !cancelled && (coachRef.current = { gemini: false, voice: false }))
+    speakerRef.current = createSpeaker({
+      elevenLabs: () => coachRef.current?.voice ?? false,
+      onSpeaking: (speaking) => {
+        setArcSpeaking(speaking)
+        listenerRef.current?.mute(speaking)
+      },
+    })
+    listenerRef.current = createListener((text) => {
+      const command = parseCommand(text)
+      if (command) runCommand(command)
+    }, setListenState)
+    return () => {
+      cancelled = true
+      listenerRef.current?.stop()
+      speakerRef.current?.stop()
+    }
+  }, [runCommand])
+
   const save = useCallback(async () => {
     if (savingRef.current) return
     savingRef.current = true
@@ -129,7 +209,8 @@ export function LiveRecorder({ profileId, config, simulate = false }: { profileI
     setStatus({ kind: 'saving' })
     try {
       const session = await api.sessions.create(input)
-      navigate(`/sessions/${session.id}`, { state: { from: '/dashboard', label: 'Dashboard' } })
+      listenerRef.current?.stop()
+      navigate(`/sessions/${session.id}`, { state: { from: '/dashboard', label: 'Dashboard', arcRead: true } })
     } catch (err) {
       savingRef.current = false
       setStatus({ kind: 'error', message: err instanceof Error ? `The session could not be saved: ${err.message}` : 'The session could not be saved.' })
@@ -178,6 +259,7 @@ export function LiveRecorder({ profileId, config, simulate = false }: { profileI
 
       let lastVideoTime = -1
       let lastKey = ''
+      let setsRead = 0
       const frame = () => {
         if (cancelled) return
         raf = requestAnimationFrame(frame)
@@ -196,9 +278,22 @@ export function LiveRecorder({ profileId, config, simulate = false }: { profileI
         if (canvasRef.current) draw(canvasRef.current, videoAspect, landmarks, reading)
         // Re-render only when something on screen changes.
         const key = `${next.phase}|${next.setNumber}|${next.repsInSet}|${next.totalReps}|${Math.round(next.metricDeg ?? -1)}|${Math.ceil(next.restLeftMs / 1000)}|${next.tracked}|${Math.round(next.bestDeg ?? -1)}`
+        viewRef.current = next
         if (key !== lastKey) {
           lastKey = key
           setView(next)
+        }
+        // A set just ended and the rest began: Arc reads it back (Gemini words, ElevenLabs voice).
+        const finished = recorder.completedSets
+        if (finished.length > setsRead) {
+          setsRead = finished.length
+          const set = finished.at(-1)!
+          if (next.phase === 'rest') {
+            api.coach
+              .setFeedback({ profileId, exercise: config.exercise, side: config.side, plan: config.plan, setNumber: set.setNumber, reps: set.reps })
+              .then((m) => !cancelled && say({ id: m.id, text: m.text }))
+              .catch(() => {})
+          }
         }
         if (next.phase === 'done') {
           cancelAnimationFrame(raf)
@@ -216,10 +311,27 @@ export function LiveRecorder({ profileId, config, simulate = false }: { profileI
       tracker?.close()
     }
     // A new attempt (Try again) restarts everything.
-  }, [config, simulate, save, attempt])
+  }, [config, simulate, save, attempt, profileId, say])
+
+  // Listen while live, when hands-free is on.
+  useEffect(() => {
+    if (status.kind === 'live' && handsFree) listenerRef.current?.start()
+    else listenerRef.current?.stop()
+  }, [status.kind, handsFree])
+
+  const toggleHandsFree = () => {
+    setHandsFree((on) => {
+      try {
+        localStorage.setItem(HANDS_FREE_KEY, on ? 'off' : 'on')
+      } catch {
+        /* per-viewer convenience only */
+      }
+      return !on
+    })
+  }
 
   const finish = () => {
-    recorderRef.current?.finish(performance.timeOrigin + performance.now())
+    runCommand('stop')
     void save()
   }
 
@@ -233,7 +345,9 @@ export function LiveRecorder({ profileId, config, simulate = false }: { profileI
         ? 'Loading the pose model…'
         : status.kind === 'saving'
           ? 'Saving the session…'
-          : phase === 'waiting'
+          : view?.paused
+            ? 'Paused · say "resume"'
+            : phase === 'waiting'
             ? `Looking for your ${JOINT_NAMES[config.exercise]}`
             : phase === 'rest'
               ? `Rest · set ${(view?.setNumber ?? 1) + 1} starts by itself`
@@ -308,15 +422,40 @@ export function LiveRecorder({ profileId, config, simulate = false }: { profileI
             </p>
           )}
 
+          <div className="mt-5 border-t border-rule pt-4" aria-live="polite">
+            <div className="flex items-center justify-between gap-3">
+              <div className="t-label flex items-center gap-2">
+                <Lamp tone={listenState === 'listening' ? 'good' : listenState === 'blocked' ? 'bad' : 'default'} blink={arcSpeaking} />
+                Arc · {listenState === 'listening' ? (arcSpeaking ? 'speaking' : 'listening') : listenState === 'blocked' ? 'microphone blocked' : listenState === 'unsupported' ? 'no voice control in this browser' : 'hands-free off'}
+              </div>
+              {listenState !== 'unsupported' && (
+                <button type="button" className="btn btn-ghost t-label" onClick={toggleHandsFree} aria-pressed={handsFree}>
+                  {handsFree ? 'Turn off' : 'Hands-free'}
+                </button>
+              )}
+            </div>
+            <p className="t-meta mt-2 normal-case">Say start, pause, resume, skip, rest, stop, how many, or repeat.</p>
+            {heard && <p className="t-mono mt-2 text-navy">Heard: {COMMAND_LABEL[heard]}</p>}
+            {arcLine && <p className="mt-2 text-[14px] leading-[1.5] text-ink-2">{arcLine.text}</p>}
+          </div>
+
           <div className="mt-5 flex flex-wrap gap-2">
             {status.kind === 'error' || status.kind === 'empty' ? (
               <button type="button" className="btn btn-block" onClick={() => setAttempt((n) => n + 1)}>
                 Try again
               </button>
             ) : (
-              <button type="button" className="btn btn-block" onClick={finish} disabled={!live || (view?.totalReps ?? 0) === 0}>
-                <Lamp tone="primary" blink={status.kind === 'saving'} /> Finish and save
-              </button>
+              <>
+                <button type="button" className="btn btn-block" onClick={finish} disabled={!live || (view?.totalReps ?? 0) === 0}>
+                  <Lamp tone="primary" blink={status.kind === 'saving'} /> Finish and save
+                </button>
+                <button type="button" className="btn" onClick={() => runCommand(view?.paused ? 'resume' : 'pause')} disabled={!live || phase === 'done'}>
+                  {view?.paused ? 'Resume' : 'Pause'}
+                </button>
+                <button type="button" className="btn" onClick={() => runCommand('skip')} disabled={!live || phase === 'done' || phase === 'waiting'}>
+                  {phase === 'rest' ? 'Skip rest' : 'Skip set'}
+                </button>
+              </>
             )}
             <Link to="/dashboard" className="btn">
               Cancel

@@ -75,10 +75,12 @@ export function makeSet(setNumber: number, peaks: number[], startedAt: number): 
 }
 
 /** A valid session body: 2 sets x 4 reps with slightly declining range. */
-export function makeSession(profileId: string, overrides: Partial<CreateSessionInput> = {}): CreateSessionInput {
+/** A two-set session; `peaks` sets the first set's rep peaks (the second set runs 2 degrees lower). */
+export function makeSession(profileId: string, { peaks, ...overrides }: Partial<CreateSessionInput> & { peaks?: number[] } = {}): CreateSessionInput {
   const startedAt = overrides.startedAt ?? Date.UTC(2026, 9, 1, 18, 0, 0)
-  const set1 = makeSet(1, [120, 119, 117, 114], startedAt + 5_000)
-  const set2 = makeSet(2, [116, 115, 112, 110], set1.endedAt + 45_000)
+  const first = peaks ?? [120, 119, 117, 114]
+  const set1 = makeSet(1, first, startedAt + 5_000)
+  const set2 = makeSet(2, peaks ? peaks.map((p) => p - 2) : [116, 115, 112, 110], set1.endedAt + 45_000)
   return {
     profileId,
     exercise: 'elbow_flexion',

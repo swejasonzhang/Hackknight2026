@@ -3,7 +3,7 @@
  * validates with them; the client gets the types for free) and the response DTO shapes.
  */
 import { z } from 'zod'
-import type { ExerciseId, SessionPlan, SessionRecord, Side } from './engine/types.ts'
+import { VOICE_COMMANDS, type ExerciseId, type SessionPlan, type SessionRecord, type Side } from './engine/types.ts'
 
 export const ExerciseIdSchema = z.enum(['elbow_flexion', 'shoulder_abduction', 'seated_knee_extension'])
 export const SideSchema = z.enum(['left', 'right'])
@@ -99,6 +99,7 @@ export const SessionPlanSchema = z.object({
 })
 
 /** Body for POST /api/sessions. The server recomputes fatigue and the summary; it never trusts them. */
+export const SessionEventSchema = z.object({ at: epochMs, command: z.enum(VOICE_COMMANDS) })
 export const CreateSessionSchema = z.object({
   profileId: z.string().min(1),
   exercise: ExerciseIdSchema,
@@ -108,6 +109,8 @@ export const CreateSessionSchema = z.object({
   plan: SessionPlanSchema,
   sets: z.array(SetRecordSchema).min(1),
   demo: z.boolean().optional(),
+  /** Voice commands given while recording (hands-free). */
+  events: z.array(SessionEventSchema).max(500).optional(),
 }).refine((s) => s.endedAt >= s.startedAt, { message: 'endedAt must not be before startedAt', path: ['endedAt'] })
 export type CreateSessionInput = z.infer<typeof CreateSessionSchema>
 
@@ -118,7 +121,77 @@ export interface ProfileDto {
   name: string
   email?: string
   notes?: string
+  /** What Arc learned in the onboarding chat. */
+  intake?: CoachIntake
   createdAt: number
+}
+
+// ---- Arc, the coach (Gemini for words, ElevenLabs for voice) ----
+
+/** The coach is always called Arc. */
+export const COACH_NAME = 'Arc'
+
+export const ChatTurnSchema = z.object({ role: z.enum(['arc', 'user']), text: z.string().trim().min(1).max(2000) })
+export type ChatTurn = z.infer<typeof ChatTurnSchema>
+
+/** One onboarding turn: the conversation so far, and the profile to fill (else Arc creates one). */
+export const OnboardingInputSchema = z.object({
+  messages: z.array(ChatTurnSchema).max(40),
+  profileId: z.string().min(1).optional(),
+})
+export type OnboardingInput = z.infer<typeof OnboardingInputSchema>
+
+export const ExperienceSchema = z.enum(['new', 'some', 'regular'])
+/** What Arc learns from the onboarding chat, saved on the profile and used in every later read. */
+export const CoachIntakeSchema = z.object({
+  goals: z.string().trim().min(1).max(500),
+  focus: ExerciseIdSchema,
+  side: SideSchema,
+  limitations: z.string().trim().max(500),
+  experience: ExperienceSchema,
+  daysPerWeek: z.number().int().min(1).max(7),
+})
+export type CoachIntake = z.infer<typeof CoachIntakeSchema>
+
+export interface OnboardingReply {
+  /** Arc's next line. */
+  reply: string
+  messageId: string
+  /** True once Arc has what it needs: the profile and plan are saved. */
+  done: boolean
+  /** True when Gemini is not configured and Arc follows its scripted questions. */
+  offline: boolean
+  intake?: CoachIntake
+  profileId?: string
+  plan?: PlanDto
+}
+
+/** Feedback for the rest after a set, before the session is saved. */
+export const SetFeedbackInputSchema = z.object({
+  profileId: z.string().min(1),
+  exercise: ExerciseIdSchema,
+  side: SideSchema,
+  plan: SessionPlanSchema,
+  setNumber: z.number().int().min(1),
+  reps: z.array(RepRecordSchema).max(100),
+})
+export type SetFeedbackInput = z.infer<typeof SetFeedbackInputSchema>
+
+export type CoachMessageKind = 'onboarding' | 'set' | 'session'
+export interface CoachMessageDto {
+  id: string
+  kind: CoachMessageKind
+  text: string
+  createdAt: number
+  offline: boolean
+  profileId?: string
+  sessionId?: string
+}
+
+/** Which of Arc's services are configured on the server. */
+export interface CoachStatus {
+  gemini: boolean
+  voice: boolean
 }
 
 export interface PlanDto extends SessionPlan {
