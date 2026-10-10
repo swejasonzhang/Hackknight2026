@@ -1,29 +1,58 @@
-import { EXERCISES, type ChatTurn, type CoachStatus, type OnboardingReply } from '@arc/dependencies'
+import { EXERCISES, ONBOARDING_TOPICS, WEEKDAY_NAMES, type ChatTurn, type CoachStatus, type OnboardingReply, type OnboardingTopic, type ProgramDto } from '@arc/dependencies'
+import { motion, useReducedMotion } from 'motion/react'
 import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { api } from '../api/client'
-import { Page } from '../components/motion'
-import { Alert, Lamp, PageHeader } from '../components/ui'
+import { IconMic, IconSend, IconVolume, IconVolumeOff, Logo } from '../components/icons'
+import { Alert, Lamp } from '../components/ui'
 import { useProfiles } from '../hooks/useProfiles'
 import { createListener, type ListenerState } from '../voice/listener'
 import { createSpeaker } from '../voice/speaker'
 
 /** What Arc is finding out, in the order it asks. */
-const LEARNING = ['Your goals', 'The area to work on', 'Left or right', 'Injuries or limits', 'Your experience', 'Days a week']
+export const TOPIC_LABELS: Record<OnboardingTopic, string> = {
+  goals: 'What you want',
+  trainingGoal: 'Strength, muscle or stamina',
+  focus: 'Where to start',
+  side: 'Left or right',
+  limitations: 'Injuries or limits',
+  experience: 'Experience',
+  days: 'Training days',
+  height: 'Height',
+  weight: 'Weight',
+}
+
+/** One tap answers the common cases; anything else is typed or spoken. */
+export const QUICK_REPLIES: Record<OnboardingTopic, string[]> = {
+  goals: ['Get stronger', 'Move more freely', 'Come back from an injury'],
+  trainingGoal: ['Get stronger', 'Build muscle', 'Build stamina'],
+  focus: ['My elbow', 'My shoulder', 'My knee'],
+  side: ['Left', 'Right'],
+  limitations: ['None', 'A bit stiff', 'Recovering from surgery'],
+  experience: ['New to it', 'Some', 'Regularly'],
+  days: ['Monday, Wednesday and Friday', 'Tuesday and Thursday', 'Weekdays', 'Every day'],
+  height: ['Skip'],
+  weight: ['Skip'],
+}
+
+const WEEK = [1, 2, 3, 4, 5, 6, 0]
 
 /**
- * /welcome, right after sign-up: a short chat with Arc (Gemini, or Arc's own questions without
- * it). Arc asks what the member wants from their body, the area, the side, limits, experience and
- * days a week; when it has enough it saves the profile and a first plan, and the page shows that
- * plan with the way to the dashboard and to recording. Arc speaks each line (ElevenLabs, or the
- * browser's voice), and the microphone button lets the member answer by voice. ?profile=<id>
- * runs the same chat for an existing profile.
+ * /welcome, its own full page between sign-up and the dashboard (ADR-0020): a chat with Arc
+ * (Gemini, or Arc's own questions without it) about what the member wants from their body, their
+ * goal (strength, muscle or stamina), where to start, the side, limits, experience, training days,
+ * height and weight. Quick replies answer common cases in a tap; Arc speaks each line and the
+ * microphone takes spoken answers. When Arc has enough it saves the profile and builds the week,
+ * shown here before the dashboard's calendar. Skip leaves at any point; ?profile=<id> runs the
+ * same chat for an existing profile.
  */
 export function WelcomePage() {
   const { reload, setSelectedId } = useProfiles()
   const [params] = useSearchParams()
   const profileId = params.get('profile') ?? undefined
+  const reduce = useReducedMotion()
   const [messages, setMessages] = useState<ChatTurn[]>([])
+  const [topic, setTopic] = useState<OnboardingTopic | null>(null)
   const [draft, setDraft] = useState('')
   const [thinking, setThinking] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -32,6 +61,7 @@ export function WelcomePage() {
   const [mic, setMic] = useState<ListenerState>('off')
   const status = useRef<CoachStatus | null>(null)
   const listEnd = useRef<HTMLDivElement>(null)
+  const input = useRef<HTMLInputElement>(null)
   const voiceOnRef = useRef(voiceOn)
   voiceOnRef.current = voiceOn
 
@@ -44,8 +74,8 @@ export function WelcomePage() {
     setError(null)
     try {
       const reply = await api.coach.onboarding(profileId ? { messages: next, profileId } : { messages: next })
-      const withArc: ChatTurn[] = [...next, { role: 'arc', text: reply.reply }]
-      setMessages(withArc)
+      setMessages([...next, { role: 'arc', text: reply.reply }])
+      setTopic(reply.topic ?? null)
       if (voiceOnRef.current) void speaker.say({ id: reply.messageId, text: reply.reply })
       if (reply.done) {
         setDone(reply)
@@ -85,130 +115,220 @@ export function WelcomePage() {
   }, [])
 
   useEffect(() => {
-    listEnd.current?.scrollIntoView?.({ block: 'nearest' })
-  }, [messages, thinking])
+    listEnd.current?.scrollIntoView?.({ block: 'end', behavior: reduce ? 'auto' : 'smooth' })
+  }, [messages, thinking, done, reduce])
+
+  // Typing goes straight into the answer box once Arc has spoken.
+  useEffect(() => {
+    if (!thinking && !done) input.current?.focus({ preventScroll: true })
+  }, [thinking, done])
 
   const onSubmit = (e: FormEvent) => {
     e.preventDefault()
     send(draft)
   }
+  const toggleVoice = () => {
+    if (voiceOn) speaker.stop()
+    setVoiceOn(!voiceOn)
+  }
 
-  const answered = messages.filter((m) => m.role === 'user').length
-  const plan = done?.plan
+  const step = done ? ONBOARDING_TOPICS.length : topic ? ONBOARDING_TOPICS.indexOf(topic) : 0
+  const progress = Math.round((step / ONBOARDING_TOPICS.length) * 100)
+  const program = done?.program
 
   return (
-    <Page>
-      <PageHeader
-        eyebrow="Welcome · Arc"
-        title="Meet Arc"
-        subtitle="Your coach. A few questions about what you want from your body, and Arc builds your first plan."
-        actions={
-          <button type="button" className="btn btn-ghost t-label" onClick={() => (voiceOn ? (setVoiceOn(false), speaker.stop()) : setVoiceOn(true))} aria-pressed={voiceOn}>
-            {voiceOn ? "Arc's voice on" : "Arc's voice off"}
+    <div className="flex min-h-[100dvh] flex-col bg-vellum text-ink">
+      {/* ---- top bar: the mark, progress through the questions, Arc's voice, the way out ---- */}
+      <header className="sticky top-0 z-20 bg-navy text-white">
+        <div className="mx-auto flex h-14 w-full max-w-[1180px] items-center gap-3 px-4 sm:px-6">
+          <Logo size={24} tone="paper" />
+          <span className="font-display text-[15px] font-bold tracking-[-0.01em]">Arc</span>
+          <span className="t-meta hidden text-rail-muted sm:inline">Getting to know you</span>
+          <span className="flex-1" />
+          <span className="t-meta text-rail-muted" aria-live="polite">
+            {done ? 'All done' : `${Math.min(step + 1, ONBOARDING_TOPICS.length)} of ${ONBOARDING_TOPICS.length}`}
+          </span>
+          <button
+            type="button"
+            onClick={toggleVoice}
+            aria-pressed={voiceOn}
+            aria-label="Arc's voice"
+            title={voiceOn ? "Arc's voice is on" : "Arc's voice is off"}
+            className="inline-flex h-9 w-9 cursor-pointer items-center justify-center text-rail-muted transition-colors hover:text-white"
+          >
+            {voiceOn ? <IconVolume size={18} /> : <IconVolumeOff size={18} />}
           </button>
-        }
-      />
-      <div className="rule-strong" />
+          <Link to="/dashboard" className="t-label whitespace-nowrap text-white hover:no-underline">
+            {done ? 'Dashboard →' : 'Skip for now →'}
+          </Link>
+        </div>
+        <div className="h-[3px] bg-white/10" aria-hidden="true">
+          <motion.div className="h-full bg-cobalt" initial={false} animate={{ width: `${progress}%` }} transition={{ duration: reduce ? 0 : 0.4, ease: [0.2, 0, 0, 1] }} />
+        </div>
+      </header>
 
-      <div className="mt-6 grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px] lg:gap-8">
-        <section className="panel flex min-w-0 flex-col p-4 sm:p-5" aria-label="Chat with Arc">
-          <ol className="flex flex-col gap-4" aria-live="polite">
+      <main className="mx-auto grid w-full max-w-[1180px] flex-1 gap-8 px-4 pt-8 pb-8 sm:px-6 lg:grid-cols-[minmax(0,1fr)_280px] lg:gap-10 lg:pt-12">
+        <section aria-label="Chat with Arc" className="min-w-0">
+          <div className="t-meta mb-3">Welcome · Arc, your coach</div>
+          <h1 className="t-title">What do you want from your body?</h1>
+          <p className="t-desc mt-3 max-w-[60ch] text-[15px]">Arc asks a few questions, one at a time, then builds your training week. Tap an answer, type, or speak. Skip whenever you like.</p>
+
+          <ol className="mt-8 flex flex-col gap-5" aria-live="polite">
             {messages.map((m, i) => (
-              <li key={i} className={m.role === 'arc' ? 'flex gap-3' : 'flex justify-end'}>
+              <motion.li
+                key={i}
+                initial={reduce ? false : { opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.28, ease: [0.2, 0, 0, 1] }}
+                className={m.role === 'arc' ? 'flex gap-3' : 'flex justify-end'}
+              >
                 {m.role === 'arc' ? (
                   <>
-                    <span aria-hidden="true" className="inline-flex h-8 w-8 flex-none items-center justify-center bg-navy font-display text-[11px] font-bold text-white">
-                      ARC
+                    <span aria-hidden="true" className="inline-flex h-9 w-9 flex-none items-center justify-center bg-navy">
+                      <Logo size={20} tone="paper" />
                     </span>
-                    <p className="max-w-[60ch] text-[15.5px] leading-[1.55] text-ink">
+                    <p className="max-w-[60ch] pt-1.5 text-[16px] leading-[1.55] text-ink">
                       <span className="sr-only">Arc: </span>
                       {m.text}
                     </p>
                   </>
                 ) : (
-                  <p className="max-w-[48ch] border border-rule bg-vellum px-3 py-2 text-[15px] leading-[1.5] text-ink shadow-[inset_3px_0_0_var(--cobalt)]">
+                  <p className="max-w-[48ch] border border-rule bg-paper px-3.5 py-2.5 text-[15.5px] leading-[1.5] text-ink shadow-[inset_3px_0_0_var(--cobalt)]">
                     <span className="sr-only">You: </span>
                     {m.text}
                   </p>
                 )}
-              </li>
+              </motion.li>
             ))}
             {thinking && (
-              <li className="t-meta flex items-center gap-2">
+              <li className="t-meta flex items-center gap-3 pl-12">
                 <Lamp tone="primary" blink /> Arc is thinking…
               </li>
             )}
           </ol>
-          <div ref={listEnd} />
 
           {error && (
-            <div className="mt-4">
+            <div className="mt-5">
               <Alert tone="bad">{error}</Alert>
             </div>
           )}
 
-          {!done && (
-            <form onSubmit={onSubmit} className="mt-5 flex flex-wrap items-stretch gap-2 border-t border-rule pt-4">
-              <label htmlFor="arc-answer" className="sr-only">
-                Your answer
-              </label>
-              <input id="arc-answer" className="input min-w-0 flex-1" value={draft} onChange={(e) => setDraft(e.target.value)} placeholder="Type your answer…" autoComplete="off" disabled={thinking} />
-              <button type="submit" className="btn btn-block" disabled={thinking || !draft.trim()}>
-                Send
-              </button>
-              {listener.supported && (
-                <button
-                  type="button"
-                  className="btn"
-                  aria-pressed={mic === 'listening'}
-                  onClick={() => (mic === 'listening' ? listener.stop() : listener.start())}
-                  title="Answer by voice"
-                >
-                  <Lamp tone={mic === 'listening' ? 'good' : mic === 'blocked' ? 'bad' : 'default'} blink={mic === 'listening'} />
-                  {mic === 'listening' ? 'Listening' : mic === 'blocked' ? 'Mic blocked' : 'Speak'}
-                </button>
-              )}
-            </form>
-          )}
+          {program && <WeekCard program={program} />}
+          <div ref={listEnd} className="scroll-mb-40" />
         </section>
 
-        <aside className="min-w-0" aria-label="What Arc is learning">
-          {plan && done ? (
-            <div className="panel p-4 sm:p-5">
-              <div className="t-label flex items-center gap-2">
-                <Lamp tone="good" /> Your plan is ready
-              </div>
-              <p className="mt-3 text-[15px] leading-[1.5] text-ink">{done.intake?.goals}</p>
-              <p className="t-meta mt-3 normal-case text-navy">
-                {EXERCISES[plan.exercise].name} · {plan.side} · {plan.sets} × {plan.reps} · {plan.restSeconds} s rest · goal {plan.targetDeg}°
-              </p>
-              <div className="mt-5 flex flex-wrap gap-2">
-                <Link to="/record" className="btn btn-block">
-                  <Lamp tone="primary" /> Start recording
-                </Link>
-                <Link to="/dashboard" className="btn">
-                  Go to the dashboard
-                </Link>
-              </div>
-            </div>
-          ) : (
-            <div className="panel p-4 sm:p-5">
-              <div className="t-label">What Arc is learning</div>
-              <ol className="mt-3">
-                {LEARNING.map((item, i) => (
-                  <li key={item} className="flex items-center gap-3 border-b border-rule py-2.5 last:border-b-0">
-                    <Lamp tone={i < answered ? 'good' : i === answered ? 'primary' : 'default'} blink={i === answered && thinking} />
-                    <span className={`text-[14px] ${i < answered ? 'text-ink' : 'text-muted'}`}>{item}</span>
+        <aside className="hidden min-w-0 lg:block" aria-label="What Arc is learning">
+          <div className="panel sticky top-24 p-4">
+            <div className="t-label">What Arc is learning</div>
+            <ol className="mt-3">
+              {ONBOARDING_TOPICS.map((t, i) => {
+                const state = done || i < step ? 'done' : i === step ? 'now' : 'next'
+                return (
+                  <li key={t} className="flex items-center gap-3 border-b border-rule py-2.5 last:border-b-0">
+                    <Lamp tone={state === 'done' ? 'good' : state === 'now' ? 'primary' : 'default'} blink={state === 'now' && thinking} />
+                    <span className={`text-[14px] ${state === 'next' ? 'text-muted' : 'text-ink'}`}>
+                      {TOPIC_LABELS[t]}
+                      {state === 'done' && <span className="sr-only"> (answered)</span>}
+                      {state === 'now' && <span className="sr-only"> (asking now)</span>}
+                    </span>
                   </li>
-                ))}
-              </ol>
-              <Link to="/dashboard" className="t-label mt-4 inline-block text-cobalt">
-                Skip for now →
-              </Link>
-            </div>
-          )}
+                )
+              })}
+            </ol>
+          </div>
         </aside>
+      </main>
+
+      {/* ---- the composer, pinned to the bottom of the screen ---- */}
+      {!done && (
+        <footer className="sticky bottom-0 z-10 border-t border-rule-strong bg-paper pb-[env(safe-area-inset-bottom)]">
+          <div className="mx-auto w-full max-w-[1180px] px-4 py-3 sm:px-6 lg:grid lg:grid-cols-[minmax(0,1fr)_280px] lg:gap-10">
+            <div className="min-w-0">
+              {topic && !thinking && (
+                <div className="mb-3 flex flex-wrap gap-2" role="group" aria-label="Quick answers">
+                  {QUICK_REPLIES[topic].map((r) => (
+                    <button key={r} type="button" className="chip" onClick={() => send(r)}>
+                      {r}
+                    </button>
+                  ))}
+                </div>
+              )}
+              <form onSubmit={onSubmit} className="flex items-stretch gap-2">
+                <label htmlFor="arc-answer" className="sr-only">
+                  Your answer
+                </label>
+                <input
+                  ref={input}
+                  id="arc-answer"
+                  className="input min-w-0 flex-1"
+                  value={draft}
+                  onChange={(e) => setDraft(e.target.value)}
+                  placeholder={mic === 'listening' ? 'Listening…' : 'Type your answer…'}
+                  autoComplete="off"
+                  disabled={thinking}
+                />
+                {listener.supported && (
+                  <button
+                    type="button"
+                    className="btn btn-icon"
+                    aria-pressed={mic === 'listening'}
+                    aria-label={mic === 'listening' ? 'Stop listening' : mic === 'blocked' ? 'Microphone blocked' : 'Answer by voice'}
+                    onClick={() => (mic === 'listening' ? listener.stop() : listener.start())}
+                  >
+                    {mic === 'listening' ? <Lamp tone="good" blink /> : <IconMic size={18} />}
+                  </button>
+                )}
+                <button type="submit" className="btn btn-block" disabled={thinking || !draft.trim()}>
+                  <IconSend size={16} aria-hidden="true" />
+                  <span className="sr-only sm:not-sr-only">Send</span>
+                </button>
+              </form>
+            </div>
+          </div>
+        </footer>
+      )}
+    </div>
+  )
+}
+
+/** The week Arc built, Monday to Sunday, with the way to the dashboard's calendar. */
+function WeekCard({ program }: { program: ProgramDto }) {
+  return (
+    <section className="panel mt-8 p-4 sm:p-5" aria-label="Your week">
+      <div className="t-label flex items-center gap-2">
+        <Lamp tone="good" /> Your week is ready
       </div>
-    </Page>
+      <p className="mt-3 max-w-[62ch] text-[15px] leading-[1.55] text-ink">{program.summary}</p>
+      <ol className="mt-4 border-t border-rule-strong">
+        {WEEK.map((d) => {
+          const day = program.days.find((x) => x.weekday === d)
+          return (
+            <li key={d} className="grid grid-cols-[48px_minmax(0,1fr)] gap-3 border-b border-rule py-2.5 sm:grid-cols-[64px_minmax(0,1fr)]">
+              <span className={`t-meta pt-0.5 ${day ? 'text-navy' : ''}`}>{WEEKDAY_NAMES[d]!.slice(0, 3)}</span>
+              {day ? (
+                <span className="min-w-0">
+                  <span className="block text-[15px] font-medium text-ink">{day.title}</span>
+                  {day.items.map((item, i) => (
+                    <span key={i} className="block font-mono text-[12.5px] leading-[1.6] text-ink-2">
+                      {EXERCISES[item.exercise].name} · {item.side} · {item.sets} × {item.reps} · {item.restSeconds} s rest
+                    </span>
+                  ))}
+                </span>
+              ) : (
+                <span className="text-[14px] text-muted">Rest</span>
+              )}
+            </li>
+          )
+        })}
+      </ol>
+      <div className="mt-5 flex flex-wrap gap-2">
+        <Link to="/dashboard" className="btn btn-block">
+          <Lamp tone="primary" /> See it on your dashboard
+        </Link>
+        <Link to="/record" className="btn">
+          Start recording
+        </Link>
+      </div>
+    </section>
   )
 }

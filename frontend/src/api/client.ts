@@ -12,6 +12,7 @@ import type {
   LoginInput,
   PlanDto,
   PlanInput,
+  ProgramDto,
   ProfileDto,
   ProgressDto,
   SessionDto,
@@ -90,6 +91,8 @@ export const api = {
     put: (profileId: string, input: PlanInput) => request<PlanDto>(`/api/profiles/${profileId}/plan`, { method: 'PUT', body: input }),
     patch: (profileId: string, input: UpdatePlanInput) =>
       request<PlanDto>(`/api/profiles/${profileId}/plan`, { method: 'PATCH', body: input }),
+    /** The week Arc built: training days and what each holds (404 until Arc has built one). */
+    program: (profileId: string) => request<ProgramDto>(`/api/profiles/${profileId}/program`),
   },
   sessions: {
     list: (profileId: string, exercise?: ExerciseId) =>

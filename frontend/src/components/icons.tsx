@@ -8,12 +8,16 @@ export {
   Check as IconCheck,
   ChartLine as IconChart,
   ChevronDown as IconChevronDown,
+  ChevronLeft as IconChevronLeft,
+  ChevronRight as IconChevronRight,
   Eye as IconEye,
   EyeOff as IconEyeOff,
   Flame as IconFlame,
   LoaderCircle as IconSpinner,
   LogOut as IconLogOut,
+  Mic as IconMic,
   Plus as IconPlus,
+  SendHorizontal as IconSend,
   ShieldCheck as IconShield,
   Sparkles as IconSparkle,
   Target as IconTarget,
@@ -21,6 +25,8 @@ export {
   Trash2 as IconTrash,
   TrendingUp as IconTrend,
   Users as IconUsers,
+  Volume2 as IconVolume,
+  VolumeX as IconVolumeOff,
 } from 'lucide-react'
 
 /** The Arc mark: a square tile, an arc, a cobalt point. `tone="paper"` is for navy surfaces. */

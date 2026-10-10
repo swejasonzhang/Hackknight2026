@@ -895,6 +895,132 @@
   .bar-link:focus-visible {
     outline-offset: -4px;
   }
+  /* ---- quick answers in the chat with Arc ---- */
+  .chip {
+    display: inline-flex;
+    align-items: center;
+    min-height: 36px;
+    padding: 0 14px;
+    border: 1px solid var(--rule-strong);
+    background: var(--paper);
+    color: var(--navy);
+    font-family: var(--font-mono);
+    font-size: 12.5px;
+    letter-spacing: 0.04em;
+    cursor: pointer;
+    transition:
+      background 0.15s,
+      color 0.15s;
+  }
+  .chip:hover {
+    background: var(--navy);
+    color: #fff;
+  }
+  .chip:focus-visible {
+    outline-offset: 2px;
+  }
+
+  /* ---- the plan calendar: a month of Monday-to-Sunday weeks ---- */
+  .cal {
+    width: 100%;
+    table-layout: fixed;
+    border-collapse: collapse;
+    border-top: 1px solid var(--rule-strong);
+  }
+  .cal th {
+    padding: 8px 0;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--muted);
+    text-align: left;
+    padding-left: 6px;
+  }
+  .cal td {
+    padding: 0;
+    border: 1px solid var(--rule);
+    vertical-align: top;
+  }
+  .cal-day {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
+    width: 100%;
+    height: 52px;
+    padding: 6px;
+    background: var(--paper);
+    color: var(--ink);
+    text-align: left;
+    cursor: pointer;
+    outline-offset: -3px;
+  }
+  .cal-day:hover {
+    background: var(--vellum);
+  }
+  .cal-day[data-out] {
+    background: transparent;
+    color: var(--muted);
+  }
+  .cal-day[data-status='planned'],
+  .cal-day[data-status='done'],
+  .cal-day[data-status='missed'] {
+    box-shadow: inset 0 2px 0 var(--cobalt);
+  }
+  .cal-day[data-status='done'] {
+    box-shadow: inset 0 2px 0 var(--ok);
+  }
+  .cal-day[data-status='missed'] {
+    box-shadow: inset 0 2px 0 var(--lamp-off);
+  }
+  [aria-selected='true'] > .cal-day {
+    outline: 2px solid var(--cobalt);
+    outline-offset: -2px;
+  }
+  .cal-num {
+    font-family: var(--font-mono);
+    font-size: 12.5px;
+    line-height: 1;
+  }
+  .cal-day[data-today] .cal-num {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 22px;
+    height: 22px;
+    margin: -4px 0 0 -4px;
+    background: var(--navy);
+    color: #fff;
+  }
+  .cal-title {
+    display: none;
+    max-width: 100%;
+    overflow: hidden;
+    font-family: var(--font-mono);
+    font-size: 10.5px;
+    line-height: 1.3;
+    letter-spacing: 0.02em;
+    color: var(--ink-2);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .cal-mark {
+    position: absolute;
+    right: 6px;
+    bottom: 6px;
+  }
+  @media (min-width: 40rem) {
+    .cal-day {
+      height: 72px;
+    }
+    .cal-title {
+      display: block;
+    }
+  }
+
   /* The account tag: on the rail above log out, and the phone bar's last cell. */
   .rail-account,
   .bar-account {
