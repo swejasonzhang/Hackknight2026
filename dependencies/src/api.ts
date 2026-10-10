@@ -24,6 +24,15 @@ export const LoginSchema = z.object({
 })
 export type LoginInput = z.infer<typeof LoginSchema>
 
+/** What deleting an account takes: the account's own email and password, and DELETE typed out. */
+export const DELETE_CONFIRMATION = 'DELETE'
+export const DeleteAccountSchema = z.object({
+  email: EmailSchema.transform((e) => e.toLowerCase()),
+  password: z.string().min(1).max(200),
+  confirm: z.literal(DELETE_CONFIRMATION),
+})
+export type DeleteAccountInput = z.input<typeof DeleteAccountSchema>
+
 export interface UserDto {
   id: string
   name: string

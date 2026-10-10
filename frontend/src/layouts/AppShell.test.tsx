@@ -53,4 +53,25 @@ describe("AppShell", () => {
     expect(logos).toHaveLength(2);
     for (const logo of logos) expect(logo).toHaveAttribute("href", "/");
   });
+
+  it("leads to the account page from the account tag, on the rail and on the phone bar", async () => {
+    render(
+      <HintProvider>
+        <AuthProvider>
+          <MemoryRouter initialEntries={["/dashboard"]}>
+            <Routes>
+              <Route element={<AppShell />}>
+                <Route path="/dashboard" element={<p>dashboard</p>} />
+              </Route>
+            </Routes>
+          </MemoryRouter>
+        </AuthProvider>
+      </HintProvider>,
+    );
+    expect(await screen.findByText("dashboard")).toBeInTheDocument();
+    const tags = await screen.findAllByRole("link", { name: "Account: Ada" });
+    expect(tags).toHaveLength(2);
+    for (const tag of tags) expect(tag).toHaveAttribute("href", "/account");
+    expect(screen.getByRole("button", { name: "Log out" })).toBeInTheDocument();
+  });
 });

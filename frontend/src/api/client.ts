@@ -7,6 +7,7 @@ import type {
   SetFeedbackInput,
   CreateSessionInput,
   CreateProfileInput,
+  DeleteAccountInput,
   ExerciseId,
   LoginInput,
   PlanDto,
@@ -74,6 +75,8 @@ export const api = {
     signup: (input: SignupInput) => request<AuthResponse>('/api/auth/signup', { method: 'POST', body: input }),
     login: (input: LoginInput) => request<AuthResponse>('/api/auth/login', { method: 'POST', body: input }),
     me: () => request<UserDto>('/api/auth/me'),
+    /** Needs the account's own email and password again; answers 204 and the token stops working. */
+    deleteAccount: (input: DeleteAccountInput) => request<null>('/api/auth/account/delete', { method: 'POST', body: input }),
   },
   profiles: {
     list: () => request<ProfileDto[]>('/api/profiles'),

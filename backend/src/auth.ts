@@ -3,6 +3,7 @@ import type { Request, RequestHandler } from 'express'
 import jwt from 'jsonwebtoken'
 import mongoose from 'mongoose'
 import { HttpError } from './http.ts'
+import { User } from './models/User.ts'
 
 /** Who is calling: a signed-in account, or the computer-vision module with the shared API key. */
 export type Principal = { kind: 'user'; userId: mongoose.Types.ObjectId } | { kind: 'service' }
@@ -49,7 +50,7 @@ function keyMatches(given: string, expected: string | undefined): boolean {
  * Express middleware: resolves `req.principal` from `x-api-key` (the CV module) or
  * `Authorization: Bearer <jwt>` (a signed-in user). Anything else is a 401.
  */
-export const authenticate: RequestHandler = (req, _res, next) => {
+export const authenticate: RequestHandler = async (req, _res, next) => {
   const apiKey = req.header('x-api-key')
   if (apiKey !== undefined) {
     if (keyMatches(apiKey, process.env.CV_API_KEY)) {
@@ -65,6 +66,11 @@ export const authenticate: RequestHandler = (req, _res, next) => {
   const userId = token ? verifyToken(token) : null
   if (!userId || !mongoose.isValidObjectId(userId)) {
     next(new HttpError(401, 'Not signed in'))
+    return
+  }
+  // A deleted account's token stops working at once, not when it expires.
+  if (!(await User.exists({ _id: userId }))) {
+    next(new HttpError(401, 'Account no longer exists'))
     return
   }
   req.principal = { kind: 'user', userId: new mongoose.Types.ObjectId(userId) }

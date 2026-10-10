@@ -2,7 +2,7 @@ import { EXERCISE_LIST, generateDemoSessions } from '@arc/dependencies'
 import * as Accordion from '@radix-ui/react-accordion'
 import { motion, useReducedMotion, useScroll, useSpring } from 'motion/react'
 import { useMemo } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useLocation } from 'react-router-dom'
 import { APP_NAME, SITE_URL } from '../brand'
 import { Logo } from '../components/icons'
 import { DemoBoard } from '../components/landing/DemoBoard'
@@ -11,7 +11,7 @@ import { Sparkline } from '../components/landing/Sparkline'
 import { useAccountLinks } from '../components/landing/accountLinks'
 import { useScrollSpy } from '../components/landing/useScrollSpy'
 import { ease, Item, MaskLines, Page, parentVariants, Reveal, riseVariants, RuleDraw } from '../components/motion'
-import { Strip } from '../components/ui'
+import { Alert, Strip } from '../components/ui'
 
 /*
  * The landing page as a datasheet: a sticky title block whose index is a measuring scale with
@@ -149,6 +149,8 @@ function TitleBlock({ active }: { active: string | null }) {
 export function LandingPage() {
   const active = useScrollSpy(SECTION_IDS)
   const account = useAccountLinks()
+  // Set by the account page after a deletion, so the member sees it went through.
+  const notice = (useLocation().state as { notice?: string } | null)?.notice
   const reduce = useReducedMotion()
   const sparkline = useMemo(
     () =>
@@ -167,6 +169,11 @@ export function LandingPage() {
         <main className="min-w-0 max-w-[1280px] px-4 pb-10 sm:px-6 lg:px-8">
           {/* ---- 01 LIVE ARM: eyebrow, display headline, the specimen stage and its spec ---- */}
           <section id="joint" className="pt-5 sm:pt-6 lg:pt-8" aria-labelledby="headline">
+            {notice && (
+              <div className="mb-5">
+                <Alert tone="good">{notice}</Alert>
+              </div>
+            )}
             <motion.div {...rise(0)} className="flex items-baseline justify-between gap-4">
               <span className="t-meta text-ink-2">Range of motion, read out</span>
               <span className="t-meta hidden sm:inline">
