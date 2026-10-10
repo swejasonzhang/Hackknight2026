@@ -34,10 +34,10 @@ export function StatTile({ label, value, hint, tone = 'default', icon }: { label
   return (
     <div className="card relative flex flex-col gap-3 p-5">
       <div className="flex items-start justify-between gap-3">
-        <div className="text-[12px] font-bold tracking-[0.1em] text-muted uppercase">{label}</div>
-        {icon && <div className={`inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-[10px] ${badge[tone]}`}>{icon}</div>}
+        <div className="text-[11.5px] font-semibold tracking-[0.14em] text-muted uppercase">{label}</div>
+        {icon && <div className={`inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full ${badge[tone]}`}>{icon}</div>}
       </div>
-      <div className="text-[2.35rem] leading-none font-extrabold tracking-[-0.03em] text-ink tabular-nums">{value}</div>
+      <div className="text-[2.5rem] leading-none font-semibold tracking-[-0.03em] text-ink tabular-nums">{value}</div>
       {hint && <div className="text-[13px] text-muted">{hint}</div>}
     </div>
   )
@@ -57,7 +57,7 @@ export function EmptyState({ icon, title, description, action }: { icon?: ReactN
   return (
     <div className="card flex flex-col items-center px-6 py-12 text-center" role="status">
       <div className="mb-4 text-primary">{icon ?? <EmptyArc />}</div>
-      <h3 className="text-[18px]">{title}</h3>
+      <h3 className="text-[22px] font-light">{title}</h3>
       {description && <p className="mt-2 max-w-[52ch] text-[14.5px] text-muted">{description}</p>}
       {action && <div className="mt-6 flex flex-wrap justify-center gap-2.5">{action}</div>}
     </div>
@@ -87,11 +87,11 @@ export function Avatar({ name, size = 36 }: { name: string; size?: number }) {
     .join('')
   let hash = 0
   for (const ch of name) hash = (hash * 31 + ch.charCodeAt(0)) % 360
-  const hue = 190 + (hash % 60) // blues and teals only
+  const hue = 190 + (hash % 50) // blues only
   return (
     <span
-      className="inline-flex shrink-0 items-center justify-center rounded-full font-extrabold"
-      style={{ width: size, height: size, fontSize: size * 0.38, background: `hsl(${hue} 80% 92%)`, color: `hsl(${hue} 70% 32%)` }}
+      className="inline-flex shrink-0 items-center justify-center rounded-full font-semibold"
+      style={{ width: size, height: size, fontSize: size * 0.38, background: `hsl(${hue} 90% 50% / 0.18)`, color: `hsl(${hue} 100% 72%)`, boxShadow: `0 0 0 1px hsl(${hue} 90% 55% / 0.45)` }}
       aria-hidden="true"
     >
       {initials || '?'}
@@ -108,7 +108,7 @@ export interface SegmentedOption<T extends string> {
 export function Segmented<T extends string>({ options, value, onChange, label }: { options: SegmentedOption<T>[]; value: T; onChange: (value: T) => void; label: string }) {
   const layoutId = useId()
   return (
-    <div className="inline-flex rounded-full border border-line bg-surface p-1 shadow-sm" role="tablist" aria-label={label}>
+    <div className="inline-flex rounded-full border border-line-strong bg-surface p-1" role="tablist" aria-label={label}>
       {options.map((o) => {
         const active = o.value === value
         return (
@@ -118,7 +118,7 @@ export function Segmented<T extends string>({ options, value, onChange, label }:
             role="tab"
             aria-selected={active}
             onClick={() => onChange(o.value)}
-            className={`relative cursor-pointer rounded-full px-4 py-2 text-[13px] font-bold transition-colors focus-visible:ring-[3px] focus-visible:ring-primary/35 focus-visible:outline-none ${active ? 'text-white' : 'text-muted hover:text-ink'}`}
+            className={`relative cursor-pointer rounded-full px-4 py-2 text-[13px] font-medium transition-colors focus-visible:ring-[3px] focus-visible:ring-primary/40 focus-visible:outline-none ${active ? 'text-white' : 'text-muted hover:text-ink'}`}
           >
             {active && <motion.span layoutId={layoutId} className="absolute inset-0 rounded-full bg-primary shadow-blue" transition={{ type: 'spring', stiffness: 500, damping: 40 }} />}
             <span className="relative z-10">{o.label}</span>
@@ -135,15 +135,15 @@ export function Skeleton({ height = 16, width = '100%', className = '' }: { heig
 
 const alertTone: Record<Tone, string> = {
   default: 'border-line bg-surface-2 text-ink-2',
-  primary: 'border-transparent bg-primary-soft text-primary',
-  good: 'border-transparent bg-good-soft text-good',
-  warn: 'border-transparent bg-warn-soft text-warn',
-  bad: 'border-transparent bg-bad-soft text-bad',
+  primary: 'border-primary/40 bg-primary-soft text-primary',
+  good: 'border-good/40 bg-good-soft text-good',
+  warn: 'border-warn/40 bg-warn-soft text-warn',
+  bad: 'border-bad/40 bg-bad-soft text-bad',
 }
 
 export function Alert({ tone = 'default', children }: { tone?: Tone; children: ReactNode }) {
   return (
-    <motion.div initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }} className={`rounded-[12px] border px-4 py-3 text-[14px] font-semibold ${alertTone[tone]}`} role={tone === 'bad' ? 'alert' : 'status'}>
+    <motion.div initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }} className={`rounded-[14px] border px-4 py-3 text-[14px] font-medium ${alertTone[tone]}`} role={tone === 'bad' ? 'alert' : 'status'}>
       {children}
     </motion.div>
   )

@@ -1,87 +1,111 @@
 @import 'tailwindcss';
 
 /* =====================================================================
-   Arc design system: premium white-and-blue fitness identity
+   Arc design system: neon black.
+   Black canvas, white type, one electric blue, condensed uppercase
+   display headlines with a glow, pill buttons and cards that glow at the edge.
    Tokens live here; Tailwind utilities read them through @theme inline.
    ===================================================================== */
 :root {
   /* surfaces */
-  --canvas: #f6f8fc; /* off-white with a cool cast */
-  --surface: #ffffff;
-  --surface-2: #eef3fa; /* light blue-gray */
-  --line: #e3e9f2;
-  --line-strong: #c9d4e3;
+  --canvas: #000000;
+  --surface: #0a0a0c;
+  --surface-2: #141418;
+  --line: rgb(255 255 255 / 0.1);
+  --line-strong: rgb(255 255 255 / 0.24);
 
   /* text */
-  --ink: #0b1a33; /* navy-charcoal */
-  --ink-2: #334155;
-  --muted: #64748b;
+  --ink: #ffffff;
+  --ink-2: #d9d9d9;
+  --muted: #8b8b94;
 
   /* brand */
-  --primary: #2563eb; /* energetic blue */
-  --primary-600: #1d4ed8;
-  --primary-soft: #e6efff;
-  --navy: #0a1f44; /* deep navy for authority */
-  --navy-2: #122a5c;
-  --sky: #38bdf8; /* highlight on navy */
-  --accent: #0ea5e9;
+  --primary: #00a1ff; /* electric blue */
+  --primary-600: #0089da;
+  --primary-soft: rgb(0 161 255 / 0.14);
+  --navy: #000000; /* kept for dark panels: on this theme they are black */
+  --navy-2: #0f0f13;
+  --sky: #5fc8ff;
+  --accent: #00a1ff;
 
   /* feedback */
-  --good: #16a34a;
-  --good-soft: #e7f7ec;
-  --warn: #d97706;
-  --warn-soft: #fef3df;
-  --bad: #dc2626;
-  --bad-soft: #fdecec;
+  --good: #2ed272;
+  --good-soft: rgb(46 210 114 / 0.14);
+  --warn: #ffb020;
+  --warn-soft: rgb(255 176 32 / 0.14);
+  --bad: #ff4d6d;
+  --bad-soft: rgb(255 77 109 / 0.14);
 
   /* charts */
-  --chart-grid: #e3e9f2;
-  --chart-axis: #64748b;
-  --chart-1: #2563eb;
-  --chart-1-soft: #93c5fd;
-  --chart-goal: #f59e0b;
-  --chart-fatigue: #ef4444;
-  --chart-reps: #2563eb;
-  --chart-weeks: #0ea5e9;
+  --chart-grid: rgb(255 255 255 / 0.08);
+  --chart-axis: #8b8b94;
+  --chart-1: #00a1ff;
+  --chart-1-soft: #7fd0ff;
+  --chart-goal: #ffb020;
+  --chart-fatigue: #ff4d6d;
+  --chart-reps: #00a1ff;
+  --chart-weeks: #5fc8ff;
 
-  /* depth */
-  --shadow-sm: 0 1px 2px rgb(11 26 51 / 0.05), 0 1px 0 rgb(255 255 255 / 0.6) inset;
-  --shadow-card: 0 1px 2px rgb(11 26 51 / 0.04), 0 12px 32px -20px rgb(11 26 51 / 0.25);
-  --shadow-pop: 0 24px 60px -24px rgb(11 26 51 / 0.35);
-  --shadow-blue: 0 12px 28px -12px rgb(37 99 235 / 0.55);
+  /* depth: on black, depth is light, not shadow */
+  --glow: 0 0 0 1px rgb(0 161 255 / 0.32), 0 0 28px rgb(0 161 255 / 0.22);
+  --glow-strong: 0 0 0 1px rgb(0 161 255 / 0.6), 0 0 48px rgb(0 161 255 / 0.4);
+  --shadow-sm: 0 1px 2px rgb(0 0 0 / 0.6);
+  --shadow-card: var(--glow);
+  --shadow-pop: var(--glow-strong);
+  --shadow-blue: 0 0 24px rgb(0 161 255 / 0.55);
 
   /* type scale */
-  --text-display: clamp(2.6rem, 5.2vw, 4.5rem);
-  --text-h1: clamp(1.9rem, 3vw, 2.4rem);
-  --text-h2: clamp(1.6rem, 2.4vw, 2rem);
-  --text-h3: 1.0625rem;
+  --text-display: clamp(3.2rem, 7.6vw, 6.25rem);
+  --text-display-2: clamp(2.5rem, 5.6vw, 5rem);
+  --text-h1: clamp(2.4rem, 4vw, 3.5rem);
+  --text-h2: clamp(1.9rem, 3vw, 2.6rem);
+  --text-h3: 1.25rem;
 
-  --radius-lg: 20px;
-  --radius: 14px;
-  --radius-sm: 10px;
-  color-scheme: light;
-}
-
-/* Re-themes tokens for dark navy sections so the same components work on both. */
-.on-navy {
-  --canvas: var(--navy);
-  --surface: #122a5c;
-  --surface-2: #1a3a78;
-  --line: rgb(255 255 255 / 0.12);
-  --line-strong: rgb(255 255 255 / 0.26);
-  --ink: #ffffff;
-  --ink-2: #dbe6ff;
-  --muted: #9fb3d9;
-  --primary-soft: rgb(56 189 248 / 0.16);
-  --chart-grid: rgb(255 255 255 / 0.1);
-  --chart-axis: #9fb3d9;
-  --shadow-card: 0 12px 32px -20px rgb(0 0 0 / 0.6);
-  --shadow-pop: 0 24px 60px -24px rgb(0 0 0 / 0.7);
+  --radius-lg: 28px;
+  --radius: 18px;
+  --radius-sm: 12px;
   color-scheme: dark;
 }
 
+/* White sections: the same components on a light surface. */
+.on-light {
+  --canvas: #ffffff;
+  --surface: #ffffff;
+  --surface-2: #f3f4f6;
+  --line: #e6e7eb;
+  --line-strong: #cfd2d8;
+  --ink: #26262b;
+  --ink-2: #44444c;
+  --muted: #8a8a93;
+  --primary-soft: #e6f5ff;
+  --chart-grid: #e6e7eb;
+  --chart-axis: #8a8a93;
+  --glow: 0 0 0 1px rgb(0 161 255 / 0.28), 0 0 32px rgb(0 161 255 / 0.28);
+  --glow-strong: 0 0 0 1px rgb(0 161 255 / 0.5), 0 0 48px rgb(0 161 255 / 0.4);
+  --shadow-card: var(--glow);
+  --shadow-pop: var(--glow-strong);
+  color-scheme: light;
+}
+
+/* The blue band: white type, black buttons. */
+.on-blue {
+  --canvas: #00a1ff;
+  --surface: #0b8fe0;
+  --surface-2: #1a9cea;
+  --line: rgb(255 255 255 / 0.3);
+  --line-strong: rgb(255 255 255 / 0.5);
+  --ink: #ffffff;
+  --ink-2: #eaf6ff;
+  --muted: #d6efff;
+  --primary: #000000;
+  --primary-600: #151518;
+  --primary-soft: rgb(255 255 255 / 0.2);
+  --shadow-blue: none;
+}
+
 @theme inline {
-  --font-sans: 'Manrope', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-sans: 'Inter', 'Helvetica Neue', Helvetica, Arial, sans-serif;
+  --font-display: 'Bayon', 'Arial Narrow', Impact, sans-serif;
 
   --color-canvas: var(--canvas);
   --color-surface: var(--surface);
@@ -109,6 +133,8 @@
   --shadow-card: var(--shadow-card);
   --shadow-pop: var(--shadow-pop);
   --shadow-blue: var(--shadow-blue);
+  --shadow-glow: var(--glow);
+  --shadow-glow-strong: var(--glow-strong);
 
   --radius-lg: var(--radius-lg);
   --radius-md: var(--radius);
@@ -124,22 +150,21 @@
     @apply bg-canvas font-sans text-[15px] leading-[1.6] text-ink antialiased;
   }
   h1,
-  h2,
-  h3 {
-    @apply font-extrabold tracking-[-0.02em] text-ink;
+  h2 {
+    @apply font-display font-normal tracking-[0.01em] text-ink uppercase;
+    line-height: 0.92;
     text-wrap: balance;
   }
   h1 {
     font-size: var(--text-h1);
-    line-height: 1.1;
   }
   h2 {
     font-size: var(--text-h2);
-    line-height: 1.15;
   }
   h3 {
     font-size: var(--text-h3);
-    @apply font-bold tracking-[-0.01em];
+    @apply font-medium tracking-[-0.01em] text-ink;
+    text-wrap: balance;
   }
   a {
     @apply text-primary;
@@ -149,25 +174,41 @@
     color: #fff;
   }
   strong {
-    @apply font-bold text-ink;
+    @apply font-semibold text-ink;
   }
 }
 
 @layer components {
+  /* ---- type ---- */
   .display {
     font-size: var(--text-display);
-    line-height: 1;
-    @apply font-extrabold tracking-[-0.04em] text-ink;
+    line-height: 0.9;
+    @apply font-display font-normal tracking-[0.01em] text-ink uppercase;
     text-wrap: balance;
   }
+  .display-2 {
+    font-size: var(--text-display-2);
+    line-height: 0.95;
+    @apply font-display font-normal tracking-[0.01em] text-ink uppercase;
+    text-wrap: balance;
+  }
+  .glow-text {
+    text-shadow:
+      0 0 8px rgb(0 161 255 / 0.9),
+      0 0 24px rgb(0 161 255 / 0.7),
+      0 0 60px rgb(0 161 255 / 0.45);
+  }
   .eyebrow {
-    @apply text-[12px] font-bold tracking-[0.14em] text-primary uppercase;
+    @apply text-[12px] font-semibold tracking-[0.18em] text-primary uppercase;
   }
   .lead {
-    @apply text-[17px] leading-[1.65] text-ink-2;
+    @apply text-[18px] leading-[1.6] text-ink-2;
+  }
+  .feature-title {
+    @apply text-[clamp(1.75rem,3vw,2.75rem)] leading-[1.1] font-light tracking-[-0.01em] text-ink;
   }
   .nav-link {
-    @apply relative text-[14px] font-bold text-ink-2 no-underline transition-colors hover:text-ink hover:no-underline;
+    @apply relative text-[14px] font-medium text-ink-2 no-underline transition-colors hover:text-ink hover:no-underline;
   }
   .nav-link::after {
     content: '';
@@ -178,47 +219,52 @@
     @apply scale-x-100;
   }
 
+  /* ---- buttons: pills ---- */
   .btn {
-    @apply inline-flex cursor-pointer items-center justify-center gap-2 rounded-[12px] border border-line-strong bg-surface px-4 py-2.5 text-[14px] leading-none font-bold text-ink transition-[background,border-color,transform,box-shadow,color] duration-150 hover:border-primary hover:text-primary active:scale-[0.98] focus-visible:ring-[3px] focus-visible:ring-primary/35 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-45 disabled:active:scale-100;
+    @apply inline-flex cursor-pointer items-center justify-center gap-2 rounded-full border border-line-strong bg-transparent px-5 py-3 text-[15px] leading-none font-medium text-ink transition-[background,border-color,transform,box-shadow,color] duration-150 hover:border-ink hover:bg-ink/5 active:scale-[0.98] focus-visible:ring-[3px] focus-visible:ring-primary/40 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-45 disabled:active:scale-100;
   }
   .btn-primary {
     @apply border-primary bg-primary text-white shadow-blue hover:border-primary-600 hover:bg-primary-600 hover:text-white;
   }
+  .btn-white {
+    @apply border-white bg-white text-[#26262b] hover:border-white hover:bg-[#e9e9ec] hover:text-[#26262b];
+  }
   .btn-navy {
-    @apply border-navy bg-navy text-white hover:border-navy-2 hover:bg-navy-2 hover:text-white;
+    @apply border-black bg-black text-white hover:border-black hover:bg-[#151518] hover:text-white;
   }
   .btn-ghost {
-    @apply border-transparent bg-transparent text-ink-2 shadow-none hover:border-transparent hover:bg-surface-2 hover:text-ink;
+    @apply border-transparent bg-transparent text-ink-2 shadow-none hover:border-transparent hover:bg-ink/5 hover:text-ink;
   }
   .btn-danger {
-    @apply border-transparent bg-transparent text-bad hover:border-bad/30 hover:bg-bad-soft hover:text-bad;
+    @apply border-transparent bg-transparent text-bad hover:border-bad/40 hover:bg-bad-soft hover:text-bad;
   }
   .btn-sm {
-    @apply rounded-[10px] px-3 py-2 text-[13px];
+    @apply px-3.5 py-2 text-[13px];
   }
   .btn-lg {
-    @apply rounded-[14px] px-6 py-3.5 text-[15px];
+    @apply px-7 py-4 text-[16px];
   }
 
+  /* ---- forms ---- */
   .input {
-    @apply w-full rounded-[12px] border border-line-strong bg-surface px-3.5 py-3 text-[15px] text-ink transition-[border-color,box-shadow] duration-150 placeholder:text-muted/70 hover:border-muted focus:border-primary focus:ring-[3px] focus:ring-primary/25 focus:outline-none;
+    @apply w-full rounded-[14px] border border-line-strong bg-surface px-4 py-3 text-[15px] text-ink transition-[border-color,box-shadow] duration-150 placeholder:text-muted/70 hover:border-ink/40 focus:border-primary focus:ring-[3px] focus:ring-primary/30 focus:outline-none;
   }
   .input[aria-invalid='true'] {
-    @apply border-bad focus:border-bad focus:ring-bad/25;
+    @apply border-bad focus:border-bad focus:ring-bad/30;
   }
   .input-sm {
-    @apply w-auto rounded-[10px] px-3 py-2 text-[14px];
+    @apply w-auto rounded-full px-3.5 py-2 text-[14px];
   }
   select.input {
     @apply appearance-none bg-no-repeat pr-9;
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2364748b' stroke-width='2.5'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%238b8b94' stroke-width='2.5'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
     background-position: right 12px center;
   }
   .field {
     @apply flex flex-col gap-1.5;
   }
   .field > label {
-    @apply text-[13px] font-bold text-ink-2;
+    @apply text-[13px] font-medium text-ink-2;
   }
   .field-msg {
     @apply inline-flex items-center gap-1.5 text-[12.5px] text-muted;
@@ -230,33 +276,43 @@
     @apply text-good;
   }
   .eye {
-    @apply absolute top-1/2 right-2 inline-flex h-9 w-9 -translate-y-1/2 cursor-pointer items-center justify-center rounded-[10px] text-muted transition-colors hover:bg-surface-2 hover:text-ink focus-visible:ring-[3px] focus-visible:ring-primary/35 focus-visible:outline-none;
+    @apply absolute top-1/2 right-2 inline-flex h-9 w-9 -translate-y-1/2 cursor-pointer items-center justify-center rounded-full text-muted transition-colors hover:bg-ink/10 hover:text-ink focus-visible:ring-[3px] focus-visible:ring-primary/40 focus-visible:outline-none;
   }
 
+  /* ---- surfaces ---- */
   .card {
-    @apply rounded-[20px] border border-line bg-surface p-5 shadow-card sm:p-6;
+    @apply rounded-[var(--radius-lg)] border border-primary/25 bg-surface p-5 shadow-card sm:p-6;
+  }
+  .card-quiet {
+    @apply border-line shadow-none;
   }
   .badge {
-    @apply ml-1.5 inline-flex items-center rounded-full bg-surface-2 px-2 py-0.5 align-middle text-[11px] font-bold text-muted;
+    @apply ml-1.5 inline-flex items-center rounded-full bg-surface-2 px-2 py-0.5 align-middle text-[11px] font-semibold text-muted;
+  }
+  .ring-icon {
+    @apply inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full border-2 border-primary text-primary;
+  }
+  .plus-icon {
+    @apply inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary text-white;
   }
   .table {
     @apply w-full border-collapse text-[14px];
   }
   .table th {
-    @apply border-b border-line px-2.5 py-2.5 text-left text-[11px] font-bold tracking-[0.08em] text-muted uppercase;
+    @apply border-b border-line px-2.5 py-2.5 text-left text-[11px] font-semibold tracking-[0.1em] text-muted uppercase;
   }
   .table td {
     @apply border-b border-line px-2.5 py-3 align-middle;
   }
   .table tbody tr:hover td {
-    @apply bg-surface-2/60;
+    @apply bg-ink/[0.04];
   }
   .table .num {
     @apply text-right tabular-nums;
   }
   .skeleton {
-    @apply rounded-[12px];
-    background: linear-gradient(90deg, var(--surface-2) 25%, var(--line) 50%, var(--surface-2) 75%);
+    @apply rounded-[14px];
+    background: linear-gradient(90deg, var(--surface-2) 25%, var(--line-strong) 50%, var(--surface-2) 75%);
     background-size: 200% 100%;
     animation: shimmer 1.4s infinite;
   }
@@ -266,9 +322,9 @@
     background-clip: text;
     color: transparent;
   }
-  /* soft radial glow used behind hero and panels */
+  /* soft radial glow used behind the hero */
   .glow-blue {
-    background: radial-gradient(60% 60% at 30% 20%, rgb(37 99 235 / 0.16), transparent 70%);
+    background: radial-gradient(60% 50% at 50% 0%, rgb(0 161 255 / 0.22), transparent 70%);
   }
 }
 
@@ -304,16 +360,6 @@
   }
 }
 
-/* ---------- Landing page motion ---------- */
-@keyframes marquee {
-  from {
-    transform: translateX(0);
-  }
-  to {
-    transform: translateX(-50%);
-  }
-}
-
 @keyframes grid-pan {
   from {
     background-position:
@@ -327,42 +373,13 @@
   }
 }
 
-.marquee {
-  overflow: hidden;
-  mask-image: linear-gradient(90deg, transparent, black 8%, black 92%, transparent);
-  -webkit-mask-image: linear-gradient(90deg, transparent, black 8%, black 92%, transparent);
-}
-
-.marquee-track {
-  display: flex;
-  width: max-content;
-  padding: 14px 0;
-  animation: marquee 34s linear infinite;
-}
-
-.marquee-item {
-  display: inline-flex;
-  align-items: center;
-  padding: 0 0.25rem;
-  font-size: 14px;
-  font-weight: 700;
-  letter-spacing: 0.02em;
-  color: var(--ink-2);
-  white-space: nowrap;
-}
-
-.marquee-dot {
-  margin: 0 1.25rem;
-  color: var(--sky);
-}
-
 .grid-lines {
   background-image:
     linear-gradient(var(--line) 1px, transparent 1px),
     linear-gradient(90deg, var(--line) 1px, transparent 1px);
   background-size: 56px 56px;
-  mask-image: radial-gradient(ellipse at 40% 30%, black 10%, transparent 72%);
-  -webkit-mask-image: radial-gradient(ellipse at 40% 30%, black 10%, transparent 72%);
+  mask-image: radial-gradient(ellipse at 50% 20%, black 10%, transparent 70%);
+  -webkit-mask-image: radial-gradient(ellipse at 50% 20%, black 10%, transparent 70%);
   animation: grid-pan 48s linear infinite;
 }
 
@@ -370,7 +387,6 @@
   html {
     scroll-behavior: auto;
   }
-  .marquee-track,
   .grid-lines,
   .skeleton,
   .faq-content {
