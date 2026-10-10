@@ -36,7 +36,7 @@ class RoutineExercise:
         # Live State
         self.reps_completed = 0
         self.current_set = 1
-        self.current_stage = "down"  # 'up' or 'down'
+        self.current_stage = "up"  # Set to 'up' so starting bent doesn't auto-trigger reps
         self.min_angle = 180.0
         self.max_angle = 0.0
 
@@ -48,24 +48,48 @@ class RoutineExercise:
         self.current_rep_max = 0.0
 
     def evaluate_rep_quality(self, min_ang, max_ang):
-        """Calculates form quality score based on range of motion thresholds and form limits."""
-        # Detect hyper-extension or form flaring
-        if max_ang > self.max_allowed_extension and not self.invert_logic:
+        """Calculates form quality score based on absolute deviation from ROM targets."""
+        # Detect hyper-extension / over-extension penalties
+        if max_ang > self.max_allowed_extension:
             return "POOR FORM (OVER-EXTENSION)", (0, 0, 255)
 
         if self.invert_logic:
-            extend_delta = self.extend_threshold - max_ang
-            flex_delta = min_ang - self.flex_threshold
-        else:
-            flex_delta = min_ang - self.flex_threshold
-            extend_delta = self.extend_threshold - max_ang
+            # For inverted logic: Goal is getting peak angle above extend_threshold
+            # and flexed angle below flex_threshold.
+            target_extension = self.extend_threshold
+            target_flexion = self.flex_threshold
 
-        if flex_delta <= 10 and extend_delta <= 10:
-            return "PERFECT", (0, 255, 0)
-        elif flex_delta <= 20 and extend_delta <= 20:
-            return "GOOD", (0, 255, 255)
+            achieved_extension = max_ang
+            achieved_flexion = min_ang
+
+            # Calculate shortfall from target targets
+            extension_shortfall = max(0.0, target_extension - achieved_extension)
+            flexion_shortfall = max(0.0, achieved_flexion - target_flexion)
+
         else:
+            # For standard logic: Goal is getting minimum angle below flex_threshold
+            # and extended angle above extend_threshold.
+            target_flexion = self.flex_threshold
+            target_extension = self.extend_threshold
+
+            achieved_flexion = min_ang
+            achieved_extension = max_ang
+
+            # Shortfall calculation: How far off from full contraction/extension?
+            flexion_shortfall = max(0.0, achieved_flexion - target_flexion)
+            extension_shortfall = max(0.0, target_extension - achieved_extension)
+
+        total_error = flexion_shortfall + extension_shortfall
+
+        # Strict Categorization
+        if total_error <= 10.0:
+            return "PERFECT", (0, 255, 0)
+        elif total_error <= 25.0:
+            return "GOOD", (0, 255, 255)
+        elif total_error <= 45.0:
             return "INCOMPLETE ROM", (0, 165, 255)
+        else:
+            return "POOR FORM", (0, 0, 255)
 
 
 class ExerciseTracker:
@@ -102,12 +126,12 @@ class ExerciseTracker:
                 "type": "arm_dual",
                 "right_indices": (LEFT_SHOULDER, LEFT_ELBOW, LEFT_WRIST),
                 "left_indices": (RIGHT_SHOULDER, RIGHT_ELBOW, RIGHT_WRIST),
-                "flex_threshold": 50.0,
-                "extend_threshold": 150.0,
+                "flex_threshold": 60.0,
+                "extend_threshold": 140.0,
                 "default_reps": 5,
                 "default_sets": 1,
-                "invert_logic": False,
-                "max_allowed_extension": 178.0,
+                "invert_logic": True,
+                "max_allowed_extension": 180.0,
             },
         },
         "SHOULDERS": {
@@ -134,9 +158,21 @@ class ExerciseTracker:
                 "invert_logic": True,
                 "max_allowed_extension": 110.0,
             },
+            "5": {
+                "name": "Front Raise",
+                "type": "arm_dual",
+                "right_indices": (LEFT_HIP, LEFT_SHOULDER, LEFT_WRIST),
+                "left_indices": (RIGHT_HIP, RIGHT_SHOULDER, RIGHT_WRIST),
+                "flex_threshold": 25.0,
+                "extend_threshold": 135.0,
+                "default_reps": 5,
+                "default_sets": 1,
+                "invert_logic": True,
+                "max_allowed_extension": 160.0,
+            },
         },
         "CHEST": {
-            "5": {
+            "6": {
                 "name": "Chest Press",
                 "type": "standard",
                 "indices": (LEFT_WRIST, LEFT_ELBOW, LEFT_SHOULDER),
@@ -147,9 +183,20 @@ class ExerciseTracker:
                 "invert_logic": True,
                 "max_allowed_extension": 175.0,
             },
+            "7": {
+                "name": "Pec Fly",
+                "type": "standard",
+                "indices": (LEFT_WRIST, LEFT_SHOULDER, RIGHT_WRIST),
+                "flex_threshold": 25.0,   # Requires wrists to meet directly in front of chest
+                "extend_threshold": 75.0,  # Arms open wide at sides
+                "default_reps": 5,
+                "default_sets": 1,
+                "invert_logic": False,
+                "max_allowed_extension": 105.0,
+            },
         },
         "BACK": {
-            "6": {
+            "8": {
                 "name": "Lat Pulldown",
                 "type": "standard",
                 "indices": (LEFT_HIP, LEFT_SHOULDER, LEFT_ELBOW),
@@ -160,7 +207,7 @@ class ExerciseTracker:
                 "invert_logic": False,
                 "max_allowed_extension": 175.0,
             },
-            "7": {
+            "9": {
                 "name": "Bent-Over Rows",
                 "type": "standard",
                 "indices": (LEFT_SHOULDER, LEFT_ELBOW, LEFT_WRIST),
@@ -171,11 +218,11 @@ class ExerciseTracker:
                 "invert_logic": False,
                 "max_allowed_extension": 175.0,
             },
-            "8": {
+            "10": {
                 "name": "Deadlift",
                 "type": "standard",
                 "indices": (LEFT_SHOULDER, LEFT_HIP, LEFT_KNEE),
-                "flex_threshold": 130.0,  # Adjusted threshold for hip hinge detection
+                "flex_threshold": 130.0,
                 "extend_threshold": 165.0,
                 "default_reps": 5,
                 "default_sets": 1,
@@ -184,7 +231,7 @@ class ExerciseTracker:
             },
         },
         "LEGS": {
-            "9": {
+            "11": {
                 "name": "Squats",
                 "type": "standard",
                 "indices": (LEFT_HIP, LEFT_KNEE, LEFT_ANKLE),
@@ -195,7 +242,7 @@ class ExerciseTracker:
                 "invert_logic": False,
                 "max_allowed_extension": 180.0,
             },
-            "10": {
+            "12": {
                 "name": "Lunges",
                 "type": "standard",
                 "indices": (LEFT_HIP, LEFT_KNEE, LEFT_ANKLE),
@@ -208,16 +255,27 @@ class ExerciseTracker:
             },
         },
         "CORE": {
-            "11": {
+            "13": {
                 "name": "Ab Twist",
                 "type": "twist",
-                "indices": (LEFT_SHOULDER, RIGHT_SHOULDER, 0),  # Uses shoulder line tilt angle
-                "flex_threshold": 8.0,  # Below 8 degrees tilt is resting center
-                "extend_threshold": 22.0,  # Above 22 degrees tilt registers side twist
+                "indices": (LEFT_SHOULDER, RIGHT_SHOULDER, 0),
+                "flex_threshold": 8.0,
+                "extend_threshold": 22.0,
                 "default_reps": 10,
                 "default_sets": 1,
-                "invert_logic": True,  # Rep triggers when angle increases past extend_threshold
+                "invert_logic": True,
                 "max_allowed_extension": 60.0,
+            },
+            "14": {
+                "name": "Crunches",
+                "type": "standard",
+                "indices": (LEFT_SHOULDER, LEFT_HIP, LEFT_KNEE),
+                "flex_threshold": 135.0,  # Torso curled up toward knees
+                "extend_threshold": 165.0, # Lying flat on back
+                "default_reps": 8,
+                "default_sets": 1,
+                "invert_logic": False,
+                "max_allowed_extension": 180.0,
             },
         },
     }
@@ -427,12 +485,12 @@ class ExerciseTracker:
             RoutineExercise(
                 "Tricep Extension (Down) (Right)",
                 (self.LEFT_SHOULDER, self.LEFT_ELBOW, self.LEFT_WRIST),
-                flex_threshold=50.0,
-                extend_threshold=150.0,
+                flex_threshold=60.0,
+                extend_threshold=140.0,
                 target_reps=3,
                 target_sets=2,
-                invert_logic=False,
-                max_allowed_extension=178.0,
+                invert_logic=True,
+                max_allowed_extension=180.0,
             ),
             RoutineExercise(
                 "Squats",
@@ -469,6 +527,7 @@ class ExerciseTracker:
     def advance_set_or_exercise(self):
         """Advances to the next set or moves to the next exercise once all sets are complete."""
         active_exercise = self.routine[self.current_index]
+        active_exercise.current_stage = "up"
         if active_exercise.current_set < active_exercise.target_sets:
             active_exercise.current_set += 1
             active_exercise.reps_completed = 0
@@ -477,6 +536,7 @@ class ExerciseTracker:
         else:
             self.current_index += 1
             if self.current_index < len(self.routine):
+                self.routine[self.current_index].current_stage = "up"
                 self.routine[self.current_index].last_rep_completion_time = time.time()
                 self.start_grace_period()
 
@@ -521,7 +581,7 @@ class ExerciseTracker:
 
         time_since_last = self.check_fatigue_and_stalls(current_exercise)
 
-        # Inverted logic movements
+        # Inverted logic movements (e.g., Tricep Pushdowns: Flexes up, extends down)
         if current_exercise.invert_logic:
             if angle < current_exercise.flex_threshold:
                 if current_exercise.current_stage != "down":
@@ -568,7 +628,7 @@ class ExerciseTracker:
                 if current_exercise.reps_completed >= current_exercise.target_reps:
                     self.start_rest_period()
 
-        # Flexion-based movements
+        # Flexion-based movements (e.g., Bicep Curls)
         else:
             if angle > current_exercise.extend_threshold:
                 if current_exercise.current_stage != "down":
