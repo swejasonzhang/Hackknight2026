@@ -8,6 +8,7 @@ import { axisTick, tooltipStyle } from '../components/ProgressCharts'
 import { LazyJointScene } from '../components/three/lazy'
 import { Alert, Lamp, Skeleton, StatTile, Strip, Tag } from '../components/ui'
 import { deg, fatigueLabel, formatDateTime, pct } from '../format'
+import { useStickyTop } from '../components/useStickyTop'
 
 const MONO = "'IBM Plex Mono', ui-monospace, monospace"
 
@@ -18,7 +19,7 @@ const AREA = {
   back: 'lg:col-span-4 lg:col-start-1 lg:row-start-1 lg:pb-5',
   title: 'border-b border-rule-strong pb-5 lg:col-span-8 lg:col-start-5 lg:row-start-1',
   numeral: 'lg:col-span-4 lg:col-start-5 lg:row-start-2 lg:pt-6 lg:pb-8',
-  stage: 'lg:col-span-4 lg:col-start-1 lg:row-span-3 lg:row-start-1 lg:sticky lg:top-6 lg:self-start',
+  stage: 'lg:col-span-4 lg:col-start-1 lg:row-span-3 lg:row-start-1 lg:sticky lg:self-start',
   readouts: 'lg:col-span-4 lg:col-start-9 lg:row-start-2 lg:border-l lg:border-rule lg:pt-6 lg:pb-8 lg:pl-8',
   strips: 'lg:col-span-8 lg:col-start-5 lg:row-start-3',
 }
@@ -73,6 +74,7 @@ function BackLink() {
 export function SessionDetailPage() {
   const { id = '' } = useParams()
   const back = useBack()
+  const [stageRef, stageTop] = useStickyTop<HTMLElement>(24)
   const [session, setSession] = useState<SessionDto | null>(null)
   const [error, setError] = useState<string | null>(null)
 
@@ -197,7 +199,7 @@ export function SessionDetailPage() {
       </div>
 
       {/* Stage column: the limb posed at the best rep on the blueprint grid, then the spec list. */}
-      <aside className={`${AREA.stage} grid gap-5 sm:grid-cols-2 lg:grid-cols-1`} aria-label="Session stage">
+      <aside ref={stageRef} className={`${AREA.stage} grid gap-5 sm:grid-cols-2 lg:grid-cols-1`} style={{ top: stageTop }} aria-label="Session stage">
         <div className="panel">
           <div className="stage h-[220px] sm:h-[260px] lg:h-[300px]">
             <LazyJointScene

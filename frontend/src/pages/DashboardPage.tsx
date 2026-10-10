@@ -10,6 +10,7 @@ import { FatigueChart, PeakChart, RepChart, WeeklyChart } from '../components/Pr
 import { LazyJointScene, LazyProgressScene } from '../components/three/lazy'
 import { Alert, EmptyState, Lamp, Segmented, Skeleton, StatTile, Strip } from '../components/ui'
 import { deg, fatigueLabel, formatDate, weekStartIso } from '../format'
+import { useStickyTop } from '../components/useStickyTop'
 import { useProfiles } from '../hooks/useProfiles'
 
 /** The switch carries short labels; the full exercise name is printed on the stage beneath it. */
@@ -30,6 +31,7 @@ export function DashboardPage() {
   const [loading, setLoading] = useState(false)
   const [seeding, setSeeding] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [panelRef, panelTop] = useStickyTop<HTMLElement>(32)
 
   useEffect(() => {
     if (!selectedId) return
@@ -91,9 +93,9 @@ export function DashboardPage() {
   )
 
   return (
-    <Page className="grid gap-8 lg:grid-cols-12 lg:gap-8">
+    <Page className="grid grid-cols-1 gap-8 lg:grid-cols-12 lg:gap-8">
       {/* ---------- Measurement panel ---------- */}
-      <section aria-label="Measurement panel" className="panel self-start p-4 sm:p-5 lg:sticky lg:top-8 lg:col-span-5 lg:max-h-[calc(100vh-4rem)] lg:overflow-y-auto">
+      <section ref={panelRef} aria-label="Measurement panel" className="panel min-w-0 self-start p-4 sm:p-5 lg:sticky lg:col-span-5" style={{ top: panelTop }}>
         <div className="flex items-center justify-between gap-3 border-b border-rule pb-4">
           <ProfilePicker />
           {!noProfiles && (

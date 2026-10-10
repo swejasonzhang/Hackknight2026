@@ -6,6 +6,7 @@ import { Page } from '../components/motion'
 import { PlanEditor } from '../components/PlanEditor'
 import { ProfilePicker } from '../components/ProfilePicker'
 import { Alert, EmptyState, PageHeader, Skeleton, Strip } from '../components/ui'
+import { useStickyTop } from '../components/useStickyTop'
 import { useProfiles } from '../hooks/useProfiles'
 import { DayLog } from '../plan/DayLog'
 import { dayKey, defaultDay, parseDayKey, type DayKey } from '../plan/days'
@@ -21,6 +22,7 @@ export function PlanPage() {
   const [plan, setPlan] = useState<PlanDto | null>(null)
   const [sessions, setSessions] = useState<SessionDto[] | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [planRef, planTop] = useStickyTop<HTMLDivElement>(32)
 
   useEffect(() => {
     if (!selectedId) return
@@ -77,7 +79,7 @@ export function PlanPage() {
         </div>
       ) : (
         <div className="mt-6 grid gap-8 lg:grid-cols-[minmax(0,3fr)_minmax(0,7fr)] lg:gap-10">
-          <div className="min-w-0 lg:sticky lg:top-8 lg:self-start">
+          <div ref={planRef} className="min-w-0 lg:sticky lg:self-start" style={{ top: planTop }}>
             <Strip index="01" title="Plan" aside="Read by the camera app">
               {selectedId && sessions ? <PlanEditor profileId={selectedId} plan={plan} onSaved={setPlan} compact /> : <Skeleton height={360} />}
             </Strip>
