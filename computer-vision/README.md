@@ -10,14 +10,10 @@ uv run main.py   # opens the webcam window
 
 `main.py` starts `ExerciseTracker` from `movements.py`.
 
-## Opening it from the dashboard
+## Starting from a plan
 
-`launcher.py` lets the dashboard's **Open the camera app** button start this app on this computer:
+`uv run main.py --exercise elbow_flexion --side right --sets 3 --reps 8 --rest 45` starts straight into an Arc plan with no prompts; `arc_routine.py` maps Arc's movements onto this app's catalog (elbow flexion: Bicep Curls; shoulder abduction: Lateral Raise; seated knee extension: defined there, hip, knee and ankle). With no flags, `uv run main.py` builds the routine interactively. Tests: `python3 -m unittest`.
 
-```bash
-uv run launcher.py   # or python3 launcher.py; standard library only, leave it running
-```
-
-It listens on `http://127.0.0.1:8765`, accepts requests only from Arc's own pages carrying an `X-Arc-Launcher: 1` header, and starts `main.py` straight into the profile's plan, with no prompts: `main.py --exercise elbow_flexion --side right --sets 3 --reps 8 --rest 45`. `arc_routine.py` maps Arc's movements onto this app's catalog (elbow flexion: Bicep Curls; shoulder abduction: Lateral Raise; seated knee extension: defined there, hip, knee and ankle). Output goes to `camera.log`. With no flags, `uv run main.py` still builds the routine interactively. Tests: `python3 -m unittest`.
+The web app now records in the browser itself (MediaPipe's JavaScript pose model, root README section 4b), so users need neither Python nor this app; this app remains the computer-vision team's tool.
 
 Next step (backlog story C4): when a session finishes, send it to the API as described in the root README, section 4, using `POST /api/sessions` with the `x-api-key` header, so it shows up on the dashboard at getarc.health.

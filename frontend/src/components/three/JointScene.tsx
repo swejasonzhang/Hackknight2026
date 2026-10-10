@@ -103,7 +103,7 @@ function Skin({ color = SKIN }: { color?: string }) {
   return <meshStandardMaterial color={color} roughness={0.45} metalness={0.06} side={DoubleSide} />
 }
 
-/** A tracked joint as the camera app sees it: a cobalt ring around a navy landmark dot. */
+/** A tracked joint as the pose tracker sees it: a cobalt ring around a navy landmark dot. */
 function Landmark({ r }: { r: number }) {
   return (
     <>
@@ -341,7 +341,7 @@ function Body({ exercise, angle, goalDeg, rangeDeg, idle, reduce }: Pick<JointSc
         ))}
         {first.seat && <Stool seat={first.seat} />}
 
-        {/* The camera app's view on top of the body: landmark rings, the tracked segments, the arc. */}
+        {/* The tracker's view on top of the body: landmark rings, the tracked segments, the arc. */}
         <group ref={bind(refs, 'line-proximal')}>
           <Line points={[[0, 0, 0], [0, 1, 0]]} color={COBALT} lineWidth={2.5} transparent opacity={0.9} />
         </group>
@@ -378,7 +378,7 @@ function Body({ exercise, angle, goalDeg, rangeDeg, idle, reduce }: Pick<JointSc
  * A whole body performing the exercise: head, neck, torso, pelvis, both arms with hands, both legs
  * with feet, and mannequin ball joints, standing for elbow flexion (side on) and shoulder
  * abduction (face on), seated on a stool for knee extension. Only the exercising limb moves with
- * the reading (`skeletonFor`); the camera app's rings and segments and the goniometer arc sit on
+ * the reading (`skeletonFor`); the tracker's rings and segments and the goniometer arc sit on
  * its joints, and `rangeDeg` shades the range covered from rest to that reading, end to end. Drive
  * `angle` with `useRepLoop` to sweep the limb through that range rep after rep; a new fixed reading
  * sweeps the limb to it. Never rendered in tests: use `LazyJointScene`.

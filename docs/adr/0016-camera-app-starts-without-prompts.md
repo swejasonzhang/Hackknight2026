@@ -1,7 +1,7 @@
 # ADR-0016: The camera app starts straight into the plan, with no prompts
 
 - Date: 2026-10-10
-- Status: accepted (amends ADR-0015)
+- Status: partly superseded by ADR-0017 (the launcher is removed; `main.py` still starts from a plan with these flags)
 
 ## Context
 

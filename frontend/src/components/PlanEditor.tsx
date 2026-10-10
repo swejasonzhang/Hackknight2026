@@ -58,7 +58,7 @@ export function PlanEditor({ profileId, plan, onSaved, compact = false }: Props)
 
   return (
     <form onSubmit={submit} className={compact ? 'max-w-[640px] lg:max-w-none' : 'max-w-[640px]'}>
-      <p className="t-desc mb-4">{plan ? 'The camera app reads this plan to know the sets, reps, rest and goal it counts against.' : 'No plan yet. Save one so the camera app knows what to count.'}</p>
+      <p className="t-desc mb-4">{plan ? 'Recording counts against this plan: its sets, reps, rest and goal.' : 'No plan yet. Save one so recording knows what to count.'}</p>
       <div className="datasheet">
         {row(
           'exercise',

@@ -4,9 +4,8 @@ from arc_routine import build_routine, plan_from_arguments, routine_spec
 
 
 def main(argv=None):
-    # With a plan (`--exercise elbow_flexion --side right --sets 3 --reps 8 --rest 45`, as the
-    # dashboard's launcher sends), start straight into it with no prompts; without one, build the
-    # routine interactively as before.
+    # With a plan (`--exercise elbow_flexion --side right --sets 3 --reps 8 --rest 45`, Arc's plan
+    # fields), start straight into it with no prompts; without one, build the routine interactively.
     plan = plan_from_arguments(sys.argv[1:] if argv is None else argv)
 
     from movements import ExerciseTracker, RoutineExercise

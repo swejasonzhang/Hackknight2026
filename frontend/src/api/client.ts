@@ -1,5 +1,6 @@
 import type {
   AuthResponse,
+  CreateSessionInput,
   CreateProfileInput,
   ExerciseId,
   LoginInput,
@@ -86,6 +87,8 @@ export const api = {
     list: (profileId: string, exercise?: ExerciseId) =>
       request<SessionDto[]>(`/api/profiles/${profileId}/sessions${exercise ? `?exercise=${exercise}` : ''}`),
     get: (id: string) => request<SessionDto>(`/api/sessions/${id}`),
+    /** A session recorded in the browser, saved as the signed-in user (the server recomputes fatigue and the summary). */
+    create: (input: CreateSessionInput) => request<SessionDto>('/api/sessions', { method: 'POST', body: input }),
   },
   progress: (profileId: string, exercise: ExerciseId) =>
     request<ProgressDto>(`/api/profiles/${profileId}/progress?exercise=${exercise}`),

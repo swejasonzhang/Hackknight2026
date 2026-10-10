@@ -28,5 +28,3 @@ __pycache__/
 * 2
 * 2.*
 
-# Camera app output when started from the dashboard (computer-vision/launcher.py)
-computer-vision/camera.log

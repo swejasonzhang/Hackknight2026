@@ -34,7 +34,7 @@ const HOST = new URL(SITE_URL).host
 const SPEC: [string, string[]][] = [
   ['Movements', EXERCISE_LIST.map((e) => e.name.toLowerCase())],
   ['Goals', [EXERCISE_LIST.map((e) => `${e.targetDeg}°`).join(' · ')]],
-  ['Input', ['any webcam', 'the camera app']],
+  ['Input', ['any webcam', 'right in the browser']],
   ['Output', ['peak per rep', 'set and session']],
   ['Account', ['one per household', 'a profile each']],
   ['Privacy', ['yours', 'never shared']],
@@ -42,7 +42,7 @@ const SPEC: [string, string[]][] = [
 
 const METHOD = [
   { title: 'Create the household account', text: 'One account for everyone at home. Add a profile for each person who exercises and set a goal angle per movement.' },
-  { title: 'Exercise on camera', text: 'The camera app on a laptop tracks shoulder, elbow and wrist, measures every rep like a goniometer and files the set to the right profile.' },
+  { title: 'Exercise on camera', text: 'Press Start recording: the webcam tracks shoulder, elbow and wrist right in the browser, measures every rep like a goniometer and files the session to the right profile.' },
   { title: 'Read the trend', text: 'Arc draws best rep, session mean and the goal on one line, so progress is a number you can watch.' },
 ]
 
@@ -54,10 +54,10 @@ const HOUSEHOLD = [
 ]
 
 const FAQ = [
-  { q: 'What do I need?', a: 'A laptop or desktop with a webcam for the camera app. Arc itself runs in any browser, on any device, so you can check progress from your phone.' },
+  { q: 'What do I need?', a: 'A laptop, desktop or phone with a camera and a modern browser. Nothing to install: Arc tracks the movement in the browser, and you can check progress from any device.' },
   { q: 'Who is it for?', a: 'Anyone at home who wants to see their range of motion improve, at any age. One account per household, a profile per person. It is a personal tool, not a clinical one.' },
   { q: 'Which movements does it measure?', a: `${EXERCISE_LIST.map((e) => e.name).join(', ')} today, on the left or right side, always in degrees.` },
-  { q: 'Is my data private?', a: 'Your sessions belong to your account and nobody else sees them. The camera app writes to your account with its own key, and nothing is shared with anyone.' },
+  { q: 'Is my data private?', a: 'Your sessions belong to your account and nobody else sees them. The video never leaves your device: only the angle of each rep is saved, and nothing is shared with anyone.' },
 ]
 
 const FINAL = ['Every rep in degrees, not points', 'Three movements, left and right', 'A goal rule on every chart', 'A nudge when range fades late in a set', 'Profiles for everyone at home', 'Private by default']
@@ -179,7 +179,7 @@ export function LandingPage() {
             <div className="mt-6 grid gap-8 lg:grid-cols-12 lg:gap-8">
               <motion.div {...rise(0.45)} className="min-w-0 lg:col-span-7">
                 <LiveJoint />
-                <p className="t-lead mt-6">A camera app tracks your shoulder, elbow and wrist and measures every rep like a goniometer. Arc shows the trend, so progress is a number you can watch, not a feeling you have to trust.</p>
+                <p className="t-lead mt-6">Your webcam tracks your shoulder, elbow and wrist right in the browser and measures every rep like a goniometer. Arc shows the trend, so progress is a number you can watch, not a feeling you have to trust.</p>
                 <div className="mt-6 flex flex-col gap-2 sm:hidden">
                   {account.map((l) => (
                     <Link key={l.to} to={l.to} className={l.primary ? 'btn btn-block btn-lg btn-wide' : 'btn btn-lg btn-wide'}>
@@ -219,7 +219,7 @@ export function LandingPage() {
                 <h2 id="method-title" className="t-strip text-white">
                   Method
                 </h2>
-                <span className="strip-aside t-meta">Three steps · the camera app does the measuring</span>
+                <span className="strip-aside t-meta">Three steps · the webcam does the measuring</span>
               </motion.header>
               <RuleDraw className="mt-6" />
               <ol className="mt-6 grid gap-8 sm:grid-cols-3 sm:gap-6">
