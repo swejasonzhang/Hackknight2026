@@ -170,6 +170,12 @@ describe('skeletonFor: a whole body for every exercise', () => {
       for (const deg of RANGE.pec_fly) {
         const j = skeletonFor('pec_fly', deg, figure).joints
         expect(j.lWrist[0], `${figure} fly ${deg}°`).toBeGreaterThanOrEqual(j.rWrist[0] - 1e-6)
+        // Straight arms throughout: shoulder, elbow and wrist in one line.
+        for (const [s, e, w] of [
+          [j.lShoulder, j.lElbow, j.lWrist],
+          [j.rShoulder, j.rElbow, j.rWrist],
+        ] as const)
+          expect(len(s, w), `${figure} fly ${deg}° straight`).toBeCloseTo(len(s, e) + len(e, w), 6)
         // At shoulder to chest height, in front of the body.
         expect(j.lWrist[1]).toBeLessThan(j.lShoulder[1] + 0.05)
         expect(j.lWrist[1]).toBeGreaterThan(j.lShoulder[1] - 0.6)

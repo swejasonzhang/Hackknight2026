@@ -404,14 +404,11 @@ function posesFor(P: Proportions): Record<ExerciseId, (m: number, fill: number) 
   // ---- the pec fly: both arms sweep in front of the chest, at shoulder height ----
   function flyAt(sweep: number) {
     const t = trunk('front', [0, P.hipY], 90)
-    // Open, the arms are near level with the shoulders; they come down to chest height as they close.
-    const k = Math.min(1, Math.max(0, sweep / 90))
-    const upDrop = lerp(2, 8, k)
-    const foreDrop = lerp(5, 22, k)
-    const up = (s: number): V3 => [Math.cos(rad(sweep)) * Math.cos(rad(upDrop)) * s, -Math.sin(rad(upDrop)), Math.sin(rad(sweep)) * Math.cos(rad(upDrop))]
-    const fore = (s: number): V3 => [Math.cos(rad(sweep + 20)) * Math.cos(rad(foreDrop)) * s, -Math.sin(rad(foreDrop)), Math.sin(rad(sweep + 20)) * Math.cos(rad(foreDrop))]
-    const [rElbow, rWrist, rFingertip] = arm3(t.rShoulder, up(-1), fore(-1))
-    const [lElbow, lWrist, lFingertip] = arm3(t.lShoulder, up(1), fore(1))
+    // Straight arms all the way: open near level with the shoulders, coming down to chest height as they close.
+    const drop = lerp(2, 12, Math.min(1, Math.max(0, sweep / 100)))
+    const along = (s: number): V3 => [Math.cos(rad(sweep)) * Math.cos(rad(drop)) * s, -Math.sin(rad(drop)), Math.sin(rad(sweep)) * Math.cos(rad(drop))]
+    const [rElbow, rWrist, rFingertip] = arm3(t.rShoulder, along(-1), along(-1))
+    const [lElbow, lWrist, lFingertip] = arm3(t.lShoulder, along(1), along(1))
     const closed = 180 - innerAt(xy(lWrist), xy(t.lShoulder), xy(rWrist))
     return { joints: { ...t, ...frontLegs(), rElbow, lElbow, rWrist, lWrist, rFingertip, lFingertip }, closed }
   }
