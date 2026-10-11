@@ -26,8 +26,7 @@ export function AuthLayout() {
         <div className="mx-auto flex min-h-[160px] max-w-[1280px] flex-col justify-between px-5 py-5 sm:min-h-[220px] sm:px-8 sm:py-6">
           <div className="flex items-center justify-between gap-4">
             <Link to="/" className="flex items-center gap-3 text-white no-underline hover:no-underline">
-              <Logo size={28} tone="paper" />
-              <span className="font-display text-[15px] font-semibold tracking-[0.02em]">{APP_NAME}</span>
+              <Logo height={22} tone="paper" label={APP_NAME} />
               <span className="t-meta hidden text-rail-muted sm:inline">Range-of-motion readout</span>
             </Link>
             <Link to="/" className="t-meta text-rail-muted hover:text-white">

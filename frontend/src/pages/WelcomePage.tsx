@@ -153,10 +153,7 @@ export function WelcomePage() {
         <div className="mx-auto flex h-14 w-full max-w-[1180px] items-center gap-3 px-4 sm:px-6">
           {/* The logo always leads back to the landing page. */}
           <Link to="/" aria-label="Arc home page" className="flex items-center gap-3 text-white no-underline hover:no-underline">
-            <Logo size={24} tone="paper" />
-            <span aria-hidden="true" className="font-display text-[15px] font-bold tracking-[-0.01em]">
-              Arc
-            </span>
+            <Logo height={18} tone="paper" />
           </Link>
           <span className="t-meta hidden text-rail-muted sm:inline">Getting to know you</span>
           <span className="flex-1" />
@@ -200,7 +197,7 @@ export function WelcomePage() {
                 {m.role === 'arc' ? (
                   <>
                     <span aria-hidden="true" className="inline-flex h-9 w-9 flex-none items-center justify-center bg-navy">
-                      <Logo size={20} tone="paper" />
+                      <Logo height={18} tone="paper" mark />
                     </span>
                     <p className="max-w-[60ch] pt-1.5 text-[16px] leading-[1.55] text-ink">
                       <span className="sr-only">Arc: </span>
