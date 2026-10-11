@@ -269,7 +269,7 @@ export function LandingPage() {
           </section>
 
           {/* ---- 03 READOUTS: the app's own charts on random demo data ---- */}
-          <Strip id="readouts" index="03" title="Readouts" className="mt-12 scroll-mt-6 sm:mt-16" aside="Seven views · random demo data">
+          <Strip id="readouts" index="03" title="Readouts" className="mt-12 scroll-mt-6 sm:mt-16" aside="Eight views · random demo data">
             <DemoBoard />
           </Strip>
 

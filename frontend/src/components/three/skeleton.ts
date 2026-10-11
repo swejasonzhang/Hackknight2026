@@ -102,8 +102,12 @@ export interface Proportions {
   trunk: Record<'pelvis' | 'neck' | 'headBase' | 'headTop' | 'shoulder' | 'clavicle', V2>
   /** The foot from the ankle to the toes in the frame of a shin hanging straight down: [forward, up]. */
   foot: V2
-  /** The hips' height lying flat with the back on the floor, the thigh's depth under its bone sitting, the ankle's height standing. */
-  room: { lying: number; seat: number; ankle: number }
+  /**
+   * The hips' height lying flat with the back on the floor and the thigh's depth under its bone
+   * sitting, each [skinny, built] (the pose takes the figure's growth between them), and the
+   * ankle's height standing.
+   */
+  room: { lying: [number, number]; seat: [number, number]; ankle: number }
 }
 
 const sub3 = (a: V3, b: V3): V3 => [a[0] - b[0], a[1] - b[1], a[2] - b[2]]
@@ -122,7 +126,8 @@ function proportionsOf(figure: FigureKey): Proportions {
   const forward = sub3([0, 0, 1], [down[0] * down[2], down[1] * down[2], down[2] * down[2]])
   const fl = len3(forward)
   const toe = sub3(j.rToe, j.rAnkle)
-  const room = figure === 'neutral' ? { lying: Math.max(BODY_META.room.female.lying, BODY_META.room.male.lying), seat: (BODY_META.room.female.seat + BODY_META.room.male.seat) / 2 } : BODY_META.room[figure]
+  // Measured by the bake on this figure's own skinny and built bodies.
+  const room = BODY_META.room[figure]
   return {
     limb: {
       upperArm: both(['rShoulder', 'rElbow'], ['lShoulder', 'lElbow']),
@@ -144,7 +149,7 @@ function proportionsOf(figure: FigureKey): Proportions {
       clavicle: trunkPoint(mid(j.rClavicle, j.lClavicle)),
     },
     foot: [dot3(toe, forward) / fl, -dot3(toe, down)],
-    room: { lying: room.lying + 0.02, seat: room.seat, ankle: (j.rAnkle[1] + j.lAnkle[1]) / 2 + 0.02 },
+    room: { lying: [room.lying[0]! + 0.02, room.lying[1]! + 0.02], seat: [room.seat[0]!, room.seat[1]!], ankle: (j.rAnkle[1] + j.lAnkle[1]) / 2 + 0.02 },
   }
 }
 
@@ -240,8 +245,8 @@ interface Pose {
 type TrunkJoints = Pick<Joints, 'pelvis' | 'neck' | 'headBase' | 'headTop' | 'rShoulder' | 'lShoulder' | 'rClavicle' | 'lClavicle'>
 type LegJoints = Pick<Joints, 'rHip' | 'lHip' | 'rKnee' | 'lKnee' | 'rAnkle' | 'lAnkle' | 'rToe' | 'lToe'>
 
-/** Every movement's pose function for one figure's proportions. */
-function posesFor(P: Proportions): Record<ExerciseId, (m: number) => Pose> {
+/** Every movement's pose function for one figure's proportions: the reading `m`, and how built the figure is (`fill`, 0..1). */
+function posesFor(P: Proportions): Record<ExerciseId, (m: number, fill: number) => Pose> {
   const { upperArm, forearm, hand, thigh, shin } = P.limb
   /** The ankle joint's height when the legs stand straight and the feet are flat. */
   const ankleY = P.hipY - thigh - shin
@@ -492,7 +497,7 @@ function posesFor(P: Proportions): Record<ExerciseId, (m: number) => Pose> {
     },
     // Seated on the stool, side on: thighs level, the left shin hanging with the foot on the floor,
     // the right shin swinging out; the trunk leans back a little and the hands rest on the thighs.
-    seated_knee_extension: (m) => {
+    seated_knee_extension: (m, fill) => {
       const hipY = ankleY + shin
       const rHip: V3 = [0, hipY, P.hipHalf]
       const lHip: V3 = [0, hipY, -P.hipHalf]
@@ -504,12 +509,12 @@ function posesFor(P: Proportions): Record<ExerciseId, (m: number) => Pose> {
       const [lElbow, lWrist, lFingertip] = arm(t.lShoulder, -80, -30, -15, [-zs[0], -zs[1], -zs[2]])
       const joints = { ...t, rElbow, lElbow, rWrist, lWrist, rFingertip, lFingertip, rHip, lHip, rKnee, lKnee, rAnkle, lAnkle, rToe, lToe }
       const k = thigh / 1.6
-      return { joints, view: 'side', seat: { top: hipY - P.room.seat, x: [-0.55 * k, 1.05 * k], z: [-0.75, 0.75] }, track: ['rHip', 'rKnee', 'rAnkle'], ...legRing }
+      return { joints, view: 'side', seat: { top: hipY - lerp(P.room.seat[0], P.room.seat[1], fill), x: [-0.55 * k, 1.05 * k], z: [-0.75, 0.75] }, track: ['rHip', 'rKnee', 'rAnkle'], ...legRing }
     },
     // Lying on the back, side on, legs out with soft knees: the trunk curls up off the floor. At
     // rest the shoulders lie level with the hips.
-    crunch: (m) => {
-      const hip: V2 = [0, P.room.lying]
+    crunch: (m, fill) => {
+      const hip: V2 = [0, lerp(P.room.lying[0], P.room.lying[1], fill)]
       const trunkDeg = 195 - m + shoulderLean
       const t = trunk('side', hip, trunkDeg)
       // The heels rest on the floor: the ankle as high as it stands.
@@ -584,7 +589,7 @@ const MARGIN = 0.45
 
 /** A figure's poses with what follows from them: each movement's sweep from rest and its framing. */
 interface FigurePoses {
-  poses: Record<ExerciseId, (m: number) => Pose>
+  poses: Record<ExerciseId, (m: number, fill: number) => Pose>
   sweep: Record<ExerciseId, { restRel: number; sign: number }>
   /** The box every reading of a movement fills, joints and stool, with a margin. */
   bounds: Partial<Record<ExerciseId, { minX: number; maxX: number; minY: number; maxY: number }>>
@@ -598,7 +603,7 @@ function figurePoses(figure: FigureKey): FigurePoses {
     const sweep = Object.fromEntries(
       EXERCISE_IDS.map((e) => {
         const rel = (m: number) => {
-          const { base, mid, end } = overlayOf(poses[e](m))
+          const { base, mid, end } = overlayOf(poses[e](m, 0))
           return wrap(angleOf(mid, end) - angleOf(mid, base))
         }
         const rest = restFor(e)
@@ -616,10 +621,14 @@ export function sweepFor(exercise: ExerciseId, metricDeg: number, figure: Figure
   return figurePoses(figure).sweep[exercise].sign * (clampMetric(exercise, metricDeg) - restFor(exercise))
 }
 
-export function skeletonFor(exercise: ExerciseId, metricDeg: number, figure: FigureKey = 'neutral'): Skeleton {
+/**
+ * The body for a reading of a movement: `figure`'s proportions, and `fill` (0 skinny, 1 most built)
+ * for how much room the body takes lying on the floor and sitting on the stool.
+ */
+export function skeletonFor(exercise: ExerciseId, metricDeg: number, figure: FigureKey = 'neutral', fill = 0): Skeleton {
   const f = figurePoses(figure)
   const m = clampMetric(exercise, metricDeg)
-  const p = f.poses[exercise](m)
+  const p = f.poses[exercise](m, Math.min(1, Math.max(0, fill)))
   const { base, mid, end } = overlayOf(p)
   const restDeg = angleOf(mid, base) + f.sweep[exercise].restRel
   const skeleton: Skeleton = {

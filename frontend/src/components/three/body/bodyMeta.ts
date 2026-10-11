@@ -67,7 +67,17 @@ export const BODY_META = {
     "calves"
   ],
   "maskSlots": 3,
-  "sha256": "a0270932fa1e17f8a4c8d724a0ae46b45bd78a39f9979d095fbe24ea8ffddb05",
+  "garments": {
+    "shorts": {
+      "vertices": 672,
+      "triangles": 1167
+    },
+    "top": {
+      "vertices": 757,
+      "triangles": 1312
+    }
+  },
+  "sha256": "a212ee701d778eb85f9646b23a8b163752ea8778ccf6b908323ddacf46a669ec",
   "sections": [
     {
       "name": "female.skinny",
@@ -75,12 +85,12 @@ export const BODY_META = {
       "offset": 0,
       "length": 40572,
       "min": [
-        -1.768519,
+        -1.798185,
         0.000778,
         -0.31092
       ],
       "max": [
-        1.768519,
+        1.798185,
         5.893154,
         1.01821
       ]
@@ -90,7 +100,7 @@ export const BODY_META = {
       "type": "Int16",
       "offset": 81144,
       "length": 40572,
-      "step": 0.0000081145326
+      "step": 0.0000058007774
     },
     {
       "name": "male.skinny",
@@ -98,12 +108,12 @@ export const BODY_META = {
       "offset": 162288,
       "length": 40572,
       "min": [
-        -2.06763,
+        -2.097296,
         0,
         -0.278988
       ],
       "max": [
-        2.06763,
+        2.097296,
         6.408889,
         1.422469
       ]
@@ -113,7 +123,7 @@ export const BODY_META = {
       "type": "Int16",
       "offset": 243432,
       "length": 40572,
-      "step": 0.0000068943574
+      "step": 0.0000053164374
     },
     {
       "name": "index",
@@ -146,16 +156,64 @@ export const BODY_META = {
       "length": 40572
     },
     {
-      "name": "shorts",
-      "type": "Uint8",
+      "name": "shorts.a",
+      "type": "Uint16",
       "offset": 676128,
-      "length": 13524
+      "length": 672
     },
     {
-      "name": "top",
+      "name": "shorts.b",
+      "type": "Uint16",
+      "offset": 677472,
+      "length": 672
+    },
+    {
+      "name": "shorts.s",
+      "type": "Uint16",
+      "offset": 678816,
+      "length": 672
+    },
+    {
+      "name": "shorts.faces",
+      "type": "Uint16",
+      "offset": 680160,
+      "length": 3501
+    },
+    {
+      "name": "shorts.hem",
       "type": "Uint8",
-      "offset": 689652,
-      "length": 13524
+      "offset": 687164,
+      "length": 672
+    },
+    {
+      "name": "top.a",
+      "type": "Uint16",
+      "offset": 687836,
+      "length": 757
+    },
+    {
+      "name": "top.b",
+      "type": "Uint16",
+      "offset": 689352,
+      "length": 757
+    },
+    {
+      "name": "top.s",
+      "type": "Uint16",
+      "offset": 690868,
+      "length": 757
+    },
+    {
+      "name": "top.faces",
+      "type": "Uint16",
+      "offset": 692384,
+      "length": 3936
+    },
+    {
+      "name": "top.hem",
+      "type": "Uint8",
+      "offset": 700256,
+      "length": 757
     }
   ],
   "joints": {
@@ -181,12 +239,12 @@ export const BODY_META = {
         0.06175
       ],
       "rShoulder": [
-        -0.58895,
+        -0.56923,
         4.67582,
         0.01328
       ],
       "lShoulder": [
-        0.58895,
+        0.56923,
         4.67582,
         0.01328
       ],
@@ -201,32 +259,32 @@ export const BODY_META = {
         0.01367
       ],
       "rElbow": [
-        -1.16963,
+        -1.14985,
         4.041,
         0.02734
       ],
       "lElbow": [
-        1.16963,
+        1.14985,
         4.041,
         0.02734
       ],
       "rWrist": [
-        -1.57467,
+        -1.55489,
         3.59744,
         0.5253
       ],
       "lWrist": [
-        1.57467,
+        1.55489,
         3.59744,
         0.5253
       ],
       "rFingertip": [
-        -1.72258,
+        -1.70281,
         3.41408,
         0.77183
       ],
       "lFingertip": [
-        1.72258,
+        1.70281,
         3.41408,
         0.77183
       ],
@@ -293,12 +351,12 @@ export const BODY_META = {
         0.1775
       ],
       "rShoulder": [
-        -0.71028,
+        -0.69056,
         5.10844,
         0.09154
       ],
       "lShoulder": [
-        0.71028,
+        0.69056,
         5.10844,
         0.09154
       ],
@@ -313,32 +371,32 @@ export const BODY_META = {
         0.10807
       ],
       "rElbow": [
-        -1.32425,
+        -1.30447,
         4.40538,
         0.08322
       ],
       "lElbow": [
-        1.32425,
+        1.30447,
         4.40538,
         0.08322
       ],
       "rWrist": [
-        -1.82292,
+        -1.80314,
         3.92926,
         0.79425
       ],
       "lWrist": [
-        1.82292,
+        1.80314,
         3.92926,
         0.79425
       ],
       "rFingertip": [
-        -2.00125,
+        -1.98147,
         3.73119,
         1.1147
       ],
       "lFingertip": [
-        2.00125,
+        1.98147,
         3.73119,
         1.1147
       ],
@@ -386,12 +444,34 @@ export const BODY_META = {
   },
   "room": {
     "female": {
-      "lying": 0.4165,
-      "seat": 0.383
+      "lying": [
+        0.3113,
+        0.4165
+      ],
+      "seat": [
+        0.26,
+        0.383
+      ]
     },
     "male": {
-      "lying": 0.4161,
-      "seat": 0.3045
+      "lying": [
+        0.3583,
+        0.4161
+      ],
+      "seat": [
+        0.2236,
+        0.3045
+      ]
+    },
+    "neutral": {
+      "lying": [
+        0.3295,
+        0.3727
+      ],
+      "seat": [
+        0.2418,
+        0.3438
+      ]
     }
   }
 } as const

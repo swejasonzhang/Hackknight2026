@@ -8,11 +8,12 @@ const OPTIONS: { value: Figure | null; label: string }[] = [
 
 /**
  * Which body the figure is drawn as: female, male, or between the two (a profile that has not
- * picked). Chips, like the leaderboard's, so a tap changes it.
+ * picked). Chips, like the leaderboard's, so a tap changes it. `label` names the group for assistive
+ * tech: whose figure it is, where several pickers share a page.
  */
-export function FigurePicker({ value, onChange, disabled = false }: { value: Figure | null; onChange: (figure: Figure | null) => void; disabled?: boolean }) {
+export function FigurePicker({ value, onChange, disabled = false, label = 'Figure' }: { value: Figure | null; onChange: (figure: Figure | null) => void; disabled?: boolean; label?: string }) {
   return (
-    <div role="group" aria-label="Figure" className="flex flex-wrap items-center gap-2">
+    <div role="group" aria-label={label} className="flex flex-wrap items-center gap-2">
       <span className="t-label">Figure</span>
       {OPTIONS.map((o) => (
         <button key={o.label} type="button" className="chip" aria-pressed={value === o.value} disabled={disabled} onClick={() => value !== o.value && onChange(o.value)}>

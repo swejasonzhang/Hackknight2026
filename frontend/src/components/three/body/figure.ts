@@ -10,12 +10,34 @@ import { BODY_META } from './bodyMeta'
  *   vertex as far as the muscle group under it has grown;
  * - the skin: Arc's bones and three helpers per side, each vertex weighted to up to four of them,
  *   and the matrix each bone carries from the bind pose to a skeleton's pose;
- * - the paint: the muscles an exercise works (red targets, yellow helpers), the clothes, the eyes.
+ * - the clothes: shorts on everyone and a sports top on the female figure and the one between,
+ *   each a surface of the body's own triangles lifted off the skin, the hollows under it filled;
+ * - the paint: the muscles an exercise works (red targets, yellow helpers), on skin and fabric.
  */
 
 export type Sex = 'female' | 'male'
 export const BONE_NAMES = BODY_META.bones
 export type SkinBone = (typeof BONE_NAMES)[number]
+export type GarmentName = 'shorts' | 'top'
+
+/**
+ * A garment: the surface of the body under it, cut cleanly at its hem. Each vertex is a point of
+ * the body: `s` of the way from body vertex `a` to body vertex `b` (on `a` itself when they are the
+ * same), so it follows the body's shape, growth and pose.
+ */
+export interface Garment {
+  a: Uint16Array
+  b: Uint16Array
+  s: Float32Array
+  /** Its triangles, by its own vertex numbers. */
+  faces: Uint16Array
+  /** 1 for a vertex on its hem. */
+  hem: Uint8Array
+  /** Each vertex's neighbours, for smoothing it over the body. */
+  neighbours: number[][]
+  /** How many edges each vertex is from the hem (0 on it). */
+  ring: Uint8Array
+}
 
 export interface BodyAsset {
   vertices: number
@@ -31,9 +53,7 @@ export interface BodyAsset {
   /** Up to three muscle groups per vertex (255 for none) and how much of the vertex each is. */
   maskIndex: Uint8Array
   maskWeight: Float32Array
-  /** 0..1 per vertex: covered by the shorts, by the sports top. */
-  shorts: Float32Array
-  top: Float32Array
+  garments: Record<GarmentName, Garment>
 }
 
 type Section = (typeof BODY_META.sections)[number]
@@ -63,6 +83,30 @@ export function decodeBody(buffer: ArrayBuffer): BodyAsset {
     shapes[sex] = { skinny, growth: Float32Array.from(view(`${sex}.growth`, Int16Array), (x) => x * step) }
   }
   const unitBytes = (name: string) => Float32Array.from(view(name, Uint8Array), (x) => x / 255)
+  const garment = (name: GarmentName): Garment => {
+    const a = view(`${name}.a`, Uint16Array)
+    const faces = view(`${name}.faces`, Uint16Array)
+    const neighbours: Set<number>[] = Array.from({ length: a.length }, () => new Set())
+    for (let k = 0; k < faces.length; k += 3) {
+      const [a, b, c] = [faces[k]!, faces[k + 1]!, faces[k + 2]!]
+      neighbours[a]!.add(b).add(c)
+      neighbours[b]!.add(a).add(c)
+      neighbours[c]!.add(a).add(b)
+    }
+    const s = Float32Array.from(view(`${name}.s`, Uint16Array), (x) => x / 65535)
+    const hem = view(`${name}.hem`, Uint8Array)
+    const lists = neighbours.map((n) => [...n])
+    // Rings from the hem inward, breadth first.
+    const ring = new Uint8Array(a.length).fill(255)
+    let front = [...hem.keys()].filter((i) => hem[i])
+    for (const i of front) ring[i] = 0
+    for (let r = 1; front.length && r < 255; r++) {
+      const nextFront: number[] = []
+      for (const i of front) for (const j of lists[i]!) if (ring[j] === 255) (ring[j] = r), nextFront.push(j)
+      front = nextFront
+    }
+    return { a, b: view(`${name}.b`, Uint16Array), s, faces, hem, neighbours: lists, ring }
+  }
   return {
     vertices: V,
     bodyVertices: BODY_META.bodyVertices,
@@ -73,9 +117,39 @@ export function decodeBody(buffer: ArrayBuffer): BodyAsset {
     skinWeight: unitBytes('skinWeight'),
     maskIndex: view('maskIndex', Uint8Array),
     maskWeight: unitBytes('maskWeight'),
-    shorts: unitBytes('shorts'),
-    top: unitBytes('top'),
+    garments: { shorts: garment('shorts'), top: garment('top') },
   }
+}
+
+/** Smooth normals of a mesh: each vertex's faces' normals, weighted by their area. */
+export function vertexNormals(positions: Float32Array, index: ArrayLike<number>, out: Float32Array = new Float32Array(positions.length)): Float32Array {
+  out.fill(0)
+  for (let k = 0; k < index.length; k += 3) {
+    const a = index[k]! * 3
+    const b = index[k + 1]! * 3
+    const c = index[k + 2]! * 3
+    const ux = positions[b]! - positions[a]!
+    const uy = positions[b + 1]! - positions[a + 1]!
+    const uz = positions[b + 2]! - positions[a + 2]!
+    const vx = positions[c]! - positions[a]!
+    const vy = positions[c + 1]! - positions[a + 1]!
+    const vz = positions[c + 2]! - positions[a + 2]!
+    const nx = uy * vz - uz * vy
+    const ny = uz * vx - ux * vz
+    const nz = ux * vy - uy * vx
+    for (const i of [a, b, c]) {
+      out[i] = out[i]! + nx
+      out[i + 1] = out[i + 1]! + ny
+      out[i + 2] = out[i + 2]! + nz
+    }
+  }
+  for (let i = 0; i < out.length; i += 3) {
+    const l = Math.hypot(out[i]!, out[i + 1]!, out[i + 2]!) || 1
+    out[i] = out[i]! / l
+    out[i + 1] = out[i + 1]! / l
+    out[i + 2] = out[i + 2]! / l
+  }
+  return out
 }
 
 // ---- the shape: skinny to built, muscle group by muscle group ----
@@ -200,7 +274,12 @@ export function frames(pose: Pick<Skeleton, 'joints' | 'view' | 'pelvisUp'>): Pa
     lClavicle: frame(j.lClavicle, j.lShoulder, fwd),
   }
   out.pelvis!.length = 1
-  for (const [bone, a, b] of ARM_CHAIN) out[bone] = frame(j[a], j[b], carry(scaleV(up, -1), unitV(subV(j[b], j[a])), fwd))
+  // Face on, the arms swing in the picture's plane: their front is carried from the trunk's line laid
+  // flat in that plane, so an arm or a forearm pointing straight up turns about the picture's axis.
+  // From the trunk's own line, tilted a degree or two out of the plane, the turn would be about an
+  // axis that flips as the limb passes vertical, and the forearm would spin through a press.
+  const armDown: Vec = side ? scaleV(up, -1) : unitV([-up[0], -up[1], 0])
+  for (const [bone, a, b] of ARM_CHAIN) out[bone] = frame(j[a], j[b], carry(armDown, unitV(subV(j[b], j[a])), fwd))
   for (const [bone, a, b] of LEG_CHAIN) out[bone] = frame(j[a], j[b], carry(scaleV(pUp, -1), unitV(subV(j[b], j[a])), pFwd))
   for (const [bone, a, b] of [['rFoot', 'rAnkle', 'rToe'], ['lFoot', 'lAnkle', 'lToe']] as [SkinBone, JointName, JointName][]) {
     out[bone] = frame(j[a], j[b], carry(pFwd, unitV(subV(j[b], j[a])), pUp))
@@ -396,53 +475,176 @@ export function facingFor(exercise: ExerciseId): number {
 
 /** Whether a figure wears the sports top: the female figure, and the one between the sexes. */
 export const wearsTop = (figure: FigureKey) => figure !== 'male'
+/** The garments a figure wears. */
+export const garmentsOf = (figure: FigureKey): GarmentName[] => (wearsTop(figure) ? ['shorts', 'top'] : ['shorts'])
+
+/** How far each garment sits off the skin, in body units (27 cm): about half a centimetre. */
+export const GARMENT_LIFT: Record<GarmentName, number> = { shorts: 0.022, top: 0.018 }
+/** Rounds of smoothing that iron the body's small details out of the fabric (Taubin: no shrinking). */
+const GARMENT_SMOOTHING = 14
+/** Edges from the hem within which the fabric is held off the visible skin. */
+const HEM_RINGS = 3
+
+/** A point on the body: `s` of the way from vertex `a` to vertex `b` of a per-vertex array. */
+function onBody(values: Float32Array, a: number, b: number, s: number, k: number): number {
+  return values[a * 3 + k]! + (values[b * 3 + k]! - values[a * 3 + k]!) * s
+}
+
+/**
+ * A garment's positions over the body in its bind pose. The fabric is the body's surface under
+ * it, smoothed (Taubin's way, so it irons out small details such as the shape of the breasts' tips
+ * or of the groin without shrinking the whole) and lifted off the skin along the normals. Near the
+ * hem, where the skin is still drawn, it never goes in toward the body; further in, where the skin
+ * under it is not drawn, it follows the smoothed shape. The hem itself sits closer, like an elastic
+ * edge, and stays put.
+ */
+export function garmentPositions(garment: Garment, bodyPositions: Float32Array, bodyNormals: Float32Array, lift: number, out: Float32Array = new Float32Array(garment.a.length * 3)): Float32Array {
+  const n = garment.a.length
+  const base = new Float32Array(n * 3)
+  const normal = new Float32Array(n * 3)
+  for (let i = 0; i < n; i++) {
+    const [a, b, s] = [garment.a[i]!, garment.b[i]!, garment.s[i]!]
+    for (let k = 0; k < 3; k++) {
+      base[i * 3 + k] = onBody(bodyPositions, a, b, s, k)
+      normal[i * 3 + k] = onBody(bodyNormals, a, b, s, k)
+    }
+    const l = Math.hypot(normal[i * 3]!, normal[i * 3 + 1]!, normal[i * 3 + 2]!) || 1
+    for (let k = 0; k < 3; k++) normal[i * 3 + k] = normal[i * 3 + k]! / l
+  }
+  let cur = Float32Array.from(base)
+  let next = new Float32Array(n * 3)
+  // Alternate a smoothing step and a slightly larger step back: details go, the size stays.
+  for (let round = 0; round < GARMENT_SMOOTHING * 2; round++) {
+    const step = round % 2 ? -0.53 : 0.5
+    for (let i = 0; i < n; i++) {
+      const nb = garment.neighbours[i]!
+      if (garment.hem[i] || !nb.length) {
+        next.set(cur.subarray(i * 3, i * 3 + 3), i * 3)
+        continue
+      }
+      for (let k = 0; k < 3; k++) {
+        let mean = 0
+        for (const j of nb) mean += cur[j * 3 + k]!
+        mean /= nb.length
+        next[i * 3 + k] = cur[i * 3 + k]! + step * (mean - cur[i * 3 + k]!)
+      }
+    }
+    ;[cur, next] = [next, cur]
+  }
+  for (let i = 0; i < n; i++) {
+    let outward = 0
+    for (let k = 0; k < 3; k++) outward += (cur[i * 3 + k]! - base[i * 3 + k]!) * normal[i * 3 + k]!
+    const d = garment.hem[i] ? lift * 0.5 : lift + (garment.ring[i]! < HEM_RINGS ? Math.max(0, outward) : outward)
+    for (let k = 0; k < 3; k++) out[i * 3 + k] = base[i * 3 + k]! + normal[i * 3 + k]! * d
+  }
+  return out
+}
+
+/** A garment vertex's four bones and weights: its two body vertices' weights, mixed and the four heaviest kept. */
+export function garmentSkin(asset: BodyAsset, garment: Garment): { index: Uint8Array; weight: Float32Array } {
+  const n = garment.a.length
+  const index = new Uint8Array(n * 4)
+  const weight = new Float32Array(n * 4)
+  for (let i = 0; i < n; i++) {
+    const mixed = new Map<number, number>()
+    for (const [v, share] of [
+      [garment.a[i]!, 1 - garment.s[i]!],
+      [garment.b[i]!, garment.s[i]!],
+    ] as const) {
+      for (let k = 0; k < 4; k++) {
+        const w = asset.skinWeight[v * 4 + k]! * share
+        if (w > 0) mixed.set(asset.skinIndex[v * 4 + k]!, (mixed.get(asset.skinIndex[v * 4 + k]!) ?? 0) + w)
+      }
+    }
+    const top = [...mixed.entries()].sort((x, y) => y[1] - x[1]).slice(0, 4)
+    const total = top.reduce((t, [, w]) => t + w, 0) || 1
+    top.forEach(([bone, w], k) => {
+      index[i * 4 + k] = bone
+      weight[i * 4 + k] = w / total
+    })
+  }
+  return { index, weight }
+}
+
+/**
+ * The triangles to draw of the body for a figure: every one but the skin a worn garment covers
+ * entirely (which could only show through the fabric at a bend), and the eyes.
+ */
+export function visibleTriangles(asset: BodyAsset, figure: FigureKey): Uint16Array {
+  const covered = new Uint8Array(asset.vertices)
+  for (const name of garmentsOf(figure)) {
+    const g = asset.garments[name]
+    // A garment vertex on a body vertex (not a cut along an edge) is a body vertex under the fabric.
+    g.a.forEach((v, i) => {
+      if (v === g.b[i]) covered[v] = 1
+    })
+  }
+  const keep: number[] = []
+  const index = asset.index
+  for (let k = 0; k < index.length; k += 3) {
+    const [a, b, c] = [index[k]!, index[k + 1]!, index[k + 2]!]
+    if (!(covered[a] && covered[b] && covered[c])) keep.push(a, b, c)
+  }
+  return Uint16Array.from(keep)
+}
 
 export type Rgb = [number, number, number]
 export interface Palette {
   skin: Rgb
-  cloth: Rgb
   eye: Rgb
   target: Rgb
   helper: Rgb
   /** The colour a fully grown muscle group takes in the growth view. */
   grown: Rgb
+  /** Each garment's fabric. */
+  fabric: Record<GarmentName, Rgb>
 }
 
-/**
- * Per-vertex colours: skin, the clothes over it, and either the muscles an exercise works
- * (`exercise`) or how far each group has grown (`growth`), or neither.
- */
-export function paintBody(
-  asset: BodyAsset,
-  positions: Float32Array,
-  figure: FigureKey,
-  palette: Palette,
-  show: { exercise: ExerciseId } | { growth: Growth } | null,
-  out: Float32Array = new Float32Array(asset.vertices * 3),
-): Float32Array {
-  const V = asset.vertices
-  const top = wearsTop(figure)
+/** What is shown on the body: the muscles an exercise works, how far each group has grown, or neither. */
+export type Show = { exercise: ExerciseId } | { growth: Growth } | null
+
+/** Per body vertex: how hard the exercise works it (target and helper), or how far its groups have grown. */
+function tints(asset: BodyAsset, positions: Float32Array, show: Show) {
   const load = show && 'exercise' in show ? muscleLoad(asset, positions, show.exercise) : null
-  const grown = show && 'growth' in show ? MUSCLE_IDS.map((m) => clamp01(show.growth.levels[m] ?? 0)) : null
-  const mix = (a: Rgb, b: Rgb, t: number): Rgb => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t]
-  for (let v = 0; v < V; v++) {
-    let c: Rgb
-    if (v >= asset.bodyVertices) c = palette.eye
-    else {
-      c = mix(palette.skin, palette.cloth, Math.max(asset.shorts[v]!, top ? asset.top[v]! : 0) * 0.92)
-      if (load) c = mix(mix(c, palette.helper, load.secondary[v]! * 0.95), palette.target, load.primary[v]! * 0.95)
-      if (grown) {
-        let g = 0
-        for (let k = 0; k < 3; k++) {
-          const i = asset.maskIndex[v * 3 + k]!
-          if (i !== 255) g += asset.maskWeight[v * 3 + k]! * grown[i]!
-        }
-        c = mix(c, palette.grown, Math.min(1, g) * 0.85)
+  let grown: Float32Array | null = null
+  if (show && 'growth' in show) {
+    const levels = MUSCLE_IDS.map((m) => clamp01(show.growth.levels[m] ?? 0))
+    grown = new Float32Array(asset.vertices)
+    for (let v = 0; v < asset.bodyVertices; v++) {
+      let g = 0
+      for (let k = 0; k < 3; k++) {
+        const i = asset.maskIndex[v * 3 + k]!
+        if (i !== 255) g += asset.maskWeight[v * 3 + k]! * levels[i]!
       }
+      grown[v] = Math.min(1, g)
     }
-    out[v * 3] = c[0]
-    out[v * 3 + 1] = c[1]
-    out[v * 3 + 2] = c[2]
+  }
+  return { load, grown }
+}
+
+const mix = (a: Rgb, b: Rgb, t: number): Rgb => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t]
+function tinted(base: Rgb, v: number, t: ReturnType<typeof tints>, palette: Palette, strength: number): Rgb {
+  let c = base
+  if (t.load) c = mix(mix(c, palette.helper, t.load.secondary[v]! * strength), palette.target, t.load.primary[v]! * strength)
+  if (t.grown) c = mix(c, palette.grown, t.grown[v]! * strength * 0.9)
+  return c
+}
+
+/** Per-vertex colours of the body: skin and the eyes, tinted by what is shown. */
+export function paintBody(asset: BodyAsset, positions: Float32Array, palette: Palette, show: Show, out: Float32Array = new Float32Array(asset.vertices * 3)): Float32Array {
+  const t = tints(asset, positions, show)
+  for (let v = 0; v < asset.vertices; v++) {
+    const c = v >= asset.bodyVertices ? palette.eye : tinted(palette.skin, v, t, palette, 0.95)
+    out.set(c, v * 3)
   }
   return out
+}
+
+/** Per-vertex colours of a garment: its fabric, tinted by what is shown on the muscles under it. */
+export function paintGarment(asset: BodyAsset, name: GarmentName, positions: Float32Array, palette: Palette, show: Show, out?: Float32Array): Float32Array {
+  const g = asset.garments[name]
+  const colors = out ?? new Float32Array(g.a.length * 3)
+  const t = tints(asset, positions, show)
+  for (let i = 0; i < g.a.length; i++) colors.set(tinted(palette.fabric[name], g.s[i]! < 0.5 ? g.a[i]! : g.b[i]!, t, palette, 0.85), i * 3)
+  return colors
 }
