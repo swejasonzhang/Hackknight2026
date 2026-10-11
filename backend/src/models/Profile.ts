@@ -1,4 +1,4 @@
-import { EXERCISE_IDS, type CoachIntake, type ProfileDto } from '@arc/dependencies'
+import { EXERCISE_IDS, FIGURES, type CoachIntake, type Figure, type ProfileDto } from '@arc/dependencies'
 import { model, Schema, type Types } from 'mongoose'
 
 export interface ProfileShape {
@@ -9,6 +9,8 @@ export interface ProfileShape {
   notes?: string | null
   /** What Arc learned in the onboarding chat. */
   intake?: CoachIntake | null
+  /** The body the figure is drawn as, once the member picked one. */
+  figure?: Figure | null
   createdAt: number
 }
 
@@ -34,6 +36,7 @@ const ProfileSchema = new Schema<ProfileShape>({
   email: { type: String, trim: true },
   notes: { type: String, maxlength: 500 },
   intake: { type: IntakeSchema },
+  figure: { type: String, enum: [...FIGURES] },
   createdAt: { type: Number, required: true },
 })
 
@@ -43,6 +46,7 @@ export function toProfileDto(p: ProfileShape): ProfileDto {
   const dto: ProfileDto = { id: p._id.toString(), ownerId: p.ownerId.toString(), name: p.name, createdAt: p.createdAt }
   if (p.email) dto.email = p.email
   if (p.notes) dto.notes = p.notes
+  if (p.figure) dto.figure = p.figure
   if (p.intake) {
     const { goals, focus, side, limitations, experience, daysPerWeek, trainingGoal, trainingDays, heightCm, weightKg } = p.intake
     dto.intake = { goals, focus, side, limitations: limitations ?? '', experience, daysPerWeek }

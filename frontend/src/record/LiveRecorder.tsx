@@ -15,6 +15,8 @@ import { createSpeaker, type Speaker, type SpokenLine } from '../voice/speaker'
 import { elevenLabsVoice } from '../voice/status'
 import { cueFor, shouldCue } from './cues'
 import { FormGuide } from './FormGuide'
+import type { Growth } from '../components/three/body/figure'
+import type { FigureKey } from '../components/three/skeleton'
 import { LoadField } from './LoadField'
 
 export interface RecordConfig {
@@ -160,7 +162,7 @@ function draw(canvas: HTMLCanvasElement, aspect: number, reading: JointReading, 
  * last set (or "Finish and save") marks it complete and opens its report. Over the video, the
  * whole white skeleton and the measured joint. The video stays in the browser.
  */
-export function LiveRecorder({ profileId, config, simulate = false, below }: { profileId: string; config: RecordConfig; simulate?: boolean; below?: ReactNode }) {
+export function LiveRecorder({ profileId, config, simulate = false, below, figure, growth }: { profileId: string; config: RecordConfig; simulate?: boolean; below?: ReactNode; figure?: FigureKey; growth?: Growth | null }) {
   const navigate = useNavigate()
   const videoRef = useRef<HTMLVideoElement>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
@@ -516,7 +518,7 @@ export function LiveRecorder({ profileId, config, simulate = false, below }: { p
       </div>
 
       <div className="flex min-w-0 flex-col gap-4">
-      <FormGuide exercise={config.exercise} side={config.side} targetDeg={config.plan.targetDeg} />
+      <FormGuide exercise={config.exercise} side={config.side} targetDeg={config.plan.targetDeg} figure={figure} growth={growth} />
       <aside className="min-w-0" aria-label="Live readings">
         <div className="panel p-4 sm:p-5">
           <div className="t-label flex items-center gap-2">

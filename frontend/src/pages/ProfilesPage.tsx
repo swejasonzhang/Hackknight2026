@@ -1,4 +1,5 @@
 import { motion, useReducedMotion } from 'motion/react'
+import type { Figure } from '@arc/dependencies'
 import { useId, useState, type FormEvent } from 'react'
 import { Link } from 'react-router-dom'
 import { api } from '../api/client'
@@ -8,6 +9,7 @@ import { ease, Page } from '../components/motion'
 import { FieldMessage, useFieldRule } from '../components/TextField'
 import { Alert, Avatar, EmptyState, Lamp, PageHeader, Skeleton } from '../components/ui'
 import { formatDate } from '../format'
+import { FigurePicker } from '../body/FigurePicker'
 import { useProfiles } from '../hooks/useProfiles'
 
 /* The ledger is a real <table> on tablet and desktop; on a phone every row becomes a stacked
@@ -27,6 +29,7 @@ export function ProfilesPage() {
   const { profiles, selectedId, setSelectedId, reload, loading, error } = useProfiles()
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
+  const [figure, setFigure] = useState<Figure | null>(null)
   const [busy, setBusy] = useState(false)
   const [message, setMessage] = useState<{ text: string; tone: 'good' | 'bad' } | null>(null)
   const formId = useId()
@@ -52,14 +55,23 @@ export function ProfilesPage() {
     e.preventDefault()
     if (!canAdd) return
     void run(async () => {
-      const p = await api.profiles.create({ name: name.trim(), email: email.trim() || undefined })
+      const p = await api.profiles.create({ name: name.trim(), email: email.trim() || undefined, ...(figure ? { figure } : {}) })
       setName('')
       setEmail('')
+      setFigure(null)
       await reload()
       setSelectedId(p.id)
       return `Added ${p.name}.`
     })
   }
+
+  /** Which body a profile's figure is drawn as; Either draws it between the two. */
+  const changeFigure = (id: string, profileName: string, next: Figure | null) =>
+    void run(async () => {
+      await api.profiles.update(id, { figure: next })
+      await reload()
+      return next ? `${profileName}'s figure is now ${next}.` : `${profileName}'s figure is now between female and male.`
+    })
 
   const remove = (id: string, profileName: string) => {
     if (!window.confirm(`Delete ${profileName} and all of their sessions? This cannot be undone.`)) return
@@ -150,7 +162,10 @@ export function ProfilesPage() {
                   <Avatar name={p.name} size={44} />
                 </td>
                 <td className={NAME}>
-                  <span className="font-sans text-[16px] font-medium text-ink">{p.name}</span>
+                  <div className="grid gap-2">
+                    <span className="font-sans text-[16px] font-medium text-ink">{p.name}</span>
+                    <FigurePicker value={p.figure ?? null} onChange={(f) => changeFigure(p.id, p.name, f)} disabled={busy} />
+                  </div>
                 </td>
                 <td className={`${STACKED} font-mono text-[12.5px] text-ink-2`}>{p.email ?? `Added ${formatDate(p.createdAt)}`}</td>
                 {/* Notes: a stacked block on a phone (only when there are notes), dropped on a tablet, a cell on desktop. */}
@@ -215,6 +230,9 @@ export function ProfilesPage() {
                   aria-describedby={ids.nameMsg}
                 />
                 <FieldMessage id={ids.nameMsg} rule={nameRule} requirement={NAME_REQUIREMENT} />
+                <div className="mt-3">
+                  <FigurePicker value={figure} onChange={setFigure} disabled={busy} />
+                </div>
               </div>
             </td>
             <td className={`${STACKED} sm:border-b-0 sm:pr-4`}>

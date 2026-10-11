@@ -10,6 +10,8 @@ import { nextEntry, plannedDay } from '../plan/checklist'
 import { dayKey } from '../plan/days'
 import { TodayList } from '../plan/TodayList'
 import { LiveRecorder, type RecordConfig } from '../record/LiveRecorder'
+import { figureKey, growthNow } from '../body/growth'
+import { useBody } from '../body/useBody'
 
 const isExercise = (v: string | null): v is ExerciseId => EXERCISE_IDS.includes(v as ExerciseId)
 
@@ -23,6 +25,8 @@ const isExercise = (v: string | null): v is ExerciseId => EXERCISE_IDS.includes(
  */
 export function RecordPage() {
   const { selected, selectedId, profiles, loading } = useProfiles()
+  // The form guide draws the member's own body, as their training has built it.
+  const { body } = useBody(selectedId)
   const [params] = useSearchParams()
   const [data, setData] = useState<{ plan: PlanDto | null; program: ProgramDto | null; sessions: SessionDto[] } | undefined>(undefined)
 
@@ -73,6 +77,8 @@ export function RecordPage() {
             profileId={selectedId}
             config={config}
             simulate={simulate}
+            figure={figureKey(selected?.figure)}
+            growth={body && body.profileId === selectedId ? growthNow(body) : null}
             below={
               today && (
                 <section className="panel mt-4 p-4 sm:p-5" aria-label="Today's workout">

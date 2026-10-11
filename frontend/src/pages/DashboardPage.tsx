@@ -1,4 +1,4 @@
-import { EXERCISE_IDS, EXERCISES, prescriptionFor, type ExerciseId, type PlanDto, type ProgramDto, type ProgressDto } from '@arc/dependencies'
+import { EXERCISE_IDS, EXERCISES, prescriptionFor, type ExerciseId, type Figure, type PlanDto, type ProgramDto, type ProgressDto } from '@arc/dependencies'
 import { useEffect, useRef, useState, type CSSProperties } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { api } from '../api/client'
@@ -17,6 +17,9 @@ import { useStickyTop } from '../components/useStickyTop'
 import { useProfiles } from '../hooks/useProfiles'
 import { PlanCalendar } from '../plan/PlanCalendar'
 import { MuscleKey } from '../components/MuscleKey'
+import { BodyGrowth } from '../body/BodyGrowth'
+import { figureKey, growthNow } from '../body/growth'
+import { useBody } from '../body/useBody'
 
 const isExercise = (v: string | null): v is ExerciseId => EXERCISE_IDS.includes(v as ExerciseId)
 
@@ -49,6 +52,24 @@ export function DashboardPage() {
   const [seeding, setSeeding] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [panelRef, panelTop] = useStickyTop<HTMLElement>(32)
+  const { body } = useBody(selectedId)
+  const [savingFigure, setSavingFigure] = useState(false)
+  const growth = body && body.profileId === selectedId ? growthNow(body) : null
+  const figure = figureKey(selected?.figure)
+
+  const chooseFigure = async (next: Figure | null) => {
+    if (!selected) return
+    setSavingFigure(true)
+    setError(null)
+    try {
+      await api.profiles.update(selected.id, { figure: next })
+      await reload()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not change the figure')
+    } finally {
+      setSavingFigure(false)
+    }
+  }
 
   // The plan and the week, once per profile; a freshly picked profile opens on its plan's movement.
   useEffect(() => {
@@ -162,6 +183,8 @@ export function DashboardPage() {
                 angle={loop ?? target}
                 rangeDeg={freshBest != null ? Math.min(freshBest, target) : undefined}
                 goalDeg={target}
+                figure={figure}
+                growth={growth}
                 className="h-full w-full"
                 label={`A 3D figure doing ${cfg.name.toLowerCase()} reps from the start position to the ${target} degree goal${latest ? `, the latest session's best of ${deg(latest.bestPeakDeg)} shaded` : ', not recorded yet'}`}
                 fallback={<div className="hatch absolute inset-8" aria-hidden="true" />}
@@ -253,6 +276,8 @@ export function DashboardPage() {
 
         {selected && !noProfiles && <PlanCalendar profileId={selected.id} exercise={exercise} />}
 
+        {selected && !noProfiles && <BodyGrowth name={selected.name} body={body && body.profileId === selected.id ? body : null} figure={selected.figure ?? null} onFigure={chooseFigure} saving={savingFigure} />}
+
         {noProfiles && (
           <Strip index="00" title="Setup">
             <EmptyState
@@ -274,7 +299,7 @@ export function DashboardPage() {
         )}
 
         {noSignal && (
-          <Strip index="02" title="Waiting for a session">
+          <Strip index="03" title="Waiting for a session">
             <EmptyState
               title={`No sessions yet for ${cfg.name.toLowerCase()}`}
               description={
@@ -328,21 +353,21 @@ function chartFolds({
   return [
     {
       id: 'peak',
-      index: '02',
+      index: '03',
       title: `Peak ${metricLabel.toLowerCase()} per session`,
       summary: `${deg(bestAll)} best${goal != null ? ` · goal ${goal}°` : ''}`,
       render: () => <PeakChart progress={data} />,
     },
     {
       id: 'reps',
-      index: '03',
+      index: '04',
       title: 'Latest session, rep by rep',
       summary: `${formatDate(latest.date)} · ${data.latestSessionReps.length} reps`,
       render: () => <RepChart progress={data} />,
     },
     {
       id: 'fatigue',
-      index: '04',
+      index: '05',
       title: 'Fatigue per session',
       summary: `${latest.fatigueIndex.toFixed(2)} latest`,
       aside: 'ROM decay + tempo drift · a proxy, not a clinical measure',
@@ -350,7 +375,7 @@ function chartFolds({
     },
     {
       id: 'weekly',
-      index: '05',
+      index: '06',
       title: 'Sessions per week',
       summary: `${thisWeek} this week`,
       aside: 'Consistency moves every other number',
@@ -358,7 +383,7 @@ function chartFolds({
     },
     {
       id: '3d',
-      index: '06',
+      index: '07',
       title: 'Peak per session, in 3D',
       summary: `${data.sessions.length} sessions`,
       aside: 'Drag to orbit · lighter is higher',
