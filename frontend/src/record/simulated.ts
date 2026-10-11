@@ -2,6 +2,7 @@ import { EXERCISES, type ExerciseId, type Side } from '@arc/dependencies'
 import { LANDMARK_OF, restFor, skeletonFor, type JointName } from '../components/three/skeleton'
 import type { Landmark } from './angle'
 import type { PoseTracker } from './pose'
+import type { PoseFrame } from './steady'
 
 /** The same joint on the other side of the body. */
 const other = (name: JointName): JointName => (name.startsWith('r') ? `l${name.slice(1)}` : `r${name.slice(1)}`) as JointName
@@ -86,6 +87,20 @@ export function simulatedLandmarks(exercise: ExerciseId, side: Side, metricDeg: 
   return all
 }
 
+/** Metres per height of the picture: a standing body fills about two thirds of it. */
+const METRES_PER_FRAME = 2.45
+
+/**
+ * The pretend person as the model reports them: the landmarks across the picture, and the same
+ * points in metres round the middle of the picture. The pretend person moves in the picture's
+ * plane, so the angles in space are the picture's angles.
+ */
+export function simulatedFrame(exercise: ExerciseId, side: Side, metricDeg: number, aspect = 16 / 9): PoseFrame {
+  const landmarks = simulatedLandmarks(exercise, side, metricDeg, aspect)
+  const world = landmarks.map((p) => ({ x: (p.x - 0.5) * aspect * METRES_PER_FRAME, y: (p.y - 0.5) * METRES_PER_FRAME, z: 0, visibility: p.visibility }))
+  return { landmarks, world }
+}
+
 export function createSimulatedTracker(exercise: ExerciseId, side: Side, peakDeg: number, periodMs = 2600): PoseTracker {
   const rest = restFor(exercise) + 4
   const started = performance.now()
@@ -94,7 +109,7 @@ export function createSimulatedTracker(exercise: ExerciseId, side: Side, peakDeg
       const t = nowMs - started
       // A short pause in view before the first rep, then reps, one per period.
       const phase = t < 900 ? 0 : (1 - Math.cos((2 * Math.PI * (t - 900)) / periodMs)) / 2
-      return simulatedLandmarks(exercise, side, rest + (peakDeg - rest) * phase)
+      return simulatedFrame(exercise, side, rest + (peakDeg - rest) * phase)
     },
     close() {},
   }

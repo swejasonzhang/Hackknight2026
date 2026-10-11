@@ -10,7 +10,8 @@ const EXERCISE = EXERCISES.elbow_flexion
 const GOAL = EXERCISE.targetDeg
 /** Six demo reps per loop; the later ones shrink, as a real set does. */
 const PEAKS = [131, 128, 134, 125, 129, 122]
-const REST = 18
+/** Every rep starts and ends with the arm straight: the readout comes all the way back to 0°. */
+const REST = EXERCISE.restDeg
 const SECONDS_PER_REP = 2.4
 const PAUSE_BETWEEN_LOOPS = 1.4
 const REPS_PER_SET = 8
@@ -40,7 +41,8 @@ function Pending({ onPending }: { onPending: (pending: boolean) => void }) {
 export function LiveJoint() {
   const reduce = useReducedMotion()
   const angle = useMotionValue(reduce ? HELD : REST)
-  const cycle = useMemo(() => createRepCycle({ top: 115, bottom: 35 }), [])
+  // A rep counts as the real counter counts it: past the curl's entry angle, then back under its exit.
+  const cycle = useMemo(() => createRepCycle({ top: EXERCISE.enterDeg, bottom: EXERCISE.exitDeg }), [])
   const [done, setDone] = useState(reduce ? HELD_REPS_DONE : 0)
   const [pending, setPending] = useState(false)
   const [failed, setFailed] = useState(false)

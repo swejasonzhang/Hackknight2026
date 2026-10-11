@@ -1,4 +1,4 @@
-import { AskInputSchema, catalogByArea, OnboardingInputSchema, SetFeedbackInputSchema, SpeakInputSchema, type CoachStatus, type OnboardingReply } from '@arc/dependencies'
+import { AskInputSchema, catalogByArea, OnboardingInputSchema, SESSION_READ_VERSION, SetFeedbackInputSchema, SpeakInputSchema, type CoachStatus, type OnboardingReply } from '@arc/dependencies'
 import { Router, type RequestHandler } from 'express'
 import mongoose from 'mongoose'
 import { requireUser } from '../auth.ts'
@@ -97,8 +97,8 @@ coachRouter.post('/sessions/:id/summary', limit, async (req, res) => {
   if (!session) throw new HttpError(404, 'Session not found')
   const profile = await requireProfile(session.profileId.toString(), { kind: 'user', userId })
 
-  // Once per session: a second call returns the stored read.
-  if (session.coachSummary) {
+  // Once per session: a second call returns the stored read, unless it was read the old way.
+  if (session.coachSummary && session.coachSummary.version === SESSION_READ_VERSION) {
     const stored = await CoachMessage.findById(session.coachSummary.messageId).lean()
     if (stored) {
       res.json(toCoachMessageDto(stored))
@@ -112,7 +112,7 @@ coachRouter.post('/sessions/:id/summary', limit, async (req, res) => {
   const { text, offline } = await sessionSummary({ name, session: toSessionDto(session), history: history.map(toSessionDto), intake: profile.intake })
   const now = Date.now()
   const message = await CoachMessage.create({ ownerId: userId, profileId: profile._id, sessionId: session._id, kind: 'session', role: 'arc', text, offline, createdAt: now })
-  await Session.updateOne({ _id: session._id }, { $set: { coachSummary: { text, messageId: message._id.toString(), createdAt: now, offline } } })
+  await Session.updateOne({ _id: session._id }, { $set: { coachSummary: { text, messageId: message._id.toString(), createdAt: now, offline, version: SESSION_READ_VERSION } } })
   res.json(toCoachMessageDto(message))
 })
 

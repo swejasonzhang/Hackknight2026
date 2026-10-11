@@ -100,6 +100,7 @@ const CoachSummarySchema = new Schema<CoachSummary>(
     messageId: { type: String, required: true },
     createdAt: { type: Number, required: true },
     offline: { type: Boolean, required: true },
+    version: { type: Number },
   },
   { _id: false },
 )
@@ -167,6 +168,6 @@ export function toSessionDto(s: SessionShape): SessionDto {
     complete: s.complete !== false,
     ...(s.loadKg != null ? { loadKg: s.loadKg } : {}),
     ...(s.events?.length ? { events: s.events.map((e) => ({ at: e.at, command: e.command })) } : {}),
-    ...(s.coachSummary ? { coachSummary: { text: s.coachSummary.text, messageId: s.coachSummary.messageId, createdAt: s.coachSummary.createdAt, offline: s.coachSummary.offline } } : {}),
+    ...(s.coachSummary ? { coachSummary: { text: s.coachSummary.text, messageId: s.coachSummary.messageId, createdAt: s.coachSummary.createdAt, offline: s.coachSummary.offline, ...(s.coachSummary.version ? { version: s.coachSummary.version } : {}) } } : {}),
   }
 }

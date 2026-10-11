@@ -229,4 +229,12 @@ export interface CoachSummary {
   createdAt: number
   /** True when Gemini was not configured and the summary came from Arc's template. */
   offline: boolean
+  /** How Arc read it (SESSION_READ_VERSION); a read from before the current way is read again. */
+  version?: number
 }
+
+/**
+ * The way Arc reads a session back. 2: a recap of that one session in English (what was done
+ * against the plan, how far, how the range held, which reps did not count), not a pep talk.
+ */
+export const SESSION_READ_VERSION = 2

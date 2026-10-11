@@ -263,7 +263,7 @@ export function SessionDetailPage() {
       <div className={AREA.strips}>
         {/* Straight after a recording on a training day: this movement crossed out, the next one offered. */}
         {dayKey(session.startedAt) === dayKey(Date.now()) && <DayWorkout profileId={session.profileId} day={dayKey(session.startedAt)} />}
-        <ArcRead session={session} autoSpeak={arcRead} />
+        <ArcRead key={session.id} session={session} autoSpeak={arcRead} />
         <Strip index="01" title="Rep by rep, by set" aside={`Peak ${exercise.metricLabel.toLowerCase()} · ${reps.length} reps`}>
           <div className="h-[240px] sm:h-[280px]">
             <ResponsiveContainer width="100%" height="100%">

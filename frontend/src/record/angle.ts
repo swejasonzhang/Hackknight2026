@@ -17,6 +17,8 @@ export interface JointReading {
   innerDeg: number
   /** The three landmarks, proximal to distal, in video coordinates (0..1). */
   points: [[number, number], [number, number], [number, number]] | null
+  /** The side read: the chosen one, or for a movement with no side, whichever the camera sees. */
+  side: Side
 }
 
 /** Below this the model is guessing where the joint is. */
@@ -30,13 +32,23 @@ export function innerAngleDeg(a: [number, number], b: [number, number], c: [numb
   return (Math.acos(Math.max(-1, Math.min(1, cos))) * 180) / Math.PI
 }
 
+/** The angle at `b` between the segments to `a` and `c` in space, in degrees (0..180). */
+export function innerAngle3Deg(a: readonly [number, number, number], b: readonly [number, number, number], c: readonly [number, number, number]): number {
+  const u = [a[0] - b[0], a[1] - b[1], a[2] - b[2]]
+  const v = [c[0] - b[0], c[1] - b[1], c[2] - b[2]]
+  const cos = (u[0]! * v[0]! + u[1]! * v[1]! + u[2]! * v[2]!) / (Math.hypot(u[0]!, u[1]!, u[2]!) * Math.hypot(v[0]!, v[1]!, v[2]!))
+  return (Math.acos(Math.max(-1, Math.min(1, cos))) * 180) / Math.PI
+}
+
 /** How far the line from `a` to `b` slopes off the level, either way, in degrees (0..90). */
 export function tiltDeg(a: [number, number], b: [number, number]): number {
   const slope = Math.abs((Math.atan2(b[1] - a[1], b[0] - a[0]) * 180) / Math.PI)
   return slope > 90 ? 180 - slope : slope
 }
 
-const UNTRACKED: JointReading = { tracked: false, metricDeg: 0, innerDeg: 0, points: null }
+const untracked = (side: Side): JointReading => ({ tracked: false, metricDeg: 0, innerDeg: 0, points: null, side })
+/** A movement with no side changes to the other side only when the camera sees it this much better. */
+const SWITCH_MARGIN = 0.15
 
 /** How well the model sees a side's three landmarks: the least visible of them. */
 function seen(landmarks: readonly Landmark[], exercise: ExerciseId, side: Side): number {
@@ -46,20 +58,35 @@ function seen(landmarks: readonly Landmark[], exercise: ExerciseId, side: Side):
 /**
  * The exercise's joint, read from a pose: the landmarks named in the exercise config for the
  * chosen side (MediaPipe names sides from the person's point of view, on the unmirrored frame),
- * the angle measured on the real picture (`aspect` = video width / height, since x and y are
- * both 0..1), and the config's conversion to the metric the rep counter and dashboard use. A
- * movement with no side to pick (a squat, a deadlift) is read on whichever side the camera sees
- * better, the chosen side when they tie, so it counts whichever way the member faces.
+ * and the config's conversion to the metric the rep counter and dashboard use.
+ *
+ * The angle is measured in space from the model's world landmarks (`world`, in metres) when it
+ * gives them, so a curl done facing the camera reads true: on the flat picture the forearm coming
+ * toward the lens shortens to a stub and its angle swings wildly. Without them it is measured on
+ * the real picture (`aspect` = video width / height, since x and y are both 0..1). A tilt (the ab
+ * twist's shoulder line against the level) is always measured on the picture, where level is.
+ *
+ * A movement with no side to pick (a squat, a deadlift) is read on whichever side the camera sees
+ * better. `prefer` is the side read last time: it is kept until the other is seen clearly better,
+ * so the reading does not flick between the two sides frame by frame.
  */
-export function readJoint(landmarks: readonly Landmark[] | null | undefined, exercise: ExerciseId, chosen: Side, aspect = 1): JointReading {
-  if (!landmarks) return UNTRACKED
+export function readJoint(landmarks: readonly Landmark[] | null | undefined, exercise: ExerciseId, chosen: Side, aspect = 1, world?: readonly Landmark[] | null, prefer?: Side): JointReading {
   const cfg = EXERCISES[exercise]
-  const other: Side = chosen === 'right' ? 'left' : 'right'
-  const side = !cfg.sided && seen(landmarks, exercise, other) > seen(landmarks, exercise, chosen) ? other : chosen
-  const marks = cfg.joints[side].map((i) => landmarks[i])
-  if (marks.some((m) => !m || (m.visibility ?? 1) < MIN_VISIBILITY)) return UNTRACKED
+  const current = cfg.sided ? chosen : (prefer ?? chosen)
+  if (!landmarks) return untracked(current)
+  const other: Side = current === 'right' ? 'left' : 'right'
+  const side = !cfg.sided && seen(landmarks, exercise, other) > seen(landmarks, exercise, current) + (prefer ? SWITCH_MARGIN : 0) ? other : current
+  const indices = cfg.joints[side]
+  const marks = indices.map((i) => landmarks[i])
+  if (marks.some((m) => !m || (m.visibility ?? 1) < MIN_VISIBILITY)) return untracked(side)
   const points = marks.map((m) => [m!.x, m!.y]) as JointReading['points'] & object
   const [a, b, c] = points.map(([x, y]) => [x * aspect, y] as [number, number]) as [[number, number], [number, number], [number, number]]
-  const innerDeg = cfg.measure === 'tilt' ? tiltDeg(a, b) : innerAngleDeg(a, b, c)
-  return { tracked: true, innerDeg, metricDeg: cfg.metricFromInnerAngle(innerDeg), points }
+  const inSpace = cfg.measure !== 'tilt' && world ? indices.map((i) => world[i]) : null
+  const innerDeg =
+    cfg.measure === 'tilt'
+      ? tiltDeg(a, b)
+      : inSpace && inSpace.every(Boolean)
+        ? innerAngle3Deg(...(inSpace.map((m) => [m!.x, m!.y, m!.z ?? 0] as const) as [readonly [number, number, number], readonly [number, number, number], readonly [number, number, number]]))
+        : innerAngleDeg(a, b, c)
+  return { tracked: true, innerDeg, metricDeg: cfg.metricFromInnerAngle(innerDeg), points, side }
 }

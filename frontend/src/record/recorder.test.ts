@@ -174,8 +174,9 @@ describe('every movement, end to end', () => {
         const rec = new SessionRecorder({ exercise, side, plan: { sets: 1, reps: 3, restSeconds: 10, targetDeg } })
         const start = performance.now()
         for (let t = 0; t < READY_MS + 900 + 3 * period + 600; t += FRAME) {
-          const pose = tracker.detect(null as never, start + t)
-          const reading = readJoint(pose, exercise, side, 16 / 9)
+          const frame = tracker.detect(null as never, start + t)
+          const pose = frame?.landmarks ?? null
+          const reading = readJoint(pose, exercise, side, 16 / 9, frame?.world)
           // The whole pose too: a person moving as the figure does keeps every movement's form.
           rec.feed({ tracked: reading.tracked, metricDeg: reading.metricDeg, tMs: T0 + t, pose, aspect: 16 / 9 })
         }
