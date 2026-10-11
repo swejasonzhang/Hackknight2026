@@ -40,6 +40,8 @@ export interface JointSceneProps {
   holding?: boolean
   /** How closed each hand is, overriding the movement's own. */
   grip?: Grip
+  /** Told where the goal tick is on the canvas (CSS pixels from its top left) whenever it moves, so a label can point at it. */
+  onGoalPoint?: (point: { x: number; y: number }) => void
   className?: string
   /** What the picture shows, for assistive tech. */
   label: string
@@ -200,7 +202,7 @@ function useBinder() {
   return { objects, bind }
 }
 
-type BodyProps = Pick<JointSceneProps, 'exercise' | 'angle' | 'goalDeg' | 'rangeDeg' | 'idle' | 'frameAt'> & {
+type BodyProps = Pick<JointSceneProps, 'exercise' | 'angle' | 'goalDeg' | 'rangeDeg' | 'idle' | 'frameAt' | 'onGoalPoint'> & {
   grip: Grip
   holding: boolean
   asset: BodyAsset
@@ -214,7 +216,7 @@ type BodyProps = Pick<JointSceneProps, 'exercise' | 'angle' | 'goalDeg' | 'range
   spin: boolean
 }
 
-function Body({ asset, exercise, angle, goalDeg, rangeDeg, idle, reduce, muscles, mirrored, figure, growth, growthShade, instrument, spin, frameAt, grip, holding }: BodyProps) {
+function Body({ asset, exercise, angle, goalDeg, rangeDeg, idle, reduce, muscles, mirrored, figure, growth, growthShade, instrument, spin, frameAt, grip, holding, onGoalPoint }: BodyProps) {
   const p = parts()
   const sway = useRef<Group>(null)
   const { objects, bind } = useBinder()
@@ -222,6 +224,7 @@ function Body({ asset, exercise, angle, goalDeg, rangeDeg, idle, reduce, muscles
   const band = useMemo(gaugeGeometry, [])
   const body = useMemo(() => makeBody(asset), [asset])
   const shown = useRef<{ exercise: ExerciseId; deg: number } | null>(null)
+  const goalPoint = useRef<{ x: number; y: number } | null>(null)
   const applied = useRef<{ exercise: ExerciseId; deg: number; figure: FigureKey; fill: number } | null>(null)
   const invalidate = useThree((s) => s.invalidate)
   const aspect = useThree((s) => s.size.width / Math.max(1, s.size.height))
@@ -384,6 +387,18 @@ function Body({ asset, exercise, angle, goalDeg, rangeDeg, idle, reduce, muscles
       const turn = spin ? facing + t * 0.35 : facing + (idle ? Math.sin(t * 0.45) * 0.34 : 0)
       sway.current.rotation.y = (mirrored ? -1 : 1) * turn
     }
+    // Where the goal tick lands on the canvas, for a label that points at it: told only when it moves a pixel or more.
+    const tick = objects.current['goal-tick']
+    if (onGoalPoint && tick && goalDeg != null) {
+      tick.updateWorldMatrix(true, false)
+      tick.getWorldPosition(dir).project(state.camera)
+      const point = { x: Math.round(((dir.x + 1) / 2) * state.size.width), y: Math.round(((1 - dir.y) / 2) * state.size.height) }
+      const last = goalPoint.current
+      if (!last || Math.abs(last.x - point.x) >= 1 || Math.abs(last.y - point.y) >= 1) {
+        goalPoint.current = point
+        onGoalPoint(point)
+      }
+    }
   })
 
   return (
@@ -474,7 +489,7 @@ function Floor({ exercise, figure, frameAt }: { exercise: ExerciseId; figure: Fi
  * it (`growth`). Drive `angle` with `useRepLoop` to sweep the limb through the range rep after
  * rep. Never rendered in tests: use `LazyJointScene`, which loads the body with the code.
  */
-export default function JointScene({ exercise, angle, goalDeg, rangeDeg, idle = true, muscles = true, mirrored = false, figure = 'neutral', growth = null, growthShade = false, instrument = true, spin = false, frameAt, holding = true, grip, className = '', label, fallback = null }: JointSceneProps) {
+export default function JointScene({ exercise, angle, goalDeg, rangeDeg, idle = true, muscles = true, mirrored = false, figure = 'neutral', growth = null, growthShade = false, instrument = true, spin = false, frameAt, holding = true, grip, onGoalPoint, className = '', label, fallback = null }: JointSceneProps) {
   const reduce = useReducedMotion() ?? false
   const fixed = typeof angle === 'number' ? angle : angle.get()
   // The body loads with the scene's code; if that download failed, show the fallback and try again.
@@ -495,7 +510,7 @@ export default function JointScene({ exercise, angle, goalDeg, rangeDeg, idle = 
           <hemisphereLight args={['#ffffff', '#9aa8c2', 1.0]} />
           <directionalLight position={[3, 4, 5]} intensity={2.2} />
           <directionalLight position={[-4, 1.5, -3]} intensity={1.4} color="#c9d6ff" />
-          <Body asset={asset} exercise={exercise} angle={reduce ? fixed : angle} goalDeg={goalDeg} rangeDeg={rangeDeg} idle={!reduce && idle} reduce={reduce} muscles={muscles} mirrored={mirrored} figure={figure} growth={growth} growthShade={growthShade} instrument={instrument} spin={!reduce && spin} frameAt={frameAt} holding={holding} grip={grip ?? (holding ? HOLDS[exercise].grip : RELAXED_HANDS)} />
+          <Body asset={asset} exercise={exercise} angle={reduce ? fixed : angle} goalDeg={goalDeg} rangeDeg={rangeDeg} idle={!reduce && idle} reduce={reduce} muscles={muscles} mirrored={mirrored} figure={figure} growth={growth} growthShade={growthShade} instrument={instrument} spin={!reduce && spin} frameAt={frameAt} onGoalPoint={onGoalPoint} holding={holding} grip={grip ?? (holding ? HOLDS[exercise].grip : RELAXED_HANDS)} />
           <Floor exercise={exercise} figure={figure} frameAt={frameAt} />
           <OrbitControls enableZoom={false} enablePan={false} minPolarAngle={Math.PI / 3} maxPolarAngle={Math.PI / 1.7} />
         </Canvas>

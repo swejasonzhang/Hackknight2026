@@ -8,16 +8,16 @@ import { createRepCycle } from './repCycle'
 
 const EXERCISE = EXERCISES.elbow_flexion
 const GOAL = EXERCISE.targetDeg
-/** Six demo reps per loop; the later ones shrink, as a real set does. */
-const PEAKS = [131, 128, 134, 125, 129, 122]
+/** Six demo reps per loop, every one reaching the goal line; the last ones only just, as a real set fades. */
+const PEAKS = [143, 145, 142, 146, 141, 140]
 /** Every rep starts and ends with the arm straight: the readout comes all the way back to 0°. */
 const REST = EXERCISE.restDeg
 const SECONDS_PER_REP = 2.4
 const PAUSE_BETWEEN_LOOPS = 1.4
 const REPS_PER_SET = 8
 const SETS = 3
-/** The demo profile's best elbow flexion: the pose held when motion is reduced. */
-const HELD = 129
+/** The pose held when motion is reduced: a rep at the top, past the goal. */
+const HELD = 142
 /** Where the counters stand in the held pose: the fourth rep of the second set. */
 const HELD_REPS_DONE = 11
 
@@ -46,6 +46,8 @@ export function LiveJoint() {
   const [done, setDone] = useState(reduce ? HELD_REPS_DONE : 0)
   const [pending, setPending] = useState(false)
   const [failed, setFailed] = useState(false)
+  // Where the goal tick is on the stage, so the goal line points exactly at it.
+  const [goalAt, setGoalAt] = useState<{ x: number; y: number } | null>(null)
 
   useEffect(() => {
     cycle.reset()
@@ -113,11 +115,17 @@ export function LiveJoint() {
             className="h-full w-full"
             label={`A 3D figure of a whole body doing elbow flexion reps toward a ${GOAL} degree goal, its shoulder, elbow and wrist tracked and the angle read out live in degrees`}
             fallback={<Pending onPending={setPending} />}
+            onGoalPoint={setGoalAt}
           />
         </SceneBoundary>
 
-        <div className="pointer-events-none absolute top-[34%] right-3 flex items-center sm:right-4" aria-hidden="true">
-          <span className="h-px w-8 bg-navy sm:w-12" />
+        {/* The goal line: from the goal tick on the figure's arc out to its label, so every rep is seen to reach it. */}
+        <div
+          className="pointer-events-none absolute right-3 flex -translate-y-1/2 items-center sm:right-4"
+          style={goalAt ? { top: goalAt.y, left: goalAt.x } : { top: '34%' }}
+          aria-hidden="true"
+        >
+          <span className={`h-px border-t border-dashed border-navy ${goalAt ? 'flex-1' : 'w-8 sm:w-12'}`} />
           <span className="callout relative">Goal {GOAL}°</span>
         </div>
 
