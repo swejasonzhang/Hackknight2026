@@ -2,334 +2,134 @@
 
 <p><img src="docs/brand/arc-wordmark.svg" alt="Arc" height="56"></p>
 
-**Range of motion is an arc.** Arc is a webcam goniometer for home use, for anyone at any age, live at [getarc.health](https://getarc.health). After sign-up, **Arc** (Gemini) asks what you want from your body in a short chat (every question skippable) and builds your training **week**: a different body area each training day, several movements a day for its muscle groups, all of it yours to change by hand. Press **Start recording** and the browser watches you exercise through the webcam: MediaPipe pose tracking runs on your device, shows a single movement indicator on the working joint (which way to move, and how far to the goal), measures joint range of motion (ROM) in degrees for any of fifteen movements, counts the reps done with good form and the sets, and saves every set to MongoDB as it finishes; the video never leaves the device. Beside the camera a 3D body shows the movement done right, the muscles it works in red and yellow, and Arc listens the whole time, answering questions and coaching reps in its voice. That body is the member's own: a real human figure, female or male, skinny at the start, each muscle group filling out week by week with the sets that train it. Each day is a checklist crossed out as you go, a **challenge** (summer body in 12 weeks, a year's transformation) sets the week phase by phase toward a finish line, and a household leaderboard ranks everyone at home. **This repository is the web app and API**: accounts, one profile per person in the household, recording, and dashboards that show progress over weeks. The teammates' Python camera app (`computer-vision/`) measures the same movements and posts its sessions to the same API; their `ai-coach/` module is where Arc's prompts and voice started. It is a personal tool, not a clinical one: no doctor or therapist sees the data.
+**Every rep, in degrees.** Arc turns any webcam into a goniometer and a training coach. It tracks your body in the browser, measures each joint's range of motion in degrees, counts only the reps done with good form, and shows your progress over the weeks, including a 3D body that grows with the training you log.
 
-Stack: MongoDB Atlas · Express 5 · React 19 · Node 20 (MERN), TypeScript everywhere, Vite, Tailwind CSS 4, Motion, MediaPipe Tasks Vision (pose tracking in the browser), Gemini and ElevenLabs (Arc, the coach), the Web Speech API (hands-free commands), React Three Fiber (a real human body, MakeHuman's CC0 mesh skinned to every movement and grown by each member's training, the muscles it works painted on, and progress bars), Radix (accordion, select, tabs, tooltip), Vitest. Hosted on Render, domain at Porkbun. Visual identity "Calibre": white and blue, an instrument on paper; Unbounded, IBM Plex Sans and IBM Plex Mono; navy rail, cobalt readouts, a whole 3D human body posed for each of the fifteen movements, its tracked joints the camera's, its muscles red where the exercise targets and yellow where they help (ADR-0010, ADR-0014, ADR-0021, ADR-0025, ADR-0030). Every dropdown is a Radix Select drawn in the same system. The landing page runs a whole 3D body through elbow-flexion reps and a demo board that draws six random weeks with the app's own generator and charts for any of the fifteen movements (weight held included), the body with the muscles each movement works, a demo household's bodies growing with six weeks of their training, and its leaderboard (ADR-0011).
+Built in 48 hours at **Hackknight 2026**, over the weekend of October 9 to 11, 2026, by a team of three. Live at **[getarc.health](https://getarc.health)**.
 
----
+[![CI](https://github.com/swejasonzhang/Hackknight2026/actions/workflows/ci.yml/badge.svg)](https://github.com/swejasonzhang/Hackknight2026/actions/workflows/ci.yml)
 
-## 1. Quick start
+![Arc's landing page: a 3D body curling a dumbbell toward a 140° goal, with the live angle read out at 135°](docs/screenshots/landing.jpg)
 
-Prerequisites: **Node 20.19 or newer** (`.nvmrc` says 20; `nvm use` picks it), npm 10, and the team's MongoDB Atlas connection string.
+> **Status:** the hackathon is over. This repository is a finished snapshot of what we built that weekend and is not under active development. The live site stays up while its hosting does.
+
+## What it does
+
+- **Tracks you through the webcam, in the browser.** MediaPipe pose tracking runs on your device. There is nothing to install, and the video never leaves your computer: only the angle of each rep is saved.
+- **Measures 15 movements** across the upper body, back, legs and core, from bicep curls and lateral raises to squats, deadlifts and ab twists.
+- **Counts only good reps.** Form checks catch a swinging upper arm, a bent arm on a raise or a rep that is too quick. The rep isn't counted, and the coach says why.
+- **Coaches by voice.** Arc, the coach (Gemini for the words, ElevenLabs for the voice), builds your training week in a short onboarding chat, answers questions hands-free mid-set, and reads each set and session back in plain English.
+- **Shows a body that grows.** A real 3D human shows each movement done right, with the muscles it trains painted on. The same figure fills out, muscle group by muscle group, with the sets you actually record.
+- **Plans and tracks progress.** An editable training week, a daily checklist, multi-week challenges (such as "summer body in 12 weeks"), progress charts and a household leaderboard. One account covers a household, with a profile for each person.
+
+Arc is a personal fitness tool, not a medical device.
+
+## Screenshots
+
+These are from the public landing page, which runs the app's own charts on randomly generated demo data.
+
+| | |
+|---|---|
+| ![Trend chart: best and mean rep per session climbing from 96° to 150° past a 140° goal](docs/screenshots/trend.jpg) | ![The 3D body mid-curl with the biceps in red and the forearms in yellow](docs/screenshots/muscles.jpg) |
+| **Progress.** Best and mean rep of every session against the goal. | **Muscles.** The movement done right, target muscles in red, helpers in yellow. |
+| ![Growth view: a 3D figure and a ranked list of the most-built muscle groups](docs/screenshots/growth.jpg) | ![Household leaderboard ranking three demo profiles by Arc score](docs/screenshots/household.jpg) |
+| **Growth.** The body as the training built it, week by week. | **Household.** Everyone at home ranked on reps, sets, weight moved and steadiness. |
+
+## How it works
+
+```mermaid
+flowchart LR
+  subgraph Browser["Browser · React 19"]
+    Cam[Webcam] --> Pose["MediaPipe Pose Landmarker<br/>(WebAssembly, on device)"]
+    Pose --> Engine["@arc/dependencies<br/>filters · rep counter · form checks"]
+    Engine --> UI["Recording · dashboards · 3D body"]
+  end
+  CV["Python camera app<br/>OpenCV + MediaPipe"] -- "API key" --> API
+  UI -- "JWT · each set as it ends" --> API["Express 5 API · Node 20"]
+  API --> DB[("MongoDB Atlas")]
+  API --> Gemini["Gemini<br/>Arc's words"]
+  API --> Eleven["ElevenLabs<br/>Arc's voice"]
+```
+
+- **One engine, three consumers.** `@arc/dependencies` is plain TypeScript shared by the browser and the API: the exercise catalog, a One Euro filter, a hysteresis rep counter, the form checks, a fatigue proxy and session summaries. The Python camera app reads the same thresholds from a JSON catalog generated from that source, and a snapshot test fails CI if the two drift apart.
+- **Steady numbers from a shaky camera.** Every landmark is smoothed with its own One Euro filter, and a frame the model is unsure of is bridged rather than trusted. Angles are read in 3D from MediaPipe's world landmarks, so a curl done facing the camera still reads true. For a movement done with both arms or legs, the tracker stays on the better-seen side until the other side is clearly better.
+- **Nothing lost mid-workout.** Each set is written to MongoDB the moment it ends (one `POST`, then a `PUT` per set), so a closed tab or a dropped camera keeps every finished set. The server recomputes summaries and fatigue from the raw reps rather than trusting the client.
+- **AI that degrades gracefully.** Gemini and ElevenLabs are called only from the server, with keys in headers. Without keys, every flow still works on Arc's own scripted questions, templated reads and the browser's built-in voice. The week Gemini writes is clamped to the member's training days, the catalog and the set and rep ranges for their training goal, and it is rejected if it trains the same body area two days running.
+- **A real human body.** The figure is MakeHuman's CC0 mesh, baked at build time into a compact binary, skinned on the GPU to a 22-joint skeleton and posed for all 15 movements. Muscle growth is modelled per vertex from the sets each group received.
+- **Performance, measured.** Pages are code-split by route, the 3D body ships gzipped, and the pose model loads only on the recording page. Profiling in GPU-enabled headless Chrome found 117 to 250 ms freezes whenever the exercise changed, because the 3D body was rebuilt each time. Mounting it once with shared materials removed them.
+
+## Tech stack
+
+| Layer | Tools |
+|---|---|
+| Frontend | React 19, TypeScript, Vite, Tailwind CSS 4, Motion, Radix UI, React Three Fiber and three.js, Recharts |
+| Computer vision | MediaPipe Tasks Vision in the browser; OpenCV and MediaPipe in the Python app |
+| Backend | Node 20, Express 5, Mongoose, zod, JWT and bcrypt |
+| Database | MongoDB Atlas |
+| AI and voice | Google Gemini, ElevenLabs, Web Speech API |
+| Testing and CI | Vitest, Testing Library, supertest with an in-memory MongoDB, Python unittest, GitHub Actions |
+| Hosting | Render (static site and web service), DNS at Porkbun |
+
+## The weekend in numbers
+
+| | |
+|---|---|
+| Time from first commit to last merge | 48 hours |
+| Pull requests merged, each through CI | 44 |
+| Automated tests | 604 (140 engine, 131 API, 303 web app, 30 Python) |
+| TypeScript written | about 25,000 lines, a third of it tests |
+| Architecture decision records | 34, in [docs/adr](docs/adr/) |
+| Movements tracked / muscle groups modelled | 15 / 17 |
+
+## Team
+
+| Who | What they built |
+|---|---|
+| Jason Zhang ([@swejasonzhang](https://github.com/swejasonzhang)) | The web app and API: browser pose tracking, the rep and form engine, the 3D body, Arc's integration, the data model, CI and deployment |
+| Kelvin ([@kekcodenoob](https://github.com/kekcodenoob)) | The Python camera app: OpenCV and MediaPipe tracking, the original exercise catalog, guiding arrows for form and pacing |
+| Jerome White ([@Jaw718](https://github.com/Jaw718)) | The `ai-coach` module: the Gemini and ElevenLabs voice coach, the onboarding survey and the training-plan ranges that Arc's weeks are built within |
+
+## Run it locally
+
+You need Node 20.19 or newer and a MongoDB connection string (Atlas, or a local `mongod`).
 
 ```bash
 git clone https://github.com/swejasonzhang/Hackknight2026.git arc && cd arc
-npm install            # all three workspaces; first run also downloads a MongoDB test binary (~150 MB)
-cp .env.example .env   # fill in MONGODB_URI and JWT_SECRET; CV_API_KEY and the Arc keys are optional (see below)
+npm install
+cp .env.example .env   # set MONGODB_URI and JWT_SECRET; the Gemini and ElevenLabs keys are optional
 npm run dev            # API on :8787, web app on :5173
+npm test               # engine, API and web app suites
 ```
 
-Open <http://localhost:5173>. `/` is the landing page; **Create account** takes you to `/signup` (one account per household), then to `/welcome`, a full-page chat with Arc, and on to the app at `/dashboard`. Every Arc logo (the app's rail and phone bar, the sign-up pages, the welcome chat, the landing page's own) leads back to the landing page, where **Open dashboard** returns you to the app. Then:
+Open <http://localhost:5173>, create an account, and use **Load demo data** on the Profiles page to fill the dashboards with six weeks of sessions.
 
-1. **Welcome** → Arc asks what you want from your body, strength, muscle or stamina, where to start (every exercise, by area), the side, limits, experience, training days, height and weight. Tap a quick reply, type or speak; **Skip this question** passes on one, **Build my week now** stops the questions, **Skip for now** leaves. Arc saves the answers on your profile and builds your week.
-2. **Dashboard** → pick who you're looking at, then a body area (Upper body, Back, Legs, Core) and an exercise. The panel always shows the member's own 3D body doing that movement, recorded or not: rep after rep from the start position to the goal (the tick on its arc) and never past it, the latest session's range shaded, the muscles it works painted red (the target) and yellow (helping) and named underneath; the calendar shows your week, marking the days that hold the picked exercise; **Your body, as trained** shows the whole figure turning slowly, skinny where untrained and built where the sets went, with a slider and **Watch it grow** to play it forward week by week, the groups from most to least built, the ones not worked yet with a movement for each, and the choice of figure (female, male or between). For demos, **Play transformation** runs a mock year from the skinny start to an end build drawn at random (**Randomize end build** draws another); every chart is folded behind a **+**: peak ROM per session against your goal, the latest session rep by rep, the fatigue proxy, sessions per week and a 3D view. **Profiles** → **Add a profile** for everyone else at home, or **Load demo data** for six weeks of random sessions across all fifteen movements, each with a weight that rises week by week. **Leaderboard** (its own page in the navigation, *Ranking* on a phone) ranks everyone on the account this week, over 30 days or all time, by an Arc score that factors in reps, sets, weight moved and steadiness (low fatigue), or by any one of them (ADR-0027).
-3. **Record** → **Start recording** (or **Next** on today's checklist) opens the webcam in the browser on today's next movement, or the exercise you picked, at its prescription (today's in your week, else your plan, else your week, else your goal's ranges). The form guide on the right shows the movement and the muscles it works; enter the weight you hold; sets and rests run by themselves, Arc answers whatever you ask, and every set is saved as it finishes. The report crosses the movement off today's list and offers **Next** (section 4b).
-4. **Plan** → your **week** on the left, yours to change: make any day a training or a rest day, add several movements a day for the muscle groups you pick (a target muscle first, then a movement that works it), reorder them, change any movement's sets, reps, rest, goal and side, or start again from an earlier week; **Save my week**. The **log** on the right goes a day at a time: a training day shows what was planned under each muscle group, crossed out as it gets done, with **Record** for each movement and **Next** for the next one today; then each workout against the previous session, the first one and the goal; open a workout for the set-by-set view. **Account** (your avatar) → log out, or delete the account and everything in it.
-5. **Challenges** (*Goals* on a phone) → a fixed plan with a finish line: Summer body in 12 weeks, a 1-year transformation, Strong arms in 8, a 30-day core, Legs and glutes, a V-taper back, a stronger back and better posture, or a first month. Each card opens the plan: who it is for, **Your body at the finish** (your own figure grown by the plan's sets, against today), its phases and its first week. **Start this challenge** makes its first phase your week; each new phase replaces the week when it starts. The page then shows the week you are in, the training days done against the plan so far and the days left; **Leave the challenge** keeps the week as it is. The dashboard names the challenge under way (ADR-0031).
+The full setup, every environment variable, the API reference, the Python camera app, deployment and troubleshooting are in **[docs/REFERENCE.md](docs/REFERENCE.md)**.
 
-Real sessions come from recording in the browser (section 4b) or from the Python camera app (section 4c). The API refuses to start without `MONGODB_URI` and `JWT_SECRET`, and prints what is missing; without `CV_API_KEY` it starts but warns that the camera app cannot store sessions.
-
-## 2. Configuration
-
-Copy `.env.example` to `.env` at the repo root. Only the backend reads it.
-
-| Variable | Meaning |
-|---|---|
-| `MONGODB_URI` | **Required.** `mongodb+srv://<user>:<password>@<cluster>.mongodb.net/arc?retryWrites=true&w=majority`. A local server also works: `mongodb://127.0.0.1:27017/arc`. If the cluster refuses the connection the API prints why and retries every 10 s. |
-| `JWT_SECRET` | **Required.** Signs login tokens. Any long random string: `openssl rand -hex 32`. |
-| `CV_API_KEY` | Shared secret the camera app sends as `x-api-key` when it stores sessions or reads a plan. `openssl rand -hex 32`. Without it the camera app cannot write. |
-| `GEMINI_API_KEY` | Optional. Arc's words (onboarding chat, set and session reads) from Gemini. Without it Arc asks its own questions and reads sessions from templates built on the same numbers. Server-side only; sent in the `x-goog-api-key` header. |
-| `GEMINI_MODEL` | Optional, default `gemini-3.8-flash` (the ai-coach module's default). |
-| `ELEVENLABS_API_KEY` | Optional. Arc's voice (ElevenLabs `eleven_turbo_v2_5`). Without it the browser speaks Arc's lines with its own voice. Server-side only. |
-| `ELEVENLABS_VOICE_ID` | Optional, default `21m00Tcm4TlvDq8ikWAM`; the ai-coach module lists other voices. |
-| `COACH_MAX_PER_MINUTE` | Optional, default 40: how many Arc requests one account may make a minute (the paid APIs sit behind them). |
-| `PORT` | API port, default `8787`. The Vite dev server proxies `/api/*` here. |
-| `CORS_ORIGINS` | Comma-separated browser origins allowed in production, e.g. `https://getarc.health,https://www.getarc.health`. |
-| `NODE_ENV` | `production` on Render. `/api/dev/seed` stays available in every environment (signed-in accounts only). |
-
-`npm run seed -- you@example.com` loads the demo profile into the account with that email (the in-app button does the same through `POST /api/dev/seed`).
-
-## 3. Everyday commands
-
-Run from the repo root.
-
-| Command | What it does |
-|---|---|
-| `npm run dev` | API + web app with hot reload (`npm run dev:backend` / `npm run dev:frontend` for one of them) |
-| `npm test` | All JavaScript test suites: shared engine, API (against a throwaway in-memory MongoDB), frontend |
-| `cd computer-vision && python3 -m unittest` | The camera app's tests (plan mapping, upload to Arc); CI runs them too |
-| `npm run test:watch -w dependencies` (or `-w backend`, `-w frontend`) | Watch mode for one workspace while doing TDD |
-| `npm run typecheck` | TypeScript across all workspaces |
-| `npm run build` | Production build of the web app into `frontend/dist` |
-| `npm run seed -- <email>` | Seed demo data into that account |
-
-## 4. How sessions get into the database
-
-Two things record sessions, and both write through this API, so every session lands in MongoDB and every chart reads it from there:
-
-- **The browser** (section 4b), as the signed-in member: the first finished set creates the session (`POST /api/sessions` with `complete: false`), each later set updates it (`PUT /api/sessions/:id`), the last marks it complete.
-- **The Python camera app** (section 4c), with the `x-api-key` header: the whole session once it ends.
-
-The server validates the body and recomputes the fatigue proxy and the summary from the raw reps every time, so the dashboard needs nothing else.
-
-```http
-POST /api/sessions
-x-api-key: <CV_API_KEY>
-content-type: application/json
-
-{
-  "profileId": "<id from GET /api/profiles>",
-  "exercise": "elbow_flexion",
-  "side": "right",
-  "startedAt": 1760000000000,
-  "endedAt": 1760000600000,
-  "plan": { "sets": 3, "reps": 8, "restSeconds": 45, "targetDeg": 140 },
-  "sets": [
-    {
-      "setNumber": 1,
-      "reps": [
-        { "index": 1, "peakDeg": 131.5, "startedAt": 1760000001000, "endedAt": 1760000003200, "durationMs": 2200 }
-      ],
-      "fatigue": { "index": 0, "romDecay": 0, "tempoDrift": 0, "romDropDeg": 0, "sampleReps": 0 },
-      "startedAt": 1760000001000,
-      "endedAt": 1760000030000,
-      "endedEarly": false
-    }
-  ]
-}
-```
-
-- Timestamps are milliseconds since the epoch. `fatigue` may be zeros; the server overwrites it.
-- With the API key the camera app can also read any profile (`GET /api/profiles`, `GET /api/profiles/:id/plan`) to know who is exercising and what their plan is.
-- The exact schema is `CreateSessionSchema` in `dependencies/src/api.ts`; the TypeScript types are in `dependencies/src/engine/types.ts`. Writing straight into the `sessions` collection also works if the documents follow `backend/src/models/Session.ts`, but then nothing recomputes the summary.
-
-### What the engine defines
-
-`@arc/dependencies` is pure TypeScript shared by the server and the browser recorder (the Python app maps its catalog in `movements.py` onto these ids and counts reps at these thresholds, section 4c):
-
-- `EXERCISES` (`dependencies/src/engine/exercises.ts`): for each exercise, which three landmarks form the angle, how the inner angle becomes the metric (`metricFromInnerAngle`, always "more degrees = deeper into the rep"), the rep thresholds (`enterDeg`, `exitDeg`), the jitter floor (`minRepMs`), the default goal, and the cue that tells the user how to face the camera. The camera app reads the thresholds and goals from `computer-vision/arc_catalog.json`, written from this file by `npm run catalog -w dependencies`; `cameraCatalog.test.ts` fails when the two disagree (ADR-0029).
-- `RepCounter`: the hysteresis rep counter (leave rest, pass `enterDeg`, return to `exitDeg` = one rep; shorter than `minRepMs` = ignored). `OneEuroFilter` smooths the angle stream first.
-- `estimateFatigue`: the proxy below. `summarizeSets`: the per-session roll-up.
-
-| Exercise | Joint (landmarks) | Metric shown and counted | Enter / exit | Default goal |
-|---|---|---|---|---|
-| Bicep curl | shoulder – elbow – wrist | 180° − inner angle | 90° / 40° | 140° |
-| Tricep extension | shoulder – elbow – wrist | inner angle | 140° / 70° | 170° |
-| Shoulder press | hip – shoulder – elbow | inner angle | 150° / 95° | 170° |
-| Lateral raise | hip – shoulder – elbow | inner angle | 70° / 30° | 90° |
-| Front raise | hip – shoulder – wrist | inner angle | 80° / 30° | 95° (just above shoulder height) |
-| Chest press | shoulder – elbow – wrist | inner angle | 150° / 80° | 170° |
-| Pec fly | left wrist – left shoulder – right wrist | 180° − inner angle | 150° / 105° | 160° |
-| Lat pulldown | hip – shoulder – elbow | 180° − inner angle | 105° / 35° | 120° |
-| Bent-over row | shoulder – elbow – wrist | 180° − inner angle | 105° / 35° | 115° |
-| Deadlift | shoulder – hip – knee | inner angle | 160° / 130° | 175° |
-| Squat | hip – knee – ankle | 180° − inner angle | 90° / 20° | 100° |
-| Lunge | hip – knee – ankle | 180° − inner angle | 80° / 30° | 90° |
-| Seated knee extension | hip – knee – ankle | inner angle | 150° / 110° | 175° |
-| Crunch | shoulder – hip – knee | 180° − inner angle | 45° / 22° | 55° |
-| Ab twist | both shoulders | shoulder line against the level | 22° / 8° | 30° |
-
-### Fatigue proxy (not a clinical measure)
-
-For a set with at least 4 reps, compare the first k reps with the last k (k ≤ 3):
+## Repository layout
 
 ```
-romDecay   = (mean peak of first k − mean peak of last k) / mean peak of first k
-tempoDrift = (mean duration of last k − mean duration of first k) / mean duration of first k
-index      = clamp(0.6 · romDecay + 0.4 · tempoDrift, 0, 1)       (only losses count)
+dependencies/     shared TypeScript: exercise catalog, rep counter, filters, form checks, demo data, API schemas
+backend/          Express 5 + Mongoose API, with tests against an in-memory MongoDB
+frontend/         React app: pages, recording, the 3D body, plans, challenges, Arc's voice
+computer-vision/  the Python camera app (OpenCV + MediaPipe)
+ai-coach/         the original Python Gemini + ElevenLabs module, ported into the API
+docs/             reference, architecture decision records, backlog and sprints
 ```
 
-The dashboard draws `0.12` (nudge) and `0.25` (early rest) as reference lines and labels the quantity "ROM decay + tempo drift", never "fatigue" as a diagnosis.
+## What we learned
 
-## 4b. Recording in the browser, the exercises and Arc
+- **Take the riskiest dependency off the critical path.** The plan was for the web app to display sessions recorded by the Python camera app. That integration was our biggest risk, so on day two we moved pose tracking into the browser too. It removed the install step for users and meant the demo no longer depended on one laptop's Python setup.
+- **Infrastructure fails in boring ways.** The API went down overnight because a temporary MongoDB Atlas IP rule expired, and the campus Wi-Fi blocked database traffic outright. The lasting fix was an API that starts without its database, reports the connection on `/api/health`, and reconnects by itself.
+- **Measure before optimising.** The 3D figure "stuttered", and software-rendered screenshots could not show why. Profiling with the real GPU found the cause.
+- **Breadth is not a demo.** We kept shipping features into the final hours. Next time we would freeze features earlier and spend that time rehearsing a tight three-minute demo.
 
-### Recording in the browser (no install)
+## Known limitations
 
-The web app tracks the body itself (ADR-0017). The dashboard's **Record a session** panel has a **Start recording** button that opens `/record`: the browser asks for the camera once, MediaPipe Pose Landmarker (`@mediapipe/tasks-vision`, the same pose model family as the Python app) runs on the device, and counting begins as soon as the movement's joints are in view. The plan's sets, reps and rest run by themselves. **Every set is saved to MongoDB as it finishes** (ADR-0023): the first set creates the session (`POST /api/sessions`, `complete: false`), each later set updates it (`PUT /api/sessions/:id`), and the last set (or **Finish and save**) marks it complete and opens its report. A recording that stops early, a closed tab or a lost camera, keeps every set that finished; its page says it stopped early, and the dashboard counts it. Over the camera there are no skeleton lines, only a **movement indicator** on the working joint (`frontend/src/record/guide.ts`, ADR-0028): an arc from the limb to where it should go now, the goal on the way up and the start on the way down, ending in an arrow, with the goal as a yellow tick; it turns green at the goal, and a label says what to do (*Curl up*, *Lower*, *Sit down*, *Stand tall*…) with the angle. On a phone the set, rep and angle also ride on the camera. **Only reps with good form count** (`dependencies/src/engine/form.ts`): while a rep is under way the pose is checked for what the movement must keep (the upper arm still in a curl or a tricep extension, no swinging in curls, raises and presses, a straight arm in raises, the back still in a row, the chest up in a lunge, the thigh on the seat in a knee extension; whole-body movements on depth and tempo alone), a rep that breaks one, or is too quick, is not counted, Arc says why at once, and the set keeps the reason (`rejected`). The checks run on the device from the pose landmarks; no video goes to Gemini. Beside the camera, **How to do it** shows the movement done right (`frontend/src/record/FormGuide.tsx`): the 3D body loops full reps from the start position to the goal, drawn the way the mirrored camera view shows the member, working on the side they picked, with the muscles it works painted and named and the cue to follow. Under the live readings, **Weight held** (kilograms or pounds, starting from the last weight used for the movement) is saved with the session as `loadKg` (0 for bodyweight) and shown on its report. The video never leaves the device; only the angle of each rep is stored.
+- The leaderboard compares the profiles in one household only. A global board would need an opt-in and public names first.
+- Hands-free voice commands rely on the Web Speech API, so they work in Chrome and Edge only.
+- One camera sees one side of the body: side-on framing and good light matter.
+- There is no password reset or data export.
+- The Python camera app counts reps at the same thresholds as the browser but does not run the form checks.
 
-How the angle becomes reps reuses the shared engine: each exercise's landmarks, metric and thresholds (`dependencies/src/engine/exercises.ts`), the One Euro filter and the hysteresis rep counter. Every landmark is steadied first (`frontend/src/record/steady.ts`: a One Euro filter on each landmark, its visibility eased so one doubtful frame keeps the joint, a missed frame bridged), so the arm on screen holds still and form checks never react to the model's shake. `angle.ts` then reads the joint in 3D from MediaPipe's world landmarks, so a curl done facing the camera reads true where the flat picture loses the forearm (a tilt stays on the picture; without world landmarks it measures the picture, corrected for the video's aspect ratio), keeps a two-sided movement on one side until the other is clearly better seen, and ignores low-visibility landmarks; `recorder.ts` runs the session (ADR-0032). The WebAssembly runtime ships with the app (about 3.5 MB gzipped, loaded only on `/record`); the full pose model (about 9 MB) loads from MediaPipe's model storage. In development, `/record?simulate` replaces the camera with a pretend person doing reps.
+## Credits
 
-Every number the signed-in app shows comes from MongoDB through the API: the dashboard's readings and charts (`/progress`), the calendar and the day log (`/sessions`, `/program`), the session report (`/sessions/:id`) and Arc's reads (`CoachMessage`, `coachSummary`). Only the public landing page draws generated sample data, for visitors without an account.
-
-### Fifteen movements, four areas
-
-Arc tracks every exercise in the camera app's catalog (`computer-vision/movements.py`) plus the seated knee extension (ADR-0021), defined once in `dependencies/src/engine/exercises.ts` on the catalog's landmarks, with the rep thresholds and goals both the browser and the camera app count with:
-
-| Area | Movement | Target (red) | Also working (yellow) | Side |
-| --- | --- | --- | --- | --- |
-| Upper body | Bicep curl | Biceps | Forearms | left or right |
-| | Tricep extension | Triceps | Forearms | left or right |
-| | Shoulder press | Front and side shoulders | Triceps, traps | both |
-| | Lateral raise | Side shoulders | Front shoulders, traps | left or right |
-| | Front raise | Front shoulders | Side shoulders, chest | left or right |
-| | Chest press | Chest | Front shoulders, triceps | both |
-| | Pec fly | Chest | Front shoulders | both |
-| Back | Lat pulldown | Lats | Upper back, biceps, rear shoulders | both |
-| | Bent-over row | Lats, upper back | Rear shoulders, biceps, lower back | left or right |
-| | Deadlift | Hamstrings, glutes, lower back | Quads, traps, forearms | both |
-| Legs | Squat | Quads, glutes | Hamstrings, lower back, calves | both |
-| | Lunge | Quads, glutes | Hamstrings, calves | left or right (front leg) |
-| | Seated knee extension | Quads | | left or right |
-| Core | Crunch | Abs | Obliques | both |
-| | Ab twist | Obliques | Abs, lower back | both |
-
-Each movement also has a range of motion it stops at (`maxDeg`: a curl at 150°, a lateral raise just past shoulder height at 105°, a front raise at 110°): the 3D figure never goes past it, and a goal must sit between where a rep starts counting and that end (`goalRange`, checked by the week editor and the API). Each movement names the muscles it works (`muscles`, from seventeen groups in `MUSCLES`) and whether one arm or leg does the work (`sided`). The back is three groups, not a left and a right: the upper back, the lats and the lower back. Adding a movement to a day in the week picks a **target muscle** first and then a movement that works it, the most focused first; a side is asked only for one-arm and one-leg movements, and the recorder reads the others on whichever side faces the camera. The 3D body is a real human mesh, MakeHuman's young adult (CC0), baked by `frontend/scripts/body/bake.mjs` into `body.bin` and skinned on the GPU to Arc's skeleton, whose proportions are read off the mesh, so every pose bends where the body does (`frontend/src/components/three/body/figure.ts`, ADR-0030). Each profile picks a female or male figure, or neither for the one between them. Its hands close round what each movement holds, a dumbbell, a cable's handle or a bar, with the wrists turned the way the movement holds it (ADR-0033). Everyone wears shorts, and the female and between figures a sports top. These are real garments: the body's surface under them, cut cleanly at the hem, smoothed and lifted off the skin, skinned with the body. The muscles are painted straight onto the skin and the fabric: on the working limb only for a one-sided movement, and turned to show its back when the targets are behind (a deadlift, a row). The figure starts skinny, and every muscle group grows with the training that works it (`dependencies/src/growth.ts`): a set counts fully for the muscles an exercise targets and half for those that help, a weight held adds up to half again, each week adds a share of what is left to gain, and a group left alone for more than two weeks gives a little back.
-
-The dashboard picks one from four body-area tabs and keeps it in `?exercise=`. Everything follows the pick: the 3D body (each movement has its own whole-body pose, from a curl to a lying crunch, with the goniometer on the measured joint), the readings and charts, the calendar (days that hold it are marked) and **Start recording**, which runs it at its prescription: today's prescription for it in the week, else the saved plan when it is for that movement, else the week's first day that holds it, else the member's goal ranges (`prescriptionFor`). With no movement named, `/record` starts on today's next movement not done yet. The browser tracker reads any of them, the ab twist as the shoulder line against the level; the development simulator takes its landmarks from the 3D body itself, so the figure, the tracker and the simulator always agree. Arc's "where to start" shows the whole catalog by area, and Gemini is given the same list.
-
-### Arc, the coach (Gemini + ElevenLabs)
-
-Arc is the coach across the whole app (ADR-0018); the name never changes.
-
-1. **After sign-up**, `/welcome` is its own full page between sign-up and the dashboard (ADR-0020): a chat in which Arc (Gemini) asks, one question at a time, what the member wants from their body, whether they want strength, muscle or stamina, where to start (every exercise in the catalog, shown by area), the side, injuries or limits, experience, which days they can train, and their height and weight (both skippable). Quick replies answer the common cases in a tap; typing and speaking work too. **Skip this question** passes on any question (Arc takes a sensible default and moves on), **Build my week now** stops the questions and builds the week from what has been said, and **Skip for now** leaves without a week. When Arc has enough it saves the answers on a new profile (`intake`) and builds the member's **week** (`Program`): their training days, each working one body area in turn (upper body, legs, back, core, starting from the focus's area), never the same area two training days running, the focus movement opening the week, with sets, reps and rest inside the training goal's ranges from the ai-coach module (strength 2-4 × 2-6 with 120-300 s rest, muscle 3-5 × 8-12 with 60-180 s, stamina 2-4 × 13-25 with 30-60 s). Gemini writes the week; the server keeps only the member's days and catalog movements, clamps the numbers into range, takes goal angles from the catalog and throws out a week that keeps to one area, falling back to Arc's own week. Each day holds several movements for its area's muscle groups (two for someone new, three for everyone else; Gemini gives two to four), each item naming the muscle it is there for. The week card at the end of the chat has **Change it**: the same week editor as the plan page, so the member can rearrange Arc's week before leaving the chat. The dashboard shows the week as a **calendar** under Record a session: training days planned, done or not recorded, today ringed, and the selected day's workout beside the grid as a checklist with the next movement to record. Every line of the chat is stored (`CoachMessage`). A profile without a week gets "Plan my week with Arc" on the calendar.
-2. **While recording**, Arc is always listening, hands-free, through the browser's speech recognition, and always ready to talk (ADR-0024). Anything said to Arc that is not a command (a question, how it feels, "Arc, …") gets an answer from the live numbers (`POST /api/coach/ask`: Gemini's words, or Arc's own: pain means stop and check with a professional, form gets the last rep against the goal, hard or easy gets a concrete change), and after each rep Arc may coach it ("Go a little deeper.", "Slow down, lower it with control.", "Your range is fading.") at most every seven seconds. The commands: *start*, *pause* (the rest countdown freezes too), *resume*, *skip* (cut the set short, or skip the rest), *rest*, *stop* (finish and save), *how many* (Arc reads the count) and *repeat*. Short phrases count; longer talk only when it is addressed to Arc ("Arc, can we pause"); "don't stop" does not stop. Arc is muted while it speaks so it never hears itself. Every command is saved with the session (`events`). Pause and Skip are buttons too.
-3. **After each set**, during the rest, Arc reads the set back in plain English in its voice: Gemini's words, or Arc's own specific read (the best and lowest rep, how many reached the goal, how many reps did not count for form and why, the tempo, one concrete thing for the next set, the form fix first when reps were refused).
-4. **After the session**, the report opens; on a training day it starts with today's workout, this movement crossed out and **Next** to the next one, so a day's movements run one after another (ADR-0026). Arc reads that one session back aloud, in plain English: what was done against the plan (sets and reps, the time, the weight), how far the reps went against the goal, how the range held through the sets, which reps did not count and why, a clause on the last session, and one next step. It is a recap, not a pep talk: Gemini words it from the session's own numbers only, and a reply that is not in English or names none of them is replaced by Arc's own recap of the same facts (ADR-0032). The read is stored on the session (`coachSummary`) and shown under each workout in the plan page's log, so progress can be compared over time.
-
-**What leaves your device.** Never the video. The angles of each rep go to the API and MongoDB. When Arc's services are switched on, the onboarding chat and a session's numbers go to Gemini to write Arc's words, Arc's lines go to ElevenLabs to be spoken, and hands-free commands go through the browser's speech recognition (Chrome sends that audio to Google).
-
-Gemini and ElevenLabs run only on the server (`backend/src/services/gemini.ts`, `voice.ts`, and Arc's prompts in `arc.ts`, ported from the teammates' `ai-coach/` module); keys travel in headers, never URLs, and never reach the browser. Without `GEMINI_API_KEY` every flow still works (Arc's scripted questions and templates, marked "Gemini off"); without `ELEVENLABS_API_KEY` the browser speaks Arc's lines, and the record page says so. With it, every line Arc speaks is ElevenLabs: stored lines by id, short ones (acknowledgements, cues) through `POST /api/coach/speak`, cached on the server so a repeat costs nothing; each page learns which voice it has before Arc's first word. Routes: `GET /api/coach/status`, `POST /api/coach/onboarding` (each reply names the `topic` it asks about; the last carries `intake`, `plan` and `program`), `POST /api/coach/ask` (live answers, both lines stored), `POST /api/coach/speak` (MP3 for a short line), `POST /api/coach/sets`, `POST /api/coach/sessions/:id/summary` (once per session), `GET /api/coach/messages/:id/audio` (MP3, owner only); signed-in members only, rate-limited per account.
-
-## 4c. The camera app (Python)
-
-The computer-vision side lives in [`computer-vision/`](computer-vision/) as a Python 3.12 project managed with [uv](https://docs.astral.sh/uv/): `main.py` starts `ExerciseTracker` from `movements.py`, which uses OpenCV and MediaPipe to track the joint, count reps against flex/extend thresholds and time rest.
-
-```bash
-cd computer-vision
-uv sync          # installs mediapipe and opencv into .venv
-uv run main.py   # opens the webcam window
-```
-
-Started with `--profile <profile id>` and `CV_API_KEY` set, it sends the finished session to Arc (`computer-vision/arc_upload.py`, ADR-0023): `POST /api/sessions` with the `x-api-key` header to `ARC_API_URL` (default `https://api.getarc.health`; plain HTTP only to this computer). Each rep's time is rebuilt from the app's own log, its peak converted to Arc's number for the movement, and the session lands in MongoDB beside the browser's.
-
-The Python app can still start straight into a plan: `uv run main.py --exercise elbow_flexion --side right --sets 3 --reps 8 --rest 45`, and with `--profile <id>` (and `CV_API_KEY`) it saves the session to Arc when the routine ends.
-
-Its tracking, landmarks and drawing are the computer-vision team's; its rep thresholds are Arc's (ADR-0029). `computer-vision/arc_catalog.json` is written from `exercises.ts`, `arc_routine.arc_thresholds` turns each movement's enter and exit angles into the app's flex and extend thresholds, and `main.py` gives them to the whole catalog at start-up, with a plan or without. A front raise counts once the arm passes 80° and aims for the 95° goal in both, where the app used to need 135°; the ab twist reads the shoulder line's tilt off the level, as the browser does.
-
-## 5. API reference
-
-Base URL in development: `http://localhost:8787`. All bodies are JSON. Validation errors return `400 { error: "Invalid request", issues: [...] }`; unknown or foreign ids return `404`; missing credentials, or a token for an account that has been deleted, return `401`.
-
-**Credentials.** Browser requests send `Authorization: Bearer <token>` (from signup or login, valid 7 days). The camera app sends `x-api-key: <CV_API_KEY>` instead and may access every profile. Users only ever see their own profiles.
-
-**Names and emails.** One rule, shared by every form and the API (`dependencies/src/fields.ts`): a name is letters (any alphabet), spaces, apostrophes, hyphens or periods, at least one letter, up to 80 characters; an email is a real address like `name@example.com`, up to 254 characters. Each field states its requirement under it, names the exact problem once it is left, and the submit button waits until every field passes.
-
-**Deleting an account.** The account tag (the avatar on the rail, or the last cell of the phone bar) opens `/account`: who is signed in, Log out, and Delete account. Deleting asks for the account's email and password again and for `DELETE` typed out; the server checks the pair, removes the account with every profile, plan, session and Arc message, and the old token stops working at once. A wrong pair answers `403` (not `401`, so a typo does not sign the member out) and five wrong tries in 15 minutes lock the form for the rest of that window. The password is never logged or echoed back.
-
-| Method & path | Body | Returns |
-|---|---|---|
-| `GET /api/health` | | `{ ok, db: "connected" \| "disconnected", uptime }` (open) |
-| `POST /api/auth/signup` | `{ name, email, password (≥ 8) }`, name and email by the rule above | `201 { token, user }`; `409` if the email exists (open) |
-| `POST /api/auth/login` | `{ email, password }` | `{ token, user }`; `401` on a bad pair (open) |
-| `GET /api/auth/me` | | the signed-in user |
-| `POST /api/auth/account/delete` | `{ email, password, confirm: "DELETE" }` | `204`; the account and all of its data are gone. `403` on a wrong pair, `429` after five wrong tries in 15 minutes (users only) |
-| `GET /api/profiles` | | your profiles, newest first (API key: all profiles) |
-| `POST /api/profiles` | `{ name, email?, notes?, figure? }` | `201` profile (users only); `figure` is `female` or `male` |
-| `GET /api/profiles/:id` | | profile |
-| `PATCH /api/profiles/:id` | `{ figure }` (`female`, `male`, or `null` for the figure between them) | the profile; members only, nothing else may change here |
-| `GET /api/profiles/:id/body` | | the body training has built: `{ figure, overall, muscles: { [group]: { level, recentSets, totalSets, change } }, weeks: [{ from, levels }] }`, levels 0 (untrained) to 1 |
-| `DELETE /api/profiles/:id` | | `204`; also deletes its plans, sessions and challenges |
-| `GET /api/profiles/:id/plan` | | active plan (`404` if none) |
-| `PUT /api/profiles/:id/plan` | `{ exercise, side, sets, reps, restSeconds, targetDeg }` | `201` new active plan; the previous one is kept inactive |
-| `PATCH /api/profiles/:id/plan` | any subset of the plan fields | updated active plan |
-| `GET /api/profiles/:id/plans` | | plan history, newest first |
-| `GET /api/profiles/:id/program` | | the week in force: `{ summary, days: [{ weekday (0 = Sunday), title, items: [plan fields + optional muscle] }], source }` (`gemini`, `arc`, `demo`, `member` or `challenge`; `404` until there is one). A challenge's new phase is written before the week is read |
-| `GET /api/profiles/:id/programs` | | every week the profile has had, newest first (up to 12) |
-| `PUT /api/profiles/:id/program` | `{ days: [{ weekday, title, items (1 to 8) }] }`, every goal inside its movement's range | `201` the member's own week, now in force (the last one kept in history); Arc writes the summary and the active plan follows its first movement. Members only (`403` for the camera app's key) |
-| `GET /api/profiles/:id/challenge` | | the profile's challenge, under way or finished: `{ id, challengeId, startedAt, status: "active" \| "done", phase }`, brought up to date first (a new phase's week written, a run past its end marked done); `404` when there is none or it was left |
-| `POST /api/profiles/:id/challenge` | `{ challengeId, tzOffsetMinutes? }` | `201` the run, started at the member's midnight; its first phase is now the week (the last one kept in history) and any other challenge is left. Members only |
-| `DELETE /api/profiles/:id/challenge` | | `204`; the challenge is left and the week stays; `404` when none is under way. Members only |
-| `POST /api/sessions` | see section 4; optional `complete: false` while a recording is saved set by set; optional `loadKg` (0 to 500); each set may carry `rejected: [{ at, fault }]`, the reps not counted for form | `201` session with server-computed fatigue and summary |
-| `PUT /api/sessions/:id` | the same body, every set so far | the session, recomputed; `409` once it is complete, `400` for another profile (users and the camera app) |
-| `GET /api/profiles/:id/sessions?exercise=` | | sessions, newest first, optional exercise filter |
-| `GET /api/sessions/:id` | | one session |
-| `GET /api/profiles/:id/progress?exercise=` | | dashboard series: peak/mean/fatigue per session (oldest first), sessions per week, latest session rep by rep, plan goal |
-| `GET /api/leaderboard?window=week\|month\|all` | | the account's profiles ranked on the window: `{ factors, rows: [{ name, reps, sets, volumeKg, topLoadKg, fatigue, steadiness, score, ranks }] }`; members only, never another account's profiles |
-| `POST /api/dev/seed` | optional `{ tzOffsetMinutes }` (the browser's `getTimezoneOffset()`) | `201`/`200` `{ profileId, sessions, created }`; your demo profile with six weeks of random sessions at local training hours (a new seed per account); signed-in accounts only, in every environment |
-
-Exercise ids (the first three predate the catalog and keep their ids): `elbow_flexion` (bicep curl), `tricep_extension`, `shoulder_press`, `shoulder_abduction` (lateral raise), `front_raise`, `chest_press`, `pec_fly`, `lat_pulldown`, `bent_over_row`, `deadlift`, `squat`, `lunge`, `seated_knee_extension`, `crunch`, `ab_twist`. Sides: `left`, `right`.
-
-## 6. Repository layout
-
-```
-dependencies/  @arc/dependencies  pure TypeScript shared by both sides: domain types, exercise configs,
-               rep counter, One Euro filter, fatigue proxy, session summary, demo data generator,
-               progress builder, the week (goal ranges, answer parsing, Arc's own week), muscle growth, the challenges, zod API schemas
-backend/       @arc/backend       Express 5 + Mongoose: models (User, Profile, Plan, Program, Session, CoachMessage, ChallengeRun), auth,
-               routes, services; src/app.ts builds the app, src/index.ts connects and listens, test/ = API tests
-frontend/      @arc/frontend      Vite + React 19 + Tailwind + Motion: pages (Landing, Signup, Login, Welcome, Dashboard,
-               Plan, Challenges, Record, Profiles, SessionDetail, Account), challenges/ (the catalog, the run, the body at the finish), plan/ (week editor, day log, today's checklist, PlanCalendar), auth (token, context, route guards),
-               body/ (Your body, as trained), components/three/ (the 3D body: skeleton, skinning, the scene),
-               scripts/body/ (bakes the body from MakeHuman's CC0 assets), api/client.ts (typed fetch wrapper)
-computer-vision/  Python camera app (OpenCV + MediaPipe, uv): tracks the joint, counts reps, times rest;
-               arc_routine.py starts it from an Arc plan, arc_upload.py sends the session to the API
-ai-coach/      Python module from the teammates (Gemini + ElevenLabs): Arc's persona, onboarding survey and
-               training ranges, ported into backend/src/services/arc.ts, which the app runs
-docs/          backlog, sprint plan, definition of done, architecture decision records
-.github/       CI workflow and issue / PR templates
-```
-
-The three JavaScript packages are npm workspaces; `computer-vision/` and `ai-coach/` are separate Python projects (uv). `@arc/dependencies` is consumed as TypeScript source, so a change there is picked up by both sides without a build step.
-
-## 7. Testing and the development process
-
-The project is developed **test-first**: write the failing test, make it pass, then clean up. `npm test` must be green before a pull request is opened, and CI (`.github/workflows/ci.yml`) runs typecheck, tests and the build on every push and PR.
-
-- `dependencies/src/**/*.test.ts`: engine behaviour (rep counting, hysteresis, jitter rejection, fatigue arithmetic, summaries, schema validation), the name and email rules (accents, other alphabets, apostrophes and hyphens accepted; digits, symbols, blanks and over-long values refused with a reason), the exercise catalog (fifteen movements in four areas, thresholds between rest and the goal, the camera app's landmarks, the camera app's copy of the thresholds and goals in `arc_catalog.json`), the demo generator (repeatable per seed, upward trends scaled to each movement's range, local training hours), what Record runs for a movement (today's prescription, else the plan, else the week, else the goal ranges), muscle groups through a day (grouping, titles, the member's week described), the household leaderboard (places, the Arc score, windows, fatigue only where a set was long enough), the progress builder, the week (the ai-coach goal ranges, reading training days, goals, heights and weights from plain answers, Arc's own week on the chosen days and inside the ranges, the training day for a date), and muscle growth (untrained at zero, targets growing more than helpers, short sets and weights held, a week's dose saturating, six demo weeks clearly grown but far from the top, a year approaching it, three idle weeks giving some back but not one, the whole body weighted by each group's size), and the challenges (every phase's week inside the catalog and the goal ranges, the sets each group gets, the training days so far on the member's calendar and across a change of clocks, the body each one builds by its finish).
-- `backend/test/*.test.ts`: every API route through supertest against a throwaway in-memory MongoDB, including sign-up, login, token checks, API-key access and profile isolation between accounts, a recording saved set by set (in MongoDB from its first set and on the dashboard at once, one session growing with each set, kept when it never finishes, a finished one final, another profile or account refused), account deletion (signed-in members only, a wrong or another account's pair refused without echoing the password and without ending the session, `DELETE` required, everything of the account removed and nothing of anyone else's, the old token refused afterwards, the lockout after five wrong tries), and Arc (onboarding with and without Gemini and its fallback when Gemini fails, the profile and plan it saves, set and session reads stored once, the session read a recap of that one session in English (done against the plan, the weight, how far, how the range held, the reps not counted and why; a Gemini reply in another language or naming none of its numbers replaced; the member's goals kept out of the prompt; a read from the old way read again), ElevenLabs audio only for the owner, the nine onboarding topics in order with the week saved and served, running again for an existing profile, Gemini's week held to the member's days, the catalog and the ranges with Arc's week filling the gaps, the week going with its profile and its account, keys only in headers, the rate limit, voice commands stored with sessions; Gemini and ElevenLabs are stubbed, never called), the member's own week (several movements a day with their muscle groups, Monday first, Arc's summary, the history, eight a day at most, members only), the household leaderboard (the week's reps, sets, weight moved and steadiness, longer windows, only the account's own profiles, members only, the weight held kept with a session), and the body (levels grown by sessions posted through the API, another account's profile not found, the camera app's key allowed to read it; the figure set, cleared and refused when invalid or another account's), and the challenges (starting one makes its first phase the week with the member's side, one at a time, a new phase's week written once however many reads arrive at once, a jump of several phases, finished after the last day, leaving keeps the week, a challenge id no longer in the catalog, members only, deleted with the profile and the account). Tests never touch the cluster in `.env`.
-- `frontend/src/**/*.test.ts(x)`: the API wrapper (token header, 401 handling, saving a recorded session), browser recording (the movement indicator's arc toward the goal and back to the start for every movement, reps counted only with good form: an upper arm that swings, a body that swings, a bent arm or a rep too quick is refused with its reason and the next good rep numbered on, each set saved as it finishes into one session, saves one after another, a failed save made up by the next, reading the joint from pose landmarks with aspect correction and visibility, in 3D from the model's world landmarks (a curl facing the camera read true where the flat picture swings), one side kept for a two-sided movement, every landmark steadied (a still arm held still, a curl's top still reached, a doubtful or missed frame bridged, a whole shaky set counted rep for rep), the session recorder's sets, rests, early finish and whole-millisecond times, the simulated person, the camera-blocked and insecure-page messages, the dashboard's record panel), the route guards (app pages send visitors to `/login`, sign-up and log-in send signed-in users to `/dashboard`), every logo leading to the landing page (the app shell, the welcome chat, the landing page's footer) and the landing page's buttons for visitors and signed-in users, the full-page chat with Arc (quick answers for the question asked, skipping, the week it shows at the end), the dashboard calendar (training days planned, done and not recorded, today's workout and the way to record it, month steps and arrow keys, the invitation when there is no week), the sign-up / login form and the requirement line under every name and email field (the profiles page included), the account page (details, log out, deletion held until the email, password and `DELETE` are right, the server's refusal shown without the password, the landing-page notice afterwards), new pages opening at the top, Arc (the onboarding chat page, the session read, the API calls), voice commands (every gym word, negations, addressing Arc), the recorder's pause, resume, skip, rest and stop with the saved command log, UI primitives, the themed dropdown, the 3D body (the baked asset whole and its skin weights adding to one, each sex's height, the skin carrying every joint to where each pose puts it for each figure, a curl raising the hand, every movement above the floor, skinny untrained and thicker where trained and only there, the figure between the sexes their mean) and where each muscle lies on it (a curl on the working arm's front only, the quads in front of the thigh and the hamstrings behind, the chest in front and the lower back behind, the clothes for each figure), Your body, as trained (skinny with a movement for every group not worked yet, the groups ranked with their sets, the week slider and Watch it grow, the figure picker), the record page's form guide, the 3D body's skeleton for all fifteen movements (every part present, the tracked landmarks on its joints, the reading measured back exactly as the camera app would, the goniometer arc on the moving segment, no limb stretching, the classics moving one limb, planted feet staying planted through squats, lunges and deadlifts, nothing below the floor, every pose in frame), the exercise picker (four area tabs, the area's movements, switching area picking its first), the ab twist's shoulder-line reading, every movement counted end to end through the camera path by the simulated person, the sticky columns that never scroll on their own, the dashboard's chart folds, the week editor (Monday first, a movement added for a muscle group with the day titled after it, reordering, changing numbers and side, removing, no empty training day, starting from an earlier week), a day's checklist (a session crosses out one movement, the next one offered, nothing before the week was set), the household leaderboard (ranked by the Arc score or any one measure, the profile being viewed marked, a longer window on request) and the weight field (pounds to kilograms, the last weight to start from, the unit remembered), the plan page's day log (stepping, rest days, today's plan ready to record, a past day crossed out and what was not recorded, progress against the previous session and the goal) and its local-calendar day arithmetic, the challenges page (the run under way with its days and phases, the cards and the detail, the body at the finish against today, starting with a question when a week is in force, leaving, a profile switched while a start is out, a failed load) and the hero's rep detector and its loop (every rep from 0° and back to 0°).
-
-- `computer-vision/test_arc_upload.py`: sending a camera-app session to Arc (sets and reps from the app's log, whole-millisecond times with the rest between sets, each movement's number and goal matching `exercises.ts`, the key in a header and never over plain HTTP to another computer, `--profile` and `CV_API_KEY`).
-- `computer-vision/test_arc_routine.py`: the plan-to-routine mapping for running the Python app from a plan (all fourteen catalog movements mapped once each and named as movements.py names them, whole-body movements on the catalog's own landmarks, a seated knee extension definition, mirrored landmarks, every movement counting a rep at the browser's thresholds and not short of them, with a plan or built interactively, the ab twist's tilt read the same whichever shoulder is on the left, plan validation, command-line round trip). `cd computer-vision && python3 -m unittest`; CI runs them too.
-
-How the team works (sprints, stories, definition of done, PR checklist) is in [CONTRIBUTING.md](CONTRIBUTING.md) and [docs/](docs/).
-
-## 8. Deployment: getarc.health
-
-The domain **getarc.health** is registered at Porkbun, which also serves its DNS. Hosting is Render, defined by [`render.yaml`](render.yaml) at the repo root: a static site `getarc-web` for the web app and a Node web service `getarc-api` for the API. The static site rewrites `/api/*` to the API's Render hostname, so the browser keeps the same-origin calls it uses in development and the site works on Render's own URLs before DNS is switched. A push to `main` deploys both.
-
-### One-time setup (about 15 minutes)
-
-1. **Connect GitHub to Render.** At dashboard.render.com choose *New → Blueprint*, pick the `swejasonzhang/Hackknight2026` repo and the `main` branch. Render reads `render.yaml` and creates `getarc-web` and `getarc-api`. (If you created services from an earlier version of the file, delete those first so the names don't collide.)
-2. **Set the secrets** it asks for: `MONGODB_URI` (the Atlas string), and for Arc's words and voice `GEMINI_API_KEY` and `ELEVENLABS_API_KEY` (both optional: without them Arc runs on its own questions and the browser's voice). `JWT_SECRET` and `CV_API_KEY` are generated; copy `CV_API_KEY` from `getarc-api` → *Environment* and give it to the camera-app team.
-3. **Allow Render in Atlas.** Atlas → Network Access → add the outbound IPs shown on `getarc-api` → *Networking* (or `0.0.0.0/0` for the hackathon).
-4. **Check it on Render's URLs first:** `https://getarc-api.onrender.com/api/health` returns `{ ok: true, db: "connected" }`, and `https://getarc-web.onrender.com` shows the landing page. If Render gave a service a suffixed hostname (the name was taken), update the rewrite destination in `render.yaml` to match.
-5. **Point the domain at Render.** The blueprint deliberately leaves domains out (Render refuses a blueprint whose domain is attached anywhere else). Add `getarc.health` under `getarc-web` → *Settings → Custom Domains* and `api.getarc.health` under `getarc-api`; if Render says a domain is taken, it names the service or workspace that holds it. Then at Porkbun → *Domain Management* → `getarc.health` → **DNS Records**, delete the default records (the `A` records for the root and `*` pointing at `192.0.79.151` / `192.0.79.171`, and any `AAAA` records; the `_acme-challenge` TXT records are Porkbun's own SSL automation and can go too) and add these. Porkbun's *Host* field takes only the part before the domain: leave it blank for the root.
-
-   | Type | Host | Answer | TTL |
-   |---|---|---|---|
-   | ALIAS | *(blank)* | `getarc-web.onrender.com` | 600 |
-   | CNAME | `www` | `getarc-web.onrender.com` | 600 |
-   | CNAME | `api` | `getarc-api.onrender.com` | 600 |
-
-   ALIAS is Porkbun's root-level CNAME, so you never have to copy an IP from Render. (If you prefer an `A` record for the root, Render's apex address is `216.24.57.1`, shown on the Custom Domains screen.) Render verifies the domain within minutes and issues HTTPS; `www.getarc.health` redirects to the root automatically.
-6. **Final check:** `https://api.getarc.health/api/health` and `https://getarc.health`.
-
-Production env on `getarc-api` (all in `render.yaml`): `NODE_ENV=production`, `NODE_VERSION`, `MONGODB_URI`, `JWT_SECRET`, `CV_API_KEY`, `CORS_ORIGINS`, `GEMINI_API_KEY`, `GEMINI_MODEL`, `ELEVENLABS_API_KEY`, `ELEVENLABS_VOICE_ID`. The camera app sends its sessions to `https://api.getarc.health` (its `ARC_API_URL` default) with the API key.
-
-## 9. Troubleshooting
-
-- **The API lamp on the rail is red** (its tooltip says unreachable, or the database disconnected): the server is not running, crashed on start, or cannot reach MongoDB. Run `npm run dev:backend` alone and read its output; `/api/health` says which.
-- **API exits with "MONGODB_URI is not set" / "JWT_SECRET is not set"**: create `.env` at the repo root from `.env.example` (locally) or set the variables on the Render service.
-- **API logs "Could not connect to MongoDB … IP that isn't whitelisted"**: in Atlas open *Network Access* → *Add IP Address* → *Allow access from anywhere* (`0.0.0.0/0`, fine for the hackathon). The API retries every 10 s and connects on its own once the rule is active. While the database is unreachable the API stays up: `/api/health` reports `db: "disconnected"` and data routes answer `503 Database unavailable`; it reconnects by itself (retrying every 10 s) once Atlas accepts the connection, so nothing needs restarting.
-- **Camera app gets 401**: it must send `x-api-key` with the exact value of `CV_API_KEY` in the API's `.env` (set `CV_API_KEY` in the shell that runs `main.py --profile …`).
-- **Arc says "Gemini off" or speaks in the browser's voice**: `GEMINI_API_KEY` or `ELEVENLABS_API_KEY` is not set on the API; everything still works on Arc's own questions and templates.
-- **`npm install` fails with "Cannot read properties of null (reading 'edgesOut')"**: an npm 10 workspace bug; the repo's `.npmrc` (`legacy-peer-deps=true`) avoids it.
-- **CI fails with "Cannot find native binding" for rolldown**: the lockfile was generated without the Linux build of Vite's bundler. Regenerate it from a clean install (`rm -rf node_modules package-lock.json && npm install`) and commit `package-lock.json`.
-- **Backend tests fail at `MongoMemoryServer.create` the first time**: the MongoDB test binary is still downloading. Run `npm test -w backend` again.
-
-## 10. Status (2026-10-11)
-
-**Ready for the demo.** The whole member journey was run end to end in a browser against a local stack: sign-up, Arc's questions, Arc's week changed in the chat, the dashboard calendar with **Next**, the plan page's log, a simulated recording saved set by set with its weight, the report crossing the movement off and offering **Next**, a session sent by the Python camera app counted in the same day, the household leaderboard with demo data, and account deletion. 570 JavaScript tests (dependencies 140, API 131, web app 299) and 30 Python tests pass in CI on every push.
-
-**Still to do.**
-
-| What | Why it matters | Who |
-|---|---|---|
-| Check the keys on `getarc-api` took | `GEMINI_API_KEY` and `ELEVENLABS_API_KEY` are set; signed in on the live site, the record page should say "Arc's voice: ElevenLabs" and reads stop saying Gemini is off | whoever holds the keys |
-| Rehearse on the live site with a real webcam | Side-on framing and good light matter; the pose model downloads from Google's storage, so the room needs internet; hands-free voice works in Chrome and Edge only | everyone |
-| Split the app's pages out of the landing bundle (D6) | The main bundle is 1.2 MB before gzip; 3D and pose tracking already load on demand | FS |
-| Password reset (D5), CSV export (D3), a profile PIN (D2) | Not needed for the demo; normal for a real launch | FS |
-
-The leaderboard compares only the profiles on one account: ranking against other accounts would need an opt-in first. The teammates' `ai-coach/` Python module is kept for reference; the app runs the port of it in `backend/src/services/arc.ts`.
-
+The 3D body is built from [MakeHuman](http://www.makehumancommunity.org/) assets (CC0). Pose tracking is Google's [MediaPipe](https://ai.google.dev/edge/mediapipe). Type is Unbounded, IBM Plex Sans and IBM Plex Mono.
