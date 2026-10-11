@@ -119,6 +119,13 @@ describe('PlanCalendar', () => {
     expect(screen.getByText(/days with tricep extension/i)).toBeInTheDocument()
   })
 
+  it("names a challenge's week as the challenge's", async () => {
+    // Started today with Mondays only: nothing left to train this week, so the week says whose it is.
+    program.mockResolvedValue({ ...PROGRAM, source: 'challenge', createdAt: NOW, days: [week.days[0]!] })
+    renderCalendar()
+    expect(await screen.findByText('Your challenge week')).toBeInTheDocument()
+  })
+
   it('invites the member to plan a week with Arc when there is none', async () => {
     program.mockRejectedValue(new ApiRequestError(404, 'No program yet'))
     renderCalendar()

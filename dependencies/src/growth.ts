@@ -103,6 +103,16 @@ const MAX_WEEKS = 104
 const perMuscle = () => Object.fromEntries(MUSCLE_IDS.map((m) => [m, 0])) as Record<MuscleId, number>
 
 /**
+ * One trained week of a group: a share of what is left to gain, the share rising with the week's
+ * stimulus (effective sets) and saturating. The history (`bodyGrowth`) and a challenge's
+ * projection (challenges.ts) both grow a level this way.
+ */
+export function growWeek(level: number, stimulus: number): number {
+  if (stimulus <= 0) return level
+  return Math.min(1, level + ((GROWTH.rate * stimulus) / (stimulus + GROWTH.halfSets)) * (1 - level))
+}
+
+/**
  * The body the sessions have grown by `now`. Time runs in windows of one UTC week, Monday to
  * Monday; the last is the week of `now`, up to `now`. From the first session's week, each group's
  * level rises with the window's stimulus (see GROWTH), or after more than `idleWeeks` windows
@@ -152,7 +162,7 @@ export function bodyGrowth(sessions: readonly GrowthSession[], { now }: { now: n
       const s = stimulus[back]![m]
       if (s > 0) {
         idle[m] = 0
-        level[m] += ((GROWTH.rate * s) / (s + GROWTH.halfSets)) * (1 - level[m])
+        level[m] = growWeek(level[m], s)
       } else if (++idle[m] > GROWTH.idleWeeks) {
         level[m] -= GROWTH.lossPerWeek * level[m]
       }

@@ -91,6 +91,32 @@ describe('api client', () => {
     expect(init.method).toBe('GET')
   })
 
+  it("starts a challenge with the browser's timezone offset, reads it back and leaves it", async () => {
+    const run = { id: 'r1', profileId: 'p1', challengeId: 'summer_body', startedAt: 1, status: 'active', phase: 0 }
+    const fetchMock = vi.fn().mockImplementation((_url: string, init: RequestInit) =>
+      Promise.resolve(init.method === 'DELETE' ? new Response(null, { status: 204 }) : jsonResponse(run, init.method === 'POST' ? 201 : 200)),
+    )
+    vi.stubGlobal('fetch', fetchMock)
+    expect(await api.challenge.start('p1', { challengeId: 'summer_body', tzOffsetMinutes: 240 })).toEqual(run)
+    const [url, init] = fetchMock.mock.calls[0]!
+    expect(url).toBe('/api/profiles/p1/challenge')
+    expect(init.method).toBe('POST')
+    expect(JSON.parse(init.body)).toEqual({ challengeId: 'summer_body', tzOffsetMinutes: 240 })
+
+    expect(await api.challenge.get('p1')).toEqual(run)
+    expect(fetchMock.mock.calls[1]![0]).toBe('/api/profiles/p1/challenge')
+    expect(fetchMock.mock.calls[1]![1].method).toBe('GET')
+
+    await api.challenge.leave('p1')
+    expect(fetchMock.mock.calls[2]![0]).toBe('/api/profiles/p1/challenge')
+    expect(fetchMock.mock.calls[2]![1]).toMatchObject({ method: 'DELETE', body: undefined })
+  })
+
+  it('reports no challenge as a 404, so the page can tell it from a failure', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse({ error: 'No challenge' }, 404)))
+    await expect(api.challenge.get('p1')).rejects.toMatchObject({ status: 404, message: 'No challenge' })
+  })
+
   it('throws ApiRequestError with the server message on non-2xx', async () => {
     vi.stubGlobal('fetch', vi.fn().mockImplementation(() => Promise.resolve(jsonResponse({ error: 'Invalid request', issues: [] }, 400))))
     await expect(api.profiles.create({ name: '' })).rejects.toMatchObject({ status: 400, message: 'Invalid request' })

@@ -94,8 +94,8 @@ export const ProgramEditSchema = z.object({ days: ProgramInputSchema.shape.days 
 })
 export type ProgramEdit = z.infer<typeof ProgramEditSchema>
 
-/** Who wrote the week: Gemini, Arc's own rules, the demo seed, or the member by hand. */
-export const PROGRAM_SOURCES = ['gemini', 'arc', 'demo', 'member'] as const
+/** Who wrote the week: Gemini, Arc's own rules, the demo seed, the member by hand, or a challenge they joined. */
+export const PROGRAM_SOURCES = ['gemini', 'arc', 'demo', 'member', 'challenge'] as const
 export type ProgramSource = (typeof PROGRAM_SOURCES)[number]
 
 export interface ProgramDto extends ProgramInput {
@@ -250,13 +250,18 @@ export function titleForDay(items: readonly Pick<ProgramItem, 'exercise' | 'musc
   return title.length <= 60 ? title : `${title.slice(0, 59).replace(/[ ,]+[^ ,]*$/, '')}…`
 }
 
-/** Arc's words for a week the member arranged: how many days, which ones, and what each works. */
-export function describeWeek(days: readonly Pick<ProgramDay, 'weekday' | 'items'>[]): string {
+/**
+ * Arc's words for a week: how many days, which ones, and what each works. `lead` opens it (the
+ * member's own week by default); with none, it starts at the count, for a summary that names the
+ * week itself (a challenge's phase).
+ */
+export function describeWeek(days: readonly Pick<ProgramDay, 'weekday' | 'items'>[], lead = 'Your own week: '): string {
   const sorted = [...days].sort((a, b) => mondayFirst(a.weekday, b.weekday))
   const count = sorted.length
   const moves = sorted.reduce((n, d) => n + d.items.length, 0)
   const each = sorted.map((d) => `${WEEKDAY_NAMES[d.weekday]} ${listOf(muscleGroupsOf(d.items).map((g) => MUSCLES[g.muscle].name.toLowerCase()))}`)
-  const text = `Your own week: ${count} ${count === 1 ? 'day' : 'days'} and ${moves} ${moves === 1 ? 'movement' : 'movements'}. ${each.join('; ')}.`
+  const size = `${count} ${count === 1 ? 'day' : 'days'} and ${moves} ${moves === 1 ? 'movement' : 'movements'}`
+  const text = `${lead}${lead ? size : size[0]!.toUpperCase() + size.slice(1)}. ${each.join('; ')}.`
   return text.length <= 800 ? text : `${text.slice(0, 797)}…`
 }
 

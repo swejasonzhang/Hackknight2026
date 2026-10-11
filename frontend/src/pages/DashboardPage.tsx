@@ -20,6 +20,7 @@ import { MuscleKey } from '../components/MuscleKey'
 import { BodyGrowth } from '../body/BodyGrowth'
 import { figureKey, growthNow } from '../body/growth'
 import { useBody } from '../body/useBody'
+import { ChallengeLink } from '../challenges/ChallengeLink'
 
 const isExercise = (v: string | null): v is ExerciseId => EXERCISE_IDS.includes(v as ExerciseId)
 
@@ -261,6 +262,7 @@ export function DashboardPage() {
             {data ? ` · ${data.sessions.length} sessions` : ''}
             {first ? ` · since ${formatDate(first.date)}` : ''}
           </p>
+          {selected && <ChallengeLink profileId={selected.id} />}
           {selected && !selected.intake && (
             <Link to={`/welcome?profile=${selected.id}`} className="t-label mt-3 inline-block text-cobalt">
               Tell Arc what you want from your body →

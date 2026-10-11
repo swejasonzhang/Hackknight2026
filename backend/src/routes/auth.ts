@@ -3,6 +3,7 @@ import bcrypt from 'bcryptjs'
 import { Router } from 'express'
 import { authenticate, requireUser, signToken } from '../auth.ts'
 import { HttpError, validate } from '../http.ts'
+import { ChallengeRun } from '../models/ChallengeRun.ts'
 import { CoachMessage } from '../models/CoachMessage.ts'
 import { Plan } from '../models/Plan.ts'
 import { Program } from '../models/Program.ts'
@@ -45,11 +46,11 @@ const FAILURE_WINDOW_MS = 15 * 60_000
 const MAX_FAILURES = 5
 
 /**
- * Deletes the signed-in account and everything in it (profiles, plans, sessions, Arc's messages),
- * permanently. It takes the account's own email and password again and DELETE typed out; another
- * account's credentials, a wrong password or a missing confirmation change nothing. The password
- * is only compared, never logged or echoed. Children go first and the account last, so a failure
- * part-way leaves the account in place to try again.
+ * Deletes the signed-in account and everything in it (profiles, plans, sessions, challenges,
+ * Arc's messages), permanently. It takes the account's own email and password again and DELETE
+ * typed out; another account's credentials, a wrong password or a missing confirmation change
+ * nothing. The password is only compared, never logged or echoed. Children go first and the
+ * account last, so a failure part-way leaves the account in place to try again.
  */
 authRouter.post('/account/delete', authenticate, async (req, res) => {
   const userId = requireUser(req)
@@ -72,6 +73,7 @@ authRouter.post('/account/delete', authenticate, async (req, res) => {
   await Session.deleteMany({ profileId: { $in: profileIds } })
   await Plan.deleteMany({ profileId: { $in: profileIds } })
   await Program.deleteMany({ profileId: { $in: profileIds } })
+  await ChallengeRun.deleteMany({ profileId: { $in: profileIds } })
   await Profile.deleteMany({ ownerId: userId })
   await User.deleteOne({ _id: userId })
   failures.delete(key)

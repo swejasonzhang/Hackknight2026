@@ -43,16 +43,18 @@ function ApiLamp({ state }: { state: ApiState }) {
   )
 }
 
+// Five cells on a phone: the long labels take a short one there (Home, Goals, Ranking), which
+// leads the link's name ("Goals (Challenges)") so a voice command for the word shown finds it.
 const LINKS = [
-  { to: '/dashboard', label: 'Dashboard', end: true },
+  { to: '/dashboard', label: 'Dashboard', short: 'Home', end: true },
   { to: '/plan', label: 'Plan', end: false },
+  { to: '/challenges', label: 'Challenges', short: 'Goals', end: false },
   { to: '/profiles', label: 'Profiles', end: false },
-  // "Leaderboard" does not fit a phone's cell; the bar says Ranking.
   { to: '/leaderboard', label: 'Leaderboard', short: 'Ranking', end: false },
 ]
 
 /**
- * The signed-in frame: a 56 px navy instrument rail (wordmark, four vertical mono labels with a
+ * The signed-in frame: a 56 px navy instrument rail (wordmark, five vertical mono labels with a
  * sliding cobalt edge in equal cells, the API lamp, the account tag and log out) beside the vellum
  * bench where each page lays out its own panels. On phones the rail becomes a bottom bar.
  * There is no top bar: the profile switcher lives in the dashboard's measurement panel.
@@ -114,7 +116,7 @@ export function AppShell() {
           <span className="sr-only">API status: {API_TEXT[apiState]}</span>
         </div>
         {LINKS.map(({ to, label, short, end }) => (
-          <NavLink key={to} to={to} end={end} className="bar-link" aria-label={short ? label : undefined}>
+          <NavLink key={to} to={to} end={end} className="bar-link" aria-label={short ? `${short} (${label})` : undefined}>
             {short ?? label}
           </NavLink>
         ))}

@@ -2,6 +2,7 @@ import { CreateProfileSchema, UpdateProfileSchema } from '@arc/dependencies'
 import { Router } from 'express'
 import { principalOf, requireUser } from '../auth.ts'
 import { HttpError, validate } from '../http.ts'
+import { ChallengeRun } from '../models/ChallengeRun.ts'
 import { Plan } from '../models/Plan.ts'
 import { Program } from '../models/Program.ts'
 import { Profile, toProfileDto, type ProfileShape } from '../models/Profile.ts'
@@ -47,6 +48,7 @@ profilesRouter.delete('/:id', async (req, res) => {
     Session.deleteMany({ profileId: profile._id }),
     Plan.deleteMany({ profileId: profile._id }),
     Program.deleteMany({ profileId: profile._id }),
+    ChallengeRun.deleteMany({ profileId: profile._id }),
     Profile.deleteOne({ _id: profile._id }),
   ])
   res.status(204).end()
