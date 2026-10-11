@@ -1,7 +1,7 @@
 import { BODY_AREAS, EXERCISE_LIST, exercisesIn, generateDemoSessions, MUSCLE_IDS } from '@arc/dependencies'
 import * as Accordion from '@radix-ui/react-accordion'
 import { motion, useReducedMotion, useScroll, useSpring } from 'motion/react'
-import { lazy, Suspense, useEffect, useMemo } from 'react'
+import { lazy, Suspense, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { api } from '../api/client'
 import { APP_NAME, SITE_URL } from '../brand'
@@ -13,8 +13,24 @@ import { useScrollSpy } from '../components/landing/useScrollSpy'
 import { ease, Item, MaskLines, Page, parentVariants, Reveal, riseVariants, RuleDraw } from '../components/motion'
 import { Alert, Strip } from '../components/ui'
 
-// The readouts board (and the chart library under it) loads after the page's first screen.
+// The readouts board (and the chart library under it) loads once a visitor scrolls near it, so the
+// first screen's figure has the connection to itself.
 const DemoBoard = lazy(() => import('../components/landing/DemoBoard').then((m) => ({ default: m.DemoBoard })))
+
+/** Its children, loaded and drawn once the placeholder comes within a screen of the viewport. */
+function NearView({ children, placeholder }: { children: ReactNode; placeholder: ReactNode }) {
+  const ref = useRef<HTMLDivElement>(null)
+  const [near, setNear] = useState(false)
+  useEffect(() => {
+    const el = ref.current
+    if (!el || near) return
+    if (!('IntersectionObserver' in window)) return setNear(true)
+    const io = new IntersectionObserver((entries) => entries.some((e) => e.isIntersecting) && setNear(true), { rootMargin: '100% 0px' })
+    io.observe(el)
+    return () => io.disconnect()
+  }, [near])
+  return <div ref={ref}>{near ? <Suspense fallback={placeholder}>{children}</Suspense> : placeholder}</div>
+}
 
 /*
  * The landing page as a datasheet: a sticky title block whose index is a measuring scale with
@@ -275,9 +291,9 @@ export function LandingPage() {
 
           {/* ---- 03 READOUTS: the app's own charts on random demo data ---- */}
           <Strip id="readouts" index="03" title="Readouts" className="mt-12 scroll-mt-6 sm:mt-16" aside="Eight views · random demo data">
-            <Suspense fallback={<div className="hatch min-h-[820px]" role="status" aria-label="Loading the readouts" />}>
+            <NearView placeholder={<div className="hatch min-h-[820px]" role="status" aria-label="Loading the readouts" />}>
               <DemoBoard />
-            </Suspense>
+            </NearView>
           </Strip>
 
           {/* ---- 04 HOUSEHOLD: ruled rows that slide in ---- */}
