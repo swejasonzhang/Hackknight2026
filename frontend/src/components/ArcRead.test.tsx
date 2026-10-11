@@ -1,4 +1,4 @@
-import type { SessionDto } from '@arc/dependencies'
+import { SESSION_READ_VERSION, type SessionDto } from '@arc/dependencies'
 import { fireEvent, render, screen } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -14,11 +14,19 @@ describe('ArcRead', () => {
   beforeEach(() => summary.mockReset())
 
   it("shows Arc's stored read of the session", () => {
-    render(<ArcRead session={{ ...SESSION, coachSummary: { text: 'Nice work, Ada.', messageId: 'm1', createdAt: 1, offline: true } }} autoSpeak={false} />)
+    render(<ArcRead session={{ ...SESSION, coachSummary: { text: 'Ada, you did 2 sets of bicep curl.', messageId: 'm1', createdAt: 1, offline: true, version: SESSION_READ_VERSION } }} autoSpeak={false} />)
     expect(screen.getByRole('heading', { name: "Arc's read" })).toBeInTheDocument()
-    expect(screen.getByText('Nice work, Ada.')).toBeInTheDocument()
+    expect(screen.getByText('Ada, you did 2 sets of bicep curl.')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /play/i })).toBeInTheDocument()
     expect(summary).not.toHaveBeenCalled()
+  })
+
+  it('reads again a session read the old way, rather than showing the old words', async () => {
+    summary.mockResolvedValue({ id: 'm4', kind: 'session', text: 'Ada, you did 2 sets of bicep curl.', createdAt: 2, offline: true })
+    render(<ArcRead session={{ ...SESSION, coachSummary: { text: 'Nice work, keep going!', messageId: 'm1', createdAt: 1, offline: true } }} autoSpeak={false} />)
+    expect(screen.queryByText('Nice work, keep going!')).toBeNull()
+    expect(await screen.findByText('Ada, you did 2 sets of bicep curl.')).toBeInTheDocument()
+    expect(summary).toHaveBeenCalledWith('s1')
   })
 
   it('asks Arc for a read when there is none yet', async () => {

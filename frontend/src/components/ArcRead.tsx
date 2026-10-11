@@ -1,4 +1,4 @@
-import type { SessionDto } from '@arc/dependencies'
+import { SESSION_READ_VERSION, type SessionDto } from '@arc/dependencies'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { api } from '../api/client'
 import { createSpeaker } from '../voice/speaker'
@@ -12,13 +12,14 @@ interface Read {
 }
 
 /**
- * Arc's plain-English read of a session (Gemini, or Arc's template without it), spoken with
- * ElevenLabs when the server has a key and the browser's voice otherwise. Right after a recording
- * (`autoSpeak`) it asks for the read and speaks it; later it plays on request, or asks Arc for a
- * read the session never had.
+ * Arc's read of a session: a recap of that one session in plain English (Gemini, or Arc's own
+ * recap without it), spoken with ElevenLabs when the server has a key and the browser's voice
+ * otherwise. Right after a recording (`autoSpeak`) it asks for the read and speaks it; later it
+ * plays on request. A session never read, or read the old way, is read when the page opens. The
+ * page keys it by session, so one session's read never shows on another's.
  */
 export function ArcRead({ session, autoSpeak }: { session: SessionDto; autoSpeak: boolean }) {
-  const stored = session.coachSummary
+  const stored = session.coachSummary?.version === SESSION_READ_VERSION ? session.coachSummary : null
   const [read, setRead] = useState<Read | null>(stored ? { id: stored.messageId, text: stored.text, offline: stored.offline } : null)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -41,9 +42,9 @@ export function ArcRead({ session, autoSpeak }: { session: SessionDto; autoSpeak
     }
   }
 
-  // Just recorded: get the read (if it is not there yet) and say it once.
+  // Just recorded, or read the old way: get the read now (and say it once, after a recording).
   useEffect(() => {
-    if (autoSpeak && !read && !busy) void ask()
+    if ((autoSpeak || session.coachSummary) && !read && !busy) void ask()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [autoSpeak])
   useEffect(() => {

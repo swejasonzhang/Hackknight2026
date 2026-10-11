@@ -1,6 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { EXERCISE_IDS } from '@arc/dependencies'
 import { CoachMessage } from '../src/models/CoachMessage.ts'
+import { Profile } from '../src/models/Profile.ts'
+import { Session } from '../src/models/Session.ts'
 import { createProfile, makeSession, service, signup } from './helpers.ts'
 
 const realFetch = globalThis.fetch
@@ -303,6 +305,58 @@ describe('Arc, the coach', () => {
     const prompt = JSON.stringify(JSON.parse(String(calls[0]!.init.body)).contents)
     expect(prompt).toContain('best 126')
     expect(prompt).toContain('best 118')
+  })
+
+  it('reads back that one session in plain English: done against the plan, how far, how it held, what did not count', async () => {
+    const c = await signup()
+    const profileId = await createProfile(c)
+    const session = makeSession(profileId, { startedAt: Date.UTC(2026, 9, 8, 18), peaks: [131, 129, 127, 124], loadKg: 12.5, plan: { sets: 3, reps: 4, restSeconds: 45, targetDeg: 140 } })
+    session.sets[0]!.rejected = [
+      { at: session.sets[0]!.endedAt - 1, fault: 'too_fast' },
+      { at: session.sets[0]!.endedAt, fault: 'upper_arm_moved' },
+      { at: session.sets[0]!.endedAt + 1, fault: 'upper_arm_moved' },
+    ]
+    const saved = await c.post('/api/sessions').send(session)
+    const read = (await c.post(`/api/coach/sessions/${saved.body.id}/summary`)).body
+    expect(read.offline).toBe(true)
+    expect(read.text).toMatch(/^Ada, you did 2 sets of bicep curl on your right side, holding 12\.5 kilos in about \d+ minutes?: 4 and 4 reps, 8 in all\./)
+    expect(read.text).toContain('The plan was 3 sets of 4, so you stopped short of it.')
+    expect(read.text).toMatch(/Your best rep reached 131 degrees, 9 short of your 140 degree goal, and your reps averaged \d+\./)
+    expect(read.text).toContain("3 reps didn't count: 2 because the upper arm moved and 1 because it was too quick.")
+    expect(read.text).toContain('It was your first session of this movement')
+    expect(read.text).toMatch(/Next time, keep your upper arm still\.$/)
+  })
+
+  it('sets aside a Gemini read that is not in English or names none of the session\'s numbers, and keeps goals out of the prompt', async () => {
+    const c = await signup()
+    const profileId = await createProfile(c)
+    await Profile.updateOne({ _id: profileId }, { $set: { intake: { goals: 'Lift my arm overhead again', trainingGoal: 'strength', focus: 'shoulder_abduction', side: 'right', limitations: 'a sore left knee', experience: 'regular', trainingDays: [2, 4], daysPerWeek: 2, heightCm: null, weightKg: null } } })
+    process.env.GEMINI_API_KEY = 'g-secret'
+    const replies = ['¡Buen trabajo! Tu mejor repetición llegó a 120 grados y mantuviste el rango en cada serie.', 'Great energy today, keep chasing those goals and stay consistent every single week!']
+    const calls = stubOutside(() => geminiText(replies.shift()!))
+    for (const day of [1, 8]) {
+      const saved = await c.post('/api/sessions').send(makeSession(profileId, { startedAt: Date.UTC(2026, 9, day, 18) }))
+      const read = (await c.post(`/api/coach/sessions/${saved.body.id}/summary`)).body
+      expect(read.offline).toBe(true)
+      expect(read.text).toMatch(/^Ada, you did 2 sets of bicep curl/)
+    }
+    const prompt = JSON.stringify(JSON.parse(String(calls[0]!.init.body)))
+    expect(prompt).toContain('in English')
+    expect(prompt).toContain('a sore left knee')
+    expect(prompt).not.toContain('Lift my arm overhead again')
+  })
+
+  it('reads again a session read the old way, and keeps the new read', async () => {
+    const c = await signup()
+    const profileId = await createProfile(c)
+    const saved = await c.post('/api/sessions').send(makeSession(profileId))
+    await Session.updateOne({ _id: saved.body.id }, { $set: { coachSummary: { text: 'Nice work, keep going!', messageId: 'old', createdAt: 1, offline: true } } })
+    expect((await c.get(`/api/sessions/${saved.body.id}`)).body.coachSummary).not.toHaveProperty('version')
+    const read = (await c.post(`/api/coach/sessions/${saved.body.id}/summary`)).body
+    expect(read.text).toMatch(/^Ada, you did 2 sets/)
+    const stored = (await c.get(`/api/sessions/${saved.body.id}`)).body.coachSummary
+    expect(stored).toMatchObject({ text: read.text, messageId: read.id, version: 2 })
+    expect((await c.post(`/api/coach/sessions/${saved.body.id}/summary`)).body.id).toBe(read.id)
   })
 
   it('speaks a message with ElevenLabs, only to its owner', async () => {

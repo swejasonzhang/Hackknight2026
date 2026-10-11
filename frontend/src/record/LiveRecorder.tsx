@@ -9,6 +9,7 @@ import { guideFor } from './guide'
 import type { PoseTracker } from './pose'
 import { SessionSaver } from './saver'
 import { SessionRecorder, type RecorderView } from './recorder'
+import { SteadyPose } from './steady'
 import { COMMAND_LABEL, isForArc, parseCommand } from '../voice/commands'
 import { createListener, type Listener, type ListenerState } from '../voice/listener'
 import { createSpeaker, type Speaker, type SpokenLine } from '../voice/speaker'
@@ -343,6 +344,9 @@ export function LiveRecorder({ profileId, config, simulate = false, below, figur
       let lastVideoTime = -1
       let lastKey = ''
       let setsRead = 0
+      // Every landmark steadied before it is read or drawn, and the side read kept until the other is clearly better.
+      const steady = new SteadyPose()
+      let side: Side | undefined
       const frame = () => {
         if (cancelled) return
         raf = requestAnimationFrame(frame)
@@ -355,9 +359,10 @@ export function LiveRecorder({ profileId, config, simulate = false, below, figur
         }
         const now = performance.now()
         const videoAspect = !simulate && video?.videoWidth ? video.videoWidth / video.videoHeight : 16 / 9
-        const landmarks = tracker.detect(video!, now)
-        const reading = readJoint(landmarks, config.exercise, config.side, videoAspect)
-        const next = recorder.feed({ tracked: reading.tracked, metricDeg: reading.metricDeg, tMs: performance.timeOrigin + now, pose: landmarks, aspect: videoAspect })
+        const pose = steady.feed(tracker.detect(video!, now), now)
+        const reading = readJoint(pose?.landmarks, config.exercise, config.side, videoAspect, pose?.world, side)
+        side = reading.side
+        const next = recorder.feed({ tracked: reading.tracked, metricDeg: reading.metricDeg, tMs: performance.timeOrigin + now, pose: pose?.landmarks, aspect: videoAspect })
         if (canvasRef.current) draw(canvasRef.current, videoAspect, reading, { exercise: config.exercise, repPhase: next.repPhase, metricDeg: next.metricDeg, goalDeg: config.plan.targetDeg, live: next.phase === 'active' && !next.paused })
         // Re-render only when something on screen changes.
         const key = `${next.phase}|${next.setNumber}|${next.repsInSet}|${next.totalReps}|${Math.round(next.metricDeg ?? -1)}|${Math.ceil(next.restLeftMs / 1000)}|${next.tracked}|${Math.round(next.bestDeg ?? -1)}`

@@ -495,52 +495,102 @@ export interface SessionSummaryContext {
   intake?: CoachIntake | null
 }
 
-function sessionSummaryTemplate({ name, session, history }: SessionSummaryContext): string {
-  const best = Math.round(session.summary.bestPeakDeg)
-  const sets = session.sets.length
-  const parts = [`Nice work, ${firstName(name)}. You did ${plural(sets, 'set')} of ${lower(session.exercise)}, ${plural(session.summary.totalReps, 'rep')}, and your best rep reached ${best} degrees.`]
-  const prev = history.at(-1)
-  const first = history[0]
-  if (prev) {
-    const delta = best - Math.round(prev.summary.bestPeakDeg)
-    const vsPrev = delta > 0 ? `That's ${delta} more than last time` : delta < 0 ? `That's ${-delta} less than last time, which happens on a tired day` : "That's the same as last time"
-    const vsFirst = first && history.length >= 2 ? `, and ${best - Math.round(first.summary.bestPeakDeg)} more than your first session` : ''
-    parts.push(`${vsPrev}${vsFirst}.`)
-  } else {
-    parts.push('This is your first one, so it sets the baseline.')
+/** Kilograms as spoken: "12.5 kilos", "1 kilo". */
+const kilos = (kg: number) => `${Number.isInteger(kg) ? kg : kg.toFixed(1)} ${kg === 1 ? 'kilo' : 'kilos'}`
+
+/** The numbers of one session, as Arc reads it back: what was done, how far, how it held, what did not count. */
+function recapFacts(s: SessionDto) {
+  const cfg = EXERCISES[s.exercise]
+  const perSet = s.sets.map((set) => set.reps.length)
+  const rejected = s.sets.flatMap((set) => set.rejected ?? [])
+  const faults = new Map<FormFault, number>()
+  for (const r of rejected) faults.set(r.fault, (faults.get(r.fault) ?? 0) + 1)
+  return {
+    cfg,
+    best: Math.round(s.summary.bestPeakDeg),
+    mean: Math.round(s.summary.meanPeakDeg),
+    target: s.plan.targetDeg,
+    perSet,
+    total: s.summary.totalReps,
+    minutes: Math.max(1, Math.round((s.endedAt - s.startedAt) / 60_000)),
+    /** The largest range lost within a set, in degrees. */
+    drop: Math.round(Math.max(0, ...s.sets.map((set) => set.fatigue.romDropDeg))),
+    fatigue: s.summary.fatigueIndex,
+    rejected: rejected.length,
+    /** The faults, most frequent first. */
+    faults: [...faults.entries()].sort((a, b) => b[1] - a[1]),
+    endedEarly: s.sets.some((set) => set.endedEarly) || perSet.length < s.plan.sets,
   }
-  const target = session.plan.targetDeg
-  parts.push(best >= target ? `You've reached your ${target} degree goal.` : `You're ${target - best} degrees from your ${target} degree goal.`)
-  const fatigue = session.summary.fatigueIndex
+}
+
+/** Arc's read of a session when Gemini is off: this one session in plain English, from its own numbers. */
+function sessionSummaryTemplate({ name, session: s, history }: SessionSummaryContext): string {
+  const f = recapFacts(s)
+  const side = f.cfg.sided ? ` on your ${s.side} side` : ''
+  const load = s.loadKg ? `, holding ${kilos(s.loadKg)}` : ''
+  const reps = f.perSet.length > 1 ? `${listOf(f.perSet.map(String))} reps, ${f.total} in all` : plural(f.total, 'rep')
+  const parts = [`${firstName(name)}, you did ${plural(f.perSet.length, 'set')} of ${lower(s.exercise)}${side}${load} in about ${plural(f.minutes, 'minute')}: ${reps}.`]
+  if (f.endedEarly) parts.push(`The plan was ${plural(s.plan.sets, 'set')} of ${s.plan.reps}, so you stopped short of it.`)
+  parts.push(`Your best rep reached ${f.best} degrees, ${f.best >= f.target ? `your ${f.target} degree goal` : `${f.target - f.best} short of your ${f.target} degree goal`}, and your reps averaged ${f.mean}.`)
+  parts.push(f.fatigue >= 0.25 ? `Your range faded within the sets, by up to ${f.drop} degrees.` : f.fatigue >= 0.12 ? `Your range slipped a little toward the end of your sets, by up to ${f.drop} degrees.` : 'Your range held steady through every set.')
+  const because = (fault: FormFault) => (fault === 'too_fast' ? 'it was too quick' : FAULT_WORDS[fault])
   parts.push(
-    fatigue >= 0.25
-      ? 'Your range faded late in the sets, so next time take a longer rest or one rep fewer per set.'
-      : fatigue >= 0.12
-        ? 'Range slipped a little toward the end of your sets; slow the last reps down next time.'
-        : 'Your range held steady across every set, so next time try one more rep per set.',
+    !f.rejected
+      ? 'Every rep you finished counted.'
+      : f.faults.length === 1
+        ? `${plural(f.rejected, 'rep')} didn't count because ${because(f.faults[0]![0])}.`
+        : `${plural(f.rejected, 'rep')} didn't count: ${listOf(f.faults.map(([fault, n]) => `${n} because ${because(fault)}`))}.`,
   )
+  const prev = history.at(-1)
+  if (prev) {
+    const before = Math.round(prev.summary.bestPeakDeg)
+    const delta = f.best - before
+    parts.push(`Last time your best was ${before}, so that's ${delta > 0 ? `${delta} more` : delta < 0 ? `${-delta} less` : 'the same'}.`)
+  } else parts.push('It was your first session of this movement, so it sets the baseline.')
+  const next = f.faults.length ? FAULT_FIX[f.faults[0]![0]] : f.fatigue >= 0.25 ? 'rest a little longer or do one rep fewer per set' : f.best < f.target ? 'take every rep a little deeper' : 'try one more rep per set'
+  parts.push(`Next time, ${next}.`)
   return parts.join(' ')
 }
 
+/** Words any English recap of a session is full of, and other languages' rarely are. */
+const ENGLISH = new Set('the you your and of to in was were is are that it on with for this set sets rep reps degrees degree time next last best did held goal than more less same each every'.split(' '))
+
+/** Whether Gemini's read is a read of this session: in English, the size of a spoken recap, and naming its numbers. */
+function readsThisSession(text: string, s: SessionDto): boolean {
+  const words = text.toLowerCase().split(/[^\p{L}\p{N}']+/u).filter(Boolean)
+  const english = words.filter((w) => ENGLISH.has(w)).length
+  if (words.length < 8 || english / words.length < 0.2 || text.length > 1200) return false
+  const numbers = new Set(text.match(/\d+/g) ?? [])
+  return numbers.has(String(Math.round(s.summary.bestPeakDeg))) || numbers.has(String(s.summary.totalReps))
+}
+
+/**
+ * Arc's read of a session just finished: a recap of that one session in plain English, spoken.
+ * Gemini words it from the session's own numbers when it is configured; a reply that is not in
+ * English or names none of the session's numbers is set aside for Arc's own recap.
+ */
 export async function sessionSummary(c: SessionSummaryContext): Promise<{ text: string; offline: boolean }> {
   const template = sessionSummaryTemplate(c)
   if (!geminiConfigured()) return { text: template, offline: true }
   const s = c.session
-  const fmt = (x: SessionDto) => `${new Date(x.startedAt).toISOString().slice(0, 10)}: best ${Math.round(x.summary.bestPeakDeg)}°, mean ${Math.round(x.summary.meanPeakDeg)}°, ${x.summary.totalReps} reps, fatigue ${Math.round(x.summary.fatigueIndex * 100)}/100`
+  const f = recapFacts(s)
+  const fmt = (x: SessionDto) => `${new Date(x.startedAt).toISOString().slice(0, 10)}: best ${Math.round(x.summary.bestPeakDeg)}°, mean ${Math.round(x.summary.meanPeakDeg)}°, ${x.summary.totalReps} reps`
   const context = [
-    `Member: ${firstName(c.name)}${c.intake ? `; goals: ${c.intake.goals}; limits: ${c.intake.limitations}; experience: ${c.intake.experience}` : ''}`,
-    `Exercise: ${EXERCISES[s.exercise].name}, ${s.side} side; goal ${s.plan.targetDeg} degrees; plan ${s.plan.sets} x ${s.plan.reps}, ${s.plan.restSeconds} s rest`,
-    `This session: ${fmt(s)}`,
-    ...s.sets.map((set) => `  Set ${set.setNumber}: ${set.reps.length} reps, peaks ${set.reps.map((r) => Math.round(r.peakDeg)).join(', ')}°, range drop ${Math.round(set.fatigue.romDropDeg)}°, tempo drift ${Math.round(set.fatigue.tempoDrift * 100)}%, fatigue ${Math.round(set.fatigue.index * 100)}/100${set.endedEarly ? ', ended early' : ''}`),
-    c.history.length ? `Earlier sessions of this movement (oldest first):\n${c.history.slice(-6).map((h) => `  ${fmt(h)}`).join('\n')}${c.history.length > 6 ? `\n  (first ever: ${fmt(c.history[0]!)})` : ''}` : 'No earlier sessions of this movement.',
+    `Member: ${firstName(c.name)}${c.intake?.limitations ? `; limits to respect in the next step (do not mention them otherwise): ${c.intake.limitations}` : ''}`,
+    `Movement: ${f.cfg.name}${f.cfg.sided ? `, ${s.side} side` : ''}; goal ${f.target} degrees; planned ${s.plan.sets} sets of ${s.plan.reps}, ${s.plan.restSeconds} s rest${s.loadKg ? `; weight held ${kilos(s.loadKg)}` : ''}`,
+    `This session: ${new Date(s.startedAt).toISOString().slice(0, 10)}, about ${plural(f.minutes, 'minute')}; ${plural(f.perSet.length, 'set')} done${f.endedEarly ? ' (stopped short of the plan)' : ''}; ${f.total} reps counted; best ${f.best}°, mean ${f.mean}°`,
+    ...s.sets.map((set) => `  Set ${set.setNumber}: ${set.reps.length} reps, peaks ${set.reps.map((r) => Math.round(r.peakDeg)).join(', ')}°, range lost within the set ${Math.round(set.fatigue.romDropDeg)}°${set.endedEarly ? ', ended early' : ''}${set.rejected?.length ? `; ${plural(set.rejected.length, 'rep')} not counted (${set.rejected.map((r) => FAULT_WORDS[r.fault]).join(', ')})` : ''}`),
+    f.rejected ? `Reps not counted in all: ${f.rejected}` : 'Every finished rep counted.',
+    c.history.length ? `The previous session of this movement: ${fmt(c.history.at(-1)!)}${c.history.length >= 2 ? `; the first: ${fmt(c.history[0]!)}` : ''}` : 'This was the first session of this movement.',
   ].join('\n')
   try {
     const text = await generate({
-      system: `${PERSONA}\n\nThe member just finished a session. In three to five short spoken sentences, say what went well with a number, compare with their last session and their first one when you have them, name what needs work, and end with one concrete next step. If the latest set's fatigue is above 40, suggest backing off (fewer reps, longer rest); if fatigue stayed below 15 in every set with steady range, tell them they handled it easily and suggest one more rep per set or a higher goal.`,
+      system: `${PERSONA}\n\nWrite Arc's read of the session the member just finished: a recap of this one session, in English, in four to six short spoken sentences. Say what was done (the movement, the sets and reps against the plan, the time, the weight when there is one), how far the reps went against the goal, how the range held through the sets, and which reps did not count and why. Compare with the previous session in one short clause when there is one. End with one concrete next step that follows from these numbers. Talk only about this session: not the member's goals, their week or other movements, and no general motivation. Use only the numbers given and the differences between them; never make one up.`,
       turns: [{ role: 'user', text: context }],
-      maxOutputTokens: 320,
+      maxOutputTokens: 360,
     })
-    return { text: text.slice(0, 1500), offline: false }
+    const read = text.trim()
+    return readsThisSession(read, s) ? { text: read.slice(0, 1500), offline: false } : { text: template, offline: true }
   } catch {
     return { text: template, offline: true }
   }
