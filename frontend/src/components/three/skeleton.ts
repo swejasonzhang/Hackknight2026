@@ -1,18 +1,23 @@
 import { EXERCISE_IDS, EXERCISES, LM, type ExerciseId } from '@arc/dependencies'
+import { BODY_META } from './body/bodyMeta'
 
 /**
- * A whole human body for each exercise, as joints in 3D: an adult of 170 cm in units of 27 cm
- * (6.3 units tall), with limb lengths and joint heights from standard anthropometric ratios
- * (shoulder at 0.82 of height, hip joint at 0.52, knee at 0.28; upper arm 0.19, forearm 0.15,
- * hand 0.11, thigh 0.245, shin 0.245, foot 0.15). +Y is up, the floor is y = 0, and the camera
- * looks down −Z. Each of the fifteen movements poses the body from the reading: the limb (or, for
- * squats, lunges, deadlifts and crunches, the whole body) moves so the tracked joint shows exactly
- * that angle, and the rest holds a natural pose. The tracked landmarks the pose tracker follows
- * are joints of this body, so the overlay (rings, segments, the goniometer arc) sits exactly on
- * it, and the development simulator reads its landmarks from the same pose. Pure maths, tested
- * without WebGL; the scene turns joints into sculpted parts.
+ * A whole human body for each exercise, as joints in 3D. The proportions are the body's own:
+ * MakeHuman's young adults (`body/bake.mjs`), female, male, or between the two for a profile that
+ * has not said, in units of 27 cm, so every joint sits where the mesh bends. +Y is up, the floor
+ * is y = 0, and the camera looks down −Z. Each of the fifteen movements poses the body from the
+ * reading: the limb (or, for squats, lunges, deadlifts and crunches, the whole body) moves so the
+ * tracked joint shows exactly that angle, and the rest holds a natural pose. The tracked landmarks
+ * the pose tracker follows are joints of this body, so the overlay (rings, segments, the
+ * goniometer arc) sits exactly on it, and the development simulator reads its landmarks from the
+ * same pose. Pure maths, tested without WebGL; the scene skins the body onto these joints.
  */
 export type V3 = [number, number, number]
+type V2 = [number, number]
+
+/** Which body: one of the two sexes, or between them. */
+export type FigureKey = 'neutral' | 'female' | 'male'
+export const FIGURE_KEYS: readonly FigureKey[] = ['neutral', 'female', 'male']
 
 export const JOINT_NAMES = [
   'pelvis',
@@ -35,6 +40,8 @@ export const JOINT_NAMES = [
   'lAnkle',
   'rToe',
   'lToe',
+  'rClavicle',
+  'lClavicle',
 ] as const
 export type JointName = (typeof JOINT_NAMES)[number]
 
@@ -46,7 +53,7 @@ export interface Bone {
   to: JointName
 }
 
-/** Every body part as a bone between two joints. */
+/** Every body part as a bone between two joints. The hand's runs from the wrist to the middle knuckle. */
 export const BONES: Bone[] = [
   { name: 'pelvis', from: 'rHip', to: 'lHip' },
   { name: 'torso', from: 'pelvis', to: 'neck' },
@@ -66,18 +73,82 @@ export const BONES: Bone[] = [
   { name: 'lFoot', from: 'lAnkle', to: 'lToe' },
 ]
 
-/** Adult proportions in body units. */
-export const LIMB = { upperArm: 1.1, forearm: 1.0, hand: 0.68, thigh: 1.6, shin: 1.5 }
-const SHOULDER_HALF = 0.68
-const HIP_HALF = 0.33
-const HIP_Y = 3.35
-/** The ankle joint's height when the foot is flat on the floor. */
-const ANKLE_Y = HIP_Y - LIMB.thigh - LIMB.shin
-/** The foot from the ankle to the toes, in the frame of a shin hanging straight down. */
-const FOOT: [number, number] = [0.72, -0.2]
-
-type V2 = [number, number]
 type Joints = Record<JointName, V3>
+type BakedJoint = keyof (typeof BODY_META.joints)['female']
+
+/** Each figure's joints standing in the bind pose, as the mesh was made; the neutral figure is the mean of the two. */
+export function bindJoints(figure: FigureKey): Record<BakedJoint, V3> {
+  const { female, male } = BODY_META.joints
+  const pick = (name: BakedJoint): V3 => {
+    const f = female[name]
+    const m = male[name]
+    if (figure === 'female') return [f[0], f[1], f[2]]
+    if (figure === 'male') return [m[0], m[1], m[2]]
+    return [(f[0] + m[0]) / 2, (f[1] + m[1]) / 2, (f[2] + m[2]) / 2]
+  }
+  return Object.fromEntries((Object.keys(female) as BakedJoint[]).map((n) => [n, pick(n)])) as Record<BakedJoint, V3>
+}
+
+/** A figure's proportions, read off its bind pose. */
+export interface Proportions {
+  /** Shoulder to elbow, elbow to wrist, wrist to the middle knuckle, hip to knee, knee to ankle. */
+  limb: { upperArm: number; forearm: number; hand: number; thigh: number; shin: number }
+  shoulderHalf: number
+  hipHalf: number
+  clavicleHalf: number
+  /** The hip joints' height standing. */
+  hipY: number
+  /** Points of the trunk from the hip joints' midpoint: [toward the front, up the trunk]. */
+  trunk: Record<'pelvis' | 'neck' | 'headBase' | 'headTop' | 'shoulder' | 'clavicle', V2>
+  /** The foot from the ankle to the toes in the frame of a shin hanging straight down: [forward, up]. */
+  foot: V2
+  /** The hips' height lying flat with the back on the floor, the thigh's depth under its bone sitting, the ankle's height standing. */
+  room: { lying: number; seat: number; ankle: number }
+}
+
+const sub3 = (a: V3, b: V3): V3 => [a[0] - b[0], a[1] - b[1], a[2] - b[2]]
+const dot3 = (a: V3, b: V3) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2]
+const len3 = (a: V3) => Math.hypot(a[0], a[1], a[2])
+
+function proportionsOf(figure: FigureKey): Proportions {
+  const j = bindJoints(figure)
+  const both = (r: [BakedJoint, BakedJoint], l: [BakedJoint, BakedJoint]) => (len3(sub3(j[r[1]], j[r[0]])) + len3(sub3(j[l[1]], j[l[0]]))) / 2
+  const hipY = (j.rHip[1] + j.lHip[1]) / 2
+  const mid = (a: V3, b: V3): V3 => [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2, (a[2] + b[2]) / 2]
+  const trunkPoint = (p: V3): V2 => [p[2], p[1] - hipY]
+  // The foot in the shin's frame: along the shin (down) and square to it toward the front.
+  const shin = sub3(j.rAnkle, j.rKnee)
+  const down: V3 = [shin[0] / len3(shin), shin[1] / len3(shin), shin[2] / len3(shin)]
+  const forward = sub3([0, 0, 1], [down[0] * down[2], down[1] * down[2], down[2] * down[2]])
+  const fl = len3(forward)
+  const toe = sub3(j.rToe, j.rAnkle)
+  const room = figure === 'neutral' ? { lying: Math.max(BODY_META.room.female.lying, BODY_META.room.male.lying), seat: (BODY_META.room.female.seat + BODY_META.room.male.seat) / 2 } : BODY_META.room[figure]
+  return {
+    limb: {
+      upperArm: both(['rShoulder', 'rElbow'], ['lShoulder', 'lElbow']),
+      forearm: both(['rElbow', 'rWrist'], ['lElbow', 'lWrist']),
+      hand: both(['rWrist', 'rFingertip'], ['lWrist', 'lFingertip']),
+      thigh: both(['rHip', 'rKnee'], ['lHip', 'lKnee']),
+      shin: both(['rKnee', 'rAnkle'], ['lKnee', 'lAnkle']),
+    },
+    shoulderHalf: (j.lShoulder[0] - j.rShoulder[0]) / 2,
+    hipHalf: (j.lHip[0] - j.rHip[0]) / 2,
+    clavicleHalf: (j.lClavicle[0] - j.rClavicle[0]) / 2,
+    hipY,
+    trunk: {
+      pelvis: trunkPoint(j.pelvis),
+      neck: trunkPoint(j.neck),
+      headBase: trunkPoint(j.headBase),
+      headTop: trunkPoint(j.headTop),
+      shoulder: trunkPoint(mid(j.rShoulder, j.lShoulder)),
+      clavicle: trunkPoint(mid(j.rClavicle, j.lClavicle)),
+    },
+    foot: [dot3(toe, forward) / fl, -dot3(toe, down)],
+    room: { lying: room.lying + 0.02, seat: room.seat, ankle: (j.rAnkle[1] + j.lAnkle[1]) / 2 + 0.02 },
+  }
+}
+
+export const PROPORTIONS = Object.fromEntries(FIGURE_KEYS.map((f) => [f, proportionsOf(f)])) as Record<FigureKey, Proportions>
 
 export interface Overlay {
   /** The three tracked landmarks, proximal to distal, in the XY plane of the movement. */
@@ -107,6 +178,8 @@ export interface Skeleton {
   overlay: Overlay
   /** The stool for the seated exercise. */
   seat?: { top: number; x: [number, number]; z: [number, number] }
+  /** Which way the pelvis points up the body when it stays put while the trunk moves (lying for a crunch). */
+  pelvisUp?: V3
 }
 
 const rad = (d: number) => (d * Math.PI) / 180
@@ -128,107 +201,9 @@ const wrap = (d: number) => {
   return r > 180 ? r - 360 : r
 }
 const lerp = (a: number, b: number, t: number) => a + (b - a) * t
-
-/** An arm hanging from `shoulder`: upper arm at `upperDeg`, forearm and hand at `foreDeg`. */
-function arm(shoulder: V3, upperDeg: number, foreDeg: number, handDeg = foreDeg, zs: [number, number, number] = [shoulder[2], shoulder[2], shoulder[2]]): [V3, V3, V3] {
-  const elbow = at(shoulder, upperDeg, LIMB.upperArm, zs[0])
-  const wrist = at(elbow, foreDeg, LIMB.forearm, zs[1])
-  const tip = at(wrist, handDeg, LIMB.hand, zs[2])
-  return [elbow, wrist, tip]
-}
-
-/** An arm in 3D: unit directions for the upper arm and for the forearm and hand. */
-function arm3(shoulder: V3, upper: V3, fore: V3): [V3, V3, V3] {
-  const go = (p: V3, d: V3, l: number): V3 => [p[0] + d[0] * l, p[1] + d[1] * l, p[2] + d[2] * l]
-  const elbow = go(shoulder, upper, LIMB.upperArm)
-  const wrist = go(elbow, fore, LIMB.forearm)
-  return [elbow, wrist, go(wrist, fore, LIMB.hand)]
-}
 const unit = (v: V3): V3 => {
   const l = Math.hypot(v[0], v[1], v[2])
   return [v[0] / l, v[1] / l, v[2] / l]
-}
-
-/** A leg from `hip`: thigh at `thighDeg`, shin at `shinDeg`, the foot square to the shin. */
-function leg(hip: V3, thighDeg: number, shinDeg: number, toeZ = hip[2]): [V3, V3, V3] {
-  const knee = at(hip, thighDeg, LIMB.thigh)
-  const ankle = at(knee, shinDeg, LIMB.shin)
-  const [fx, fy] = turn(FOOT, shinDeg + 90)
-  return [knee, ankle, [ankle[0] + fx, ankle[1] + fy, toeZ]]
-}
-
-/** A foot flat on the floor at `ankle`, toes forward (+X). */
-const toeOf = (ankle: V3): V3 => [ankle[0] + FOOT[0], ankle[1] + FOOT[1], ankle[2]]
-
-/**
- * The knee of a leg from `hip` to `ankle`, bending forward (toward +X): the two-link solution
- * with thigh and shin at their own lengths.
- */
-function kneeBetween(hip: V3, ankle: V3): V3 {
-  const d = Math.min(LIMB.thigh + LIMB.shin - 1e-9, Math.hypot(ankle[0] - hip[0], ankle[1] - hip[1]))
-  const toAnkle = angleOf(xy(hip), xy(ankle))
-  const spread = deg(Math.acos((LIMB.thigh ** 2 + d ** 2 - LIMB.shin ** 2) / (2 * LIMB.thigh * d)))
-  const a = at(hip, toAnkle + spread, LIMB.thigh)
-  const b = at(hip, toAnkle - spread, LIMB.thigh)
-  return a[0] >= b[0] ? a : b
-}
-
-/** Standing legs, side on: both feet flat under the hips. */
-function standingLegs(): Pick<Joints, 'rHip' | 'lHip' | 'rKnee' | 'lKnee' | 'rAnkle' | 'lAnkle' | 'rToe' | 'lToe'> {
-  const rHip: V3 = [0, HIP_Y, HIP_HALF]
-  const lHip: V3 = [0, HIP_Y, -HIP_HALF]
-  const [rKnee, rAnkle, rToe] = leg(rHip, -90, -90)
-  const [lKnee, lAnkle, lToe] = leg(lHip, -90, -90)
-  return { rHip, lHip, rKnee, lKnee, rAnkle, lAnkle, rToe, lToe }
-}
-
-/** Standing legs, face on: the feet point at the camera. */
-function frontLegs(): Pick<Joints, 'rHip' | 'lHip' | 'rKnee' | 'lKnee' | 'rAnkle' | 'lAnkle' | 'rToe' | 'lToe'> {
-  const rHip: V3 = [-HIP_HALF, HIP_Y, 0]
-  const lHip: V3 = [HIP_HALF, HIP_Y, 0]
-  const foot = (hip: V3): [V3, V3, V3] => {
-    const knee = at(hip, -90, LIMB.thigh)
-    const ankle = at(knee, -90, LIMB.shin)
-    return [knee, ankle, [ankle[0] + Math.sign(hip[0]) * 0.04, ankle[1] + FOOT[1], ankle[2] + FOOT[0]]]
-  }
-  const [rKnee, rAnkle, rToe] = foot(rHip)
-  const [lKnee, lAnkle, lToe] = foot(lHip)
-  return { rHip, lHip, rKnee, lKnee, rAnkle, lAnkle, rToe, lToe }
-}
-
-type TrunkJoints = Pick<Joints, 'pelvis' | 'neck' | 'headBase' | 'headTop' | 'rShoulder' | 'lShoulder'>
-
-/**
- * The trunk and head as one rigid piece pivoting at the hip centre `hip`, pointing `trunkDeg`
- * (90 is upright; side on, less leans forward). Face on, the shoulders sit across the trunk.
- */
-function trunk(view: 'side' | 'front', hip: V2, trunkDeg: number): TrunkJoints {
-  const put = (p: V2, z = 0): V3 => {
-    const [x, y] = turn(p, trunkDeg - 90)
-    return [hip[0] + x, hip[1] + y, z]
-  }
-  const lean = view === 'side' ? 1 : 0 // the head sits a little forward, seen side on
-  return {
-    pelvis: put([0, 0.15]),
-    neck: put([0.02 * lean, 1.9]),
-    headBase: put([0.04 * lean, 2.13]),
-    headTop: put([0.06 * lean, 2.95]),
-    rShoulder: view === 'side' ? put([0, 1.8], SHOULDER_HALF) : put([-SHOULDER_HALF, 1.8]),
-    lShoulder: view === 'side' ? put([0, 1.8], -SHOULDER_HALF) : put([SHOULDER_HALF, 1.8]),
-  }
-}
-
-/** What a movement's pose function returns; `skeletonFor` adds the goniometer's directions. */
-interface Pose {
-  joints: Joints
-  view: 'side' | 'front'
-  track: [JointName, JointName, JointName]
-  labels: [string, string, string]
-  z: number
-  reach: number
-  /** A reference point instead of the first tracked joint (the trunk line, the level). */
-  base?: V2
-  seat?: Skeleton['seat']
 }
 
 /** The value of `t` in [lo, hi] at which `f(t)` (monotonic) equals `target`, by bisection. */
@@ -248,224 +223,340 @@ const innerAt = (a: V2, b: V2, c: V2) => {
   return deg(Math.acos(Math.max(-1, Math.min(1, cos))))
 }
 
-const ARM_RING: Pick<Pose, 'labels' | 'z' | 'reach'> = { labels: ['shoulder', 'elbow', 'wrist'], z: SHOULDER_HALF + 0.42, reach: LIMB.forearm }
-
-/** Side on, standing, the right arm doing the work at the elbow; the forearm points `foreDeg`. */
-function sideElbow(foreDeg: number): Pose {
-  const t = trunk('side', [0, HIP_Y], 90)
-  const [rElbow, rWrist, rFingertip] = arm(t.rShoulder, -90, foreDeg)
-  const [lElbow, lWrist, lFingertip] = arm(t.lShoulder, -90, -80)
-  return { joints: { ...t, ...standingLegs(), rElbow, lElbow, rWrist, lWrist, rFingertip, lFingertip }, view: 'side', track: ['rShoulder', 'rElbow', 'rWrist'], ...ARM_RING }
+/** What a movement's pose function returns; `skeletonFor` adds the goniometer's directions. */
+interface Pose {
+  joints: Joints
+  view: 'side' | 'front'
+  track: [JointName, JointName, JointName]
+  labels: [string, string, string]
+  z: number
+  reach: number
+  /** A reference point instead of the first tracked joint (the trunk line, the level). */
+  base?: V2
+  seat?: Skeleton['seat']
+  pelvisUp?: V3
 }
 
-/** Face on, both arms working at the shoulders: upper arm `inner` degrees from the trunk, forearm `foreDeg`. */
-function frontShoulders(inner: number, foreDeg: number, both: boolean): Pose {
-  const t = trunk('front', [0, HIP_Y], 90)
-  const [rElbow, rWrist, rFingertip] = arm(t.rShoulder, -90 - inner, foreDeg)
-  const [lElbow, lWrist, lFingertip] = both ? arm(t.lShoulder, -90 + inner, 180 - foreDeg) : arm(t.lShoulder, -84, -86)
-  return {
-    joints: { ...t, ...frontLegs(), rElbow, lElbow, rWrist, lWrist, rFingertip, lFingertip },
-    view: 'front',
-    track: ['rHip', 'rShoulder', 'rElbow'],
-    labels: ['hip', 'shoulder', 'elbow'],
-    // The goniometer's fixed arm runs down the side of the trunk from the shoulder to hip level.
-    base: [t.rShoulder[0], HIP_Y],
-    z: 0.62,
-    reach: LIMB.upperArm,
+type TrunkJoints = Pick<Joints, 'pelvis' | 'neck' | 'headBase' | 'headTop' | 'rShoulder' | 'lShoulder' | 'rClavicle' | 'lClavicle'>
+type LegJoints = Pick<Joints, 'rHip' | 'lHip' | 'rKnee' | 'lKnee' | 'rAnkle' | 'lAnkle' | 'rToe' | 'lToe'>
+
+/** Every movement's pose function for one figure's proportions. */
+function posesFor(P: Proportions): Record<ExerciseId, (m: number) => Pose> {
+  const { upperArm, forearm, hand, thigh, shin } = P.limb
+  /** The ankle joint's height when the legs stand straight and the feet are flat. */
+  const ankleY = P.hipY - thigh - shin
+  // The movements' own distances (where a lunge's feet land, the stool) were set for a leg of 3.1 units.
+  const legK = (thigh + shin) / 3.1
+  const armK = (upperArm + forearm) / 2.1
+  /** How far the shoulders sit in front of the hips' line, as an angle up the trunk. */
+  const shoulderLean = deg(Math.atan2(P.trunk.shoulder[0], P.trunk.shoulder[1]))
+
+  /** An arm hanging from `shoulder`: upper arm at `upperDeg`, forearm and hand at `foreDeg`. */
+  function arm(shoulder: V3, upperDeg: number, foreDeg: number, handDeg = foreDeg, zs: [number, number, number] = [shoulder[2], shoulder[2], shoulder[2]]): [V3, V3, V3] {
+    const elbow = at(shoulder, upperDeg, upperArm, zs[0])
+    const wrist = at(elbow, foreDeg, forearm, zs[1])
+    const tip = at(wrist, handDeg, hand, zs[2])
+    return [elbow, wrist, tip]
   }
-}
 
-/** Side on, both feet planted: the knee bends `knee` degrees, the shin leans `shinLean`, the trunk points `trunkDeg`. */
-function plantedLegs(knee: number, shinLean: number): Pick<Joints, 'rHip' | 'lHip' | 'rKnee' | 'lKnee' | 'rAnkle' | 'lAnkle' | 'rToe' | 'lToe'> & { hip: V2; thighDown: number } {
-  const shin = 90 - shinLean
-  const thighUp = shin + knee // from the knee to the hip
-  const ankle: V2 = [0, ANKLE_Y]
-  const kneeXY: V2 = [ankle[0] + Math.cos(rad(shin)) * LIMB.shin, ankle[1] + Math.sin(rad(shin)) * LIMB.shin]
-  const hip: V2 = [kneeXY[0] + Math.cos(rad(thighUp)) * LIMB.thigh, kneeXY[1] + Math.sin(rad(thighUp)) * LIMB.thigh]
-  const side = (z: number) => {
-    const a: V3 = [ankle[0], ankle[1], z]
-    return { hip: [hip[0], hip[1], z] as V3, knee: [kneeXY[0], kneeXY[1], z] as V3, ankle: a, toe: toeOf(a) }
+  /** An arm in 3D: unit directions for the upper arm and for the forearm and hand. */
+  function arm3(shoulder: V3, up: V3, fore: V3): [V3, V3, V3] {
+    const go = (p: V3, d: V3, l: number): V3 => [p[0] + d[0] * l, p[1] + d[1] * l, p[2] + d[2] * l]
+    const elbow = go(shoulder, up, upperArm)
+    const wrist = go(elbow, fore, forearm)
+    return [elbow, wrist, go(wrist, fore, hand)]
   }
-  const r = side(HIP_HALF)
-  const l = side(-HIP_HALF)
-  return { rHip: r.hip, lHip: l.hip, rKnee: r.knee, lKnee: l.knee, rAnkle: r.ankle, lAnkle: l.ankle, rToe: r.toe, lToe: l.toe, hip, thighDown: thighUp + 180 }
-}
 
-const LEG_RING: Pick<Pose, 'labels' | 'z' | 'reach'> = { labels: ['hip', 'knee', 'ankle'], z: HIP_HALF + 0.55, reach: LIMB.shin }
+  /** A leg from `hip`: thigh at `thighDeg`, shin at `shinDeg`, the foot square to the shin. */
+  function leg(hip: V3, thighDeg: number, shinDeg: number, toeZ = hip[2]): [V3, V3, V3] {
+    const knee = at(hip, thighDeg, thigh)
+    const ankle = at(knee, shinDeg, shin)
+    const [fx, fy] = turn(P.foot, shinDeg + 90)
+    return [knee, ankle, [ankle[0] + fx, ankle[1] + fy, toeZ]]
+  }
 
-// ---- the lunge: the hip lowers between a planted front foot and a planted back foot ----
-const LUNGE_FRONT: V3 = [1.1, ANKLE_Y, HIP_HALF]
-const LUNGE_BACK: V3 = [-2.0, ANKLE_Y, -HIP_HALF]
-const LUNGE_HIP_X = -0.45
-function lungeAt(hipY: number) {
-  const rHip: V3 = [LUNGE_HIP_X, hipY, HIP_HALF]
-  const lHip: V3 = [LUNGE_HIP_X, hipY, -HIP_HALF]
-  const rKnee = kneeBetween(rHip, LUNGE_FRONT)
-  const lKnee = kneeBetween(lHip, LUNGE_BACK)
-  const flexion = 180 - innerAt(xy(rHip), xy(rKnee), xy(LUNGE_FRONT))
-  return { rHip, lHip, rKnee, lKnee, flexion }
-}
+  /** A foot flat on the floor at `ankle`, toes forward (+X). */
+  const toeOf = (ankle: V3): V3 => [ankle[0] + P.foot[0], ankle[1] + P.foot[1], ankle[2]]
 
-// ---- the pec fly: both arms sweep in front of the chest, at shoulder height ----
-const FLY_MAX = 100
-function flyAt(sweep: number) {
-  const t = trunk('front', [0, HIP_Y], 90)
-  const upper = (s: number): V3 => [Math.cos(rad(sweep)) * Math.cos(rad(8)) * s, -Math.sin(rad(8)), Math.sin(rad(sweep)) * Math.cos(rad(8))]
-  const fore = (s: number): V3 => [Math.cos(rad(sweep + 20)) * Math.cos(rad(22)) * s, -Math.sin(rad(22)), Math.sin(rad(sweep + 20)) * Math.cos(rad(22))]
-  const [rElbow, rWrist, rFingertip] = arm3(t.rShoulder, upper(-1), fore(-1))
-  const [lElbow, lWrist, lFingertip] = arm3(t.lShoulder, upper(1), fore(1))
-  const closed = 180 - innerAt(xy(lWrist), xy(t.lShoulder), xy(rWrist))
-  return { joints: { ...t, ...frontLegs(), rElbow, lElbow, rWrist, lWrist, rFingertip, lFingertip }, closed }
-}
+  /** The knee of a leg from `hip` to `ankle`, bending forward (toward +X): the two-link solution. */
+  function kneeBetween(hip: V3, ankle: V3): V3 {
+    const d = Math.min(thigh + shin - 1e-9, Math.hypot(ankle[0] - hip[0], ankle[1] - hip[1]))
+    const toAnkle = angleOf(xy(hip), xy(ankle))
+    const spread = deg(Math.acos((thigh ** 2 + d ** 2 - shin ** 2) / (2 * thigh * d)))
+    const a = at(hip, toAnkle + spread, thigh)
+    const b = at(hip, toAnkle - spread, thigh)
+    return a[0] >= b[0] ? a : b
+  }
 
-/** Each movement's whole body for a reading `m` (already clamped to the movement's range). */
-const POSES: Record<ExerciseId, (m: number) => Pose> = {
-  // The forearm swings forward and up from hanging.
-  elbow_flexion: (m) => sideElbow(-90 + m),
-  // Upper arm at the side, the forearm straightening from bent up to pointing down.
-  tricep_extension: (m) => sideElbow(90 - m),
-  // Both arms press from elbows at shoulder height to overhead; the forearms stay upright.
-  shoulder_press: (m) => frontShoulders(m, lerp(90, 95, (m - 85) / 90), true),
-  // The right arm rises out to the body's side, straight.
-  shoulder_abduction: (m) => {
-    const p = frontShoulders(m, -90 - m, false)
-    const [rElbow, rWrist, rFingertip] = arm(p.joints.rShoulder, -90 - m, -90 - m)
-    return { ...p, joints: { ...p.joints, rElbow, rWrist, rFingertip } }
-  },
-  // Side on, the straight right arm rises in front, measured hip, shoulder, wrist.
-  front_raise: (m) => {
-    const t = trunk('side', [0, HIP_Y], 90)
-    const [rElbow, rWrist, rFingertip] = arm(t.rShoulder, -90 + m, -90 + m)
+  /** Standing legs, side on: both feet flat under the hips. */
+  function standingLegs(): LegJoints {
+    const rHip: V3 = [0, P.hipY, P.hipHalf]
+    const lHip: V3 = [0, P.hipY, -P.hipHalf]
+    const [rKnee, rAnkle, rToe] = leg(rHip, -90, -90)
+    const [lKnee, lAnkle, lToe] = leg(lHip, -90, -90)
+    return { rHip, lHip, rKnee, lKnee, rAnkle, lAnkle, rToe, lToe }
+  }
+
+  /** Standing legs, face on: the feet point at the camera. */
+  function frontLegs(): LegJoints {
+    const rHip: V3 = [-P.hipHalf, P.hipY, 0]
+    const lHip: V3 = [P.hipHalf, P.hipY, 0]
+    const foot = (hip: V3): [V3, V3, V3] => {
+      const knee = at(hip, -90, thigh)
+      const ankle = at(knee, -90, shin)
+      return [knee, ankle, [ankle[0] + Math.sign(hip[0]) * 0.04, ankle[1] + P.foot[1], ankle[2] + P.foot[0]]]
+    }
+    const [rKnee, rAnkle, rToe] = foot(rHip)
+    const [lKnee, lAnkle, lToe] = foot(lHip)
+    return { rHip, lHip, rKnee, lKnee, rAnkle, lAnkle, rToe, lToe }
+  }
+
+  /**
+   * The trunk and head as one rigid piece pivoting at the hip joints' midpoint `hip`, pointing
+   * `trunkDeg` (90 is upright; side on, less leans forward). Side on the body faces +X and its
+   * right side the camera; face on, the shoulders sit across the trunk and the front faces +Z.
+   */
+  function trunk(view: 'side' | 'front', hip: V2, trunkDeg: number): TrunkJoints {
+    const side = view === 'side'
+    const put = ([fwd, up]: V2, lat = 0): V3 => {
+      const [x, y] = turn(side ? [fwd, up] : [lat, up], trunkDeg - 90)
+      return [hip[0] + x, hip[1] + y, side ? -lat : fwd]
+    }
+    const T = P.trunk
+    return {
+      pelvis: put(T.pelvis),
+      neck: put(T.neck),
+      headBase: put(T.headBase),
+      headTop: put(T.headTop),
+      rShoulder: put(T.shoulder, -P.shoulderHalf),
+      lShoulder: put(T.shoulder, P.shoulderHalf),
+      rClavicle: put(T.clavicle, -P.clavicleHalf),
+      lClavicle: put(T.clavicle, P.clavicleHalf),
+    }
+  }
+
+  const armRing: Pick<Pose, 'labels' | 'z' | 'reach'> = { labels: ['shoulder', 'elbow', 'wrist'], z: P.shoulderHalf + 0.42, reach: forearm }
+  const legRing: Pick<Pose, 'labels' | 'z' | 'reach'> = { labels: ['hip', 'knee', 'ankle'], z: P.hipHalf + 0.55, reach: shin }
+
+  /** Side on, standing, the right arm doing the work at the elbow; the forearm points `foreDeg`. */
+  function sideElbow(foreDeg: number): Pose {
+    const t = trunk('side', [0, P.hipY], 90)
+    const [rElbow, rWrist, rFingertip] = arm(t.rShoulder, -90, foreDeg)
     const [lElbow, lWrist, lFingertip] = arm(t.lShoulder, -90, -80)
-    return { joints: { ...t, ...standingLegs(), rElbow, lElbow, rWrist, lWrist, rFingertip, lFingertip }, view: 'side', track: ['rHip', 'rShoulder', 'rWrist'], labels: ['hip', 'shoulder', 'wrist'], z: SHOULDER_HALF + 0.42, reach: LIMB.upperArm }
-  },
-  // Side on, both hands push straight forward at chest height; the elbow opens to `m`.
-  chest_press: (m) => {
-    const t = trunk('side', [0, HIP_Y], 90)
-    const drop = 0.3
-    const reachLen = Math.sqrt(LIMB.upperArm ** 2 + LIMB.forearm ** 2 - 2 * LIMB.upperArm * LIMB.forearm * Math.cos(rad(m)))
-    const toWrist = deg(Math.atan2(-drop, Math.sqrt(reachLen ** 2 - drop ** 2)))
-    const spread = deg(Math.acos((LIMB.upperArm ** 2 + reachLen ** 2 - LIMB.forearm ** 2) / (2 * LIMB.upperArm * reachLen)))
-    const press = (shoulder: V3) => {
-      const elbow = at(shoulder, toWrist - spread, LIMB.upperArm)
-      const wrist: V3 = [shoulder[0] + Math.cos(rad(toWrist)) * reachLen, shoulder[1] + Math.sin(rad(toWrist)) * reachLen, shoulder[2]]
-      const fore = angleOf(xy(elbow), xy(wrist))
-      return [elbow, wrist, at(wrist, fore, LIMB.hand)] as const
-    }
-    const [rElbow, rWrist, rFingertip] = press(t.rShoulder)
-    const [lElbow, lWrist, lFingertip] = press(t.lShoulder)
-    return { joints: { ...t, ...standingLegs(), rElbow, lElbow, rWrist, lWrist, rFingertip, lFingertip }, view: 'side', track: ['rShoulder', 'rElbow', 'rWrist'], ...ARM_RING }
-  },
-  // Face on: measured at the left shoulder between the two wrists, as the camera app does.
-  pec_fly: (m) => {
-    const { joints } = flyAt(solve((s) => flyAt(s).closed, m, 0, FLY_MAX))
-    return { joints, view: 'front', track: ['lWrist', 'lShoulder', 'rWrist'], labels: ['left wrist', 'left shoulder', 'right wrist'], z: 2.4, reach: LIMB.upperArm }
-  },
-  // Face on, both elbows pull down from overhead; the hands come to shoulder height.
-  lat_pulldown: (m) => {
-    const inner = 180 - m
-    return frontShoulders(inner, lerp(90, 105, (inner - 50) / 110), true)
-  },
-  // Side on, hinged forward with soft knees; the right elbow pulls up and back, the forearm hangs.
-  bent_over_row: (m) => {
-    const legs = plantedLegs(20, 8)
-    const t = trunk('side', legs.hip, 30)
-    const [rElbow, rWrist, rFingertip] = arm(t.rShoulder, -90 - m, -90)
-    const [lElbow, lWrist, lFingertip] = arm(t.lShoulder, -88, -88)
-    const { hip: _hip, thighDown: _down, ...joints } = legs
-    return { joints: { ...t, ...joints, rElbow, lElbow, rWrist, lWrist, rFingertip, lFingertip }, view: 'side', track: ['rShoulder', 'rElbow', 'rWrist'], ...ARM_RING }
-  },
-  // Side on: the hips hinge from `m` (the shoulder-hip-knee angle) to standing tall; the knees soften at the bottom.
-  deadlift: (m) => {
-    const knee = 0.45 * (180 - m)
-    const legs = plantedLegs(knee, 0.4 * knee)
-    const t = trunk('side', legs.hip, legs.thighDown + m)
-    const [rElbow, rWrist, rFingertip] = arm(t.rShoulder, -90, -90)
-    const [lElbow, lWrist, lFingertip] = arm(t.lShoulder, -90, -90)
-    const { hip: _hip, thighDown: _down, ...joints } = legs
-    return { joints: { ...t, ...joints, rElbow, lElbow, rWrist, lWrist, rFingertip, lFingertip }, view: 'side', track: ['rShoulder', 'rHip', 'rKnee'], labels: ['shoulder', 'hip', 'knee'], z: HIP_HALF + 0.55, reach: LIMB.thigh * 0.75 }
-  },
-  // Side on: the knees bend `m`, the hips sit back, the trunk leans and the arms reach forward to balance.
-  squat: (m) => {
-    const legs = plantedLegs(m, 0.38 * m)
-    const t = trunk('side', legs.hip, 90 - 0.4 * m)
-    const reach = Math.min(-5, -90 + 0.8 * m)
-    const [rElbow, rWrist, rFingertip] = arm(t.rShoulder, reach, reach)
-    const [lElbow, lWrist, lFingertip] = arm(t.lShoulder, reach, reach)
-    const { hip: _hip, thighDown: _down, ...joints } = legs
-    return { joints: { ...t, ...joints, rElbow, lElbow, rWrist, lWrist, rFingertip, lFingertip }, view: 'side', track: ['rHip', 'rKnee', 'rAnkle'], ...LEG_RING }
-  },
-  // Side on, the right foot forward: the hips lower until the front knee bends `m`.
-  lunge: (m) => {
-    const hipY = solve((y) => lungeAt(y).flexion, m, 1.45, 2.93)
-    const { rHip, lHip, rKnee, lKnee } = lungeAt(hipY)
-    const t = trunk('side', [LUNGE_HIP_X, hipY], 90)
-    const [rElbow, rWrist, rFingertip] = arm(t.rShoulder, -90, -80)
-    const [lElbow, lWrist, lFingertip] = arm(t.lShoulder, -90, -80)
-    const joints = { ...t, rHip, lHip, rKnee, lKnee, rAnkle: LUNGE_FRONT, lAnkle: LUNGE_BACK, rToe: toeOf(LUNGE_FRONT), lToe: toeOf(LUNGE_BACK), rElbow, lElbow, rWrist, lWrist, rFingertip, lFingertip }
-    return { joints, view: 'side', track: ['rHip', 'rKnee', 'rAnkle'], ...LEG_RING }
-  },
-  // Seated on the stool, side on: thighs level, the left shin hanging, the right shin swinging out;
-  // the trunk leans back a little and the hands rest on the thighs.
-  seated_knee_extension: (m) => {
-    const hipY = 1.75
-    const rHip: V3 = [0, hipY, HIP_HALF]
-    const lHip: V3 = [0, hipY, -HIP_HALF]
-    const [rKnee, rAnkle, rToe] = leg(rHip, 0, m - 180)
-    const [lKnee, lAnkle, lToe] = leg(lHip, 0, -90)
-    const lean = 96 // the trunk's direction, a little past vertical
-    const pelvis: V3 = [-0.05, 1.9, 0]
-    const neck = at(pelvis, lean, 1.75)
-    const headBase = at(neck, lean - 4, 0.23)
-    const headTop = at(headBase, lean - 6, 0.82)
-    const shoulderAt = at(pelvis, lean, 1.65)
-    const rShoulder: V3 = [shoulderAt[0], shoulderAt[1], SHOULDER_HALF]
-    const lShoulder: V3 = [shoulderAt[0], shoulderAt[1], -SHOULDER_HALF]
-    const [rElbow, rWrist, rFingertip] = arm(rShoulder, -80, -25, -8, [0.6, 0.46, 0.42])
-    const [lElbow, lWrist, lFingertip] = arm(lShoulder, -80, -25, -8, [-0.6, -0.46, -0.42])
-    const joints = { pelvis, neck, headBase, headTop, rShoulder, lShoulder, rElbow, lElbow, rWrist, lWrist, rFingertip, lFingertip, rHip, lHip, rKnee, lKnee, rAnkle, lAnkle, rToe, lToe }
-    return { joints, view: 'side', seat: { top: hipY - 0.3, x: [-0.55, 1.05], z: [-0.75, 0.75] }, track: ['rHip', 'rKnee', 'rAnkle'], ...LEG_RING }
-  },
-  // Lying on the back, side on, legs out with soft knees: the trunk curls up off the floor.
-  crunch: (m) => {
-    const hip: V2 = [0, 0.4]
-    const t = trunk('side', hip, 195 - m)
-    const lyingLeg = (z: number) => {
-      const h: V3 = [hip[0], hip[1], z]
-      const knee = at(h, 15, LIMB.thigh)
-      const shin = deg(Math.asin((0.2 - knee[1]) / LIMB.shin))
-      const [, ankle, toe] = leg(h, 15, shin)
-      return { hip: h, knee, ankle, toe }
-    }
-    const r = lyingLeg(HIP_HALF)
-    const l = lyingLeg(-HIP_HALF)
-    const trunkDeg = 195 - m
-    // Hands cross on the chest: the upper arm toward the hips, the forearm back up the chest.
-    const [rElbow, rWrist, rFingertip] = arm(t.rShoulder, trunkDeg + 205, trunkDeg + 345, trunkDeg + 345, [0.62, 0.5, 0.42])
-    const [lElbow, lWrist, lFingertip] = arm(t.lShoulder, trunkDeg + 205, trunkDeg + 345, trunkDeg + 345, [-0.62, -0.5, -0.42])
-    const joints = { ...t, rHip: r.hip, lHip: l.hip, rKnee: r.knee, lKnee: l.knee, rAnkle: r.ankle, lAnkle: l.ankle, rToe: r.toe, lToe: l.toe, rElbow, lElbow, rWrist, lWrist, rFingertip, lFingertip }
-    return { joints, view: 'side', track: ['rShoulder', 'rHip', 'rKnee'], labels: ['shoulder', 'hip', 'knee'], z: HIP_HALF + 0.55, reach: LIMB.thigh * 0.75 }
-  },
-  // Face on: the shoulders lean and turn to the right, `m` degrees off level; the hands stay together in front.
-  ab_twist: (m) => {
-    const t = trunk('front', [0, HIP_Y], 90 + m)
-    const spin = (v: V3): V3 => {
-      const [x, y] = turn([v[0], v[1]], m)
-      return [x, y, v[2]]
-    }
-    const [rElbow, rWrist, rFingertip] = arm3(t.rShoulder, spin(unit([0.3, -0.75, 0.6])), spin(unit([0.29, 0.42, 0.86])))
-    const [lElbow, lWrist, lFingertip] = arm3(t.lShoulder, spin(unit([-0.3, -0.75, 0.6])), spin(unit([-0.29, 0.42, 0.86])))
+    return { joints: { ...t, ...standingLegs(), rElbow, lElbow, rWrist, lWrist, rFingertip, lFingertip }, view: 'side', track: ['rShoulder', 'rElbow', 'rWrist'], ...armRing }
+  }
+
+  /** Face on, both arms working at the shoulders: upper arm `inner` degrees from the trunk, forearm `foreDeg`. */
+  function frontShoulders(inner: number, foreDeg: number, both: boolean): Pose {
+    const t = trunk('front', [0, P.hipY], 90)
+    const [rElbow, rWrist, rFingertip] = arm(t.rShoulder, -90 - inner, foreDeg)
+    const [lElbow, lWrist, lFingertip] = both ? arm(t.lShoulder, -90 + inner, 180 - foreDeg) : arm(t.lShoulder, -84, -86)
     return {
       joints: { ...t, ...frontLegs(), rElbow, lElbow, rWrist, lWrist, rFingertip, lFingertip },
       view: 'front',
-      track: ['rShoulder', 'rShoulder', 'lShoulder'],
-      labels: ['level', 'right shoulder', 'left shoulder'],
-      // The level: a horizontal line out from the right shoulder.
-      base: [t.rShoulder[0] + 2 * SHOULDER_HALF, t.rShoulder[1]],
-      z: 1.6,
-      reach: SHOULDER_HALF,
+      track: ['rHip', 'rShoulder', 'rElbow'],
+      labels: ['hip', 'shoulder', 'elbow'],
+      // The goniometer's fixed arm runs down the side of the trunk from the shoulder to hip level.
+      base: [t.rShoulder[0], P.hipY],
+      z: 0.62,
+      reach: upperArm,
     }
-  },
+  }
+
+  /** Side on, both feet planted: the knee bends `knee` degrees, the shin leans `shinLean`. */
+  function plantedLegs(knee: number, shinLean: number): LegJoints & { hip: V2; thighDown: number } {
+    const shinDeg = 90 - shinLean
+    const thighUp = shinDeg + knee // from the knee to the hip
+    const ankle: V2 = [0, ankleY]
+    const kneeXY: V2 = [ankle[0] + Math.cos(rad(shinDeg)) * shin, ankle[1] + Math.sin(rad(shinDeg)) * shin]
+    const hip: V2 = [kneeXY[0] + Math.cos(rad(thighUp)) * thigh, kneeXY[1] + Math.sin(rad(thighUp)) * thigh]
+    const side = (z: number) => {
+      const a: V3 = [ankle[0], ankle[1], z]
+      return { hip: [hip[0], hip[1], z] as V3, knee: [kneeXY[0], kneeXY[1], z] as V3, ankle: a, toe: toeOf(a) }
+    }
+    const r = side(P.hipHalf)
+    const l = side(-P.hipHalf)
+    return { rHip: r.hip, lHip: l.hip, rKnee: r.knee, lKnee: l.knee, rAnkle: r.ankle, lAnkle: l.ankle, rToe: r.toe, lToe: l.toe, hip, thighDown: thighUp + 180 }
+  }
+  const legsOnly = ({ hip: _hip, thighDown: _down, ...joints }: ReturnType<typeof plantedLegs>): LegJoints => joints
+
+  // ---- the lunge: the hip lowers between a planted front foot and a planted back foot ----
+  const lungeFront: V3 = [1.1 * legK, ankleY, P.hipHalf]
+  const lungeBack: V3 = [-2.0 * legK, ankleY, -P.hipHalf]
+  const lungeHipX = -0.45 * legK
+  function lungeAt(hipY: number) {
+    const rHip: V3 = [lungeHipX, hipY, P.hipHalf]
+    const lHip: V3 = [lungeHipX, hipY, -P.hipHalf]
+    const rKnee = kneeBetween(rHip, lungeFront)
+    const lKnee = kneeBetween(lHip, lungeBack)
+    const flexion = 180 - innerAt(xy(rHip), xy(rKnee), xy(lungeFront))
+    return { rHip, lHip, rKnee, lKnee, flexion }
+  }
+
+  // ---- the pec fly: both arms sweep in front of the chest, at shoulder height ----
+  const FLY_MAX = 100
+  function flyAt(sweep: number) {
+    const t = trunk('front', [0, P.hipY], 90)
+    const up = (s: number): V3 => [Math.cos(rad(sweep)) * Math.cos(rad(8)) * s, -Math.sin(rad(8)), Math.sin(rad(sweep)) * Math.cos(rad(8))]
+    const fore = (s: number): V3 => [Math.cos(rad(sweep + 20)) * Math.cos(rad(22)) * s, -Math.sin(rad(22)), Math.sin(rad(sweep + 20)) * Math.cos(rad(22))]
+    const [rElbow, rWrist, rFingertip] = arm3(t.rShoulder, up(-1), fore(-1))
+    const [lElbow, lWrist, lFingertip] = arm3(t.lShoulder, up(1), fore(1))
+    const closed = 180 - innerAt(xy(lWrist), xy(t.lShoulder), xy(rWrist))
+    return { joints: { ...t, ...frontLegs(), rElbow, lElbow, rWrist, lWrist, rFingertip, lFingertip }, closed }
+  }
+
+  return {
+    // The forearm swings forward and up from hanging.
+    elbow_flexion: (m) => sideElbow(-90 + m),
+    // Upper arm at the side, the forearm straightening from bent up to pointing down.
+    tricep_extension: (m) => sideElbow(90 - m),
+    // Both arms press from elbows at shoulder height to overhead; the forearms stay upright.
+    shoulder_press: (m) => frontShoulders(m, lerp(90, 95, (m - 85) / 90), true),
+    // The right arm rises out to the body's side, straight.
+    shoulder_abduction: (m) => {
+      const p = frontShoulders(m, -90 - m, false)
+      const [rElbow, rWrist, rFingertip] = arm(p.joints.rShoulder, -90 - m, -90 - m)
+      return { ...p, joints: { ...p.joints, rElbow, rWrist, rFingertip } }
+    },
+    // Side on, the straight right arm rises in front, measured hip, shoulder, wrist: it turns `m`
+    // forward from the line down to the hip.
+    front_raise: (m) => {
+      const t = trunk('side', [0, P.hipY], 90)
+      const down = angleOf(xy(t.rShoulder), [0, P.hipY])
+      const [rElbow, rWrist, rFingertip] = arm(t.rShoulder, down + m, down + m)
+      const [lElbow, lWrist, lFingertip] = arm(t.lShoulder, -90, -80)
+      return { joints: { ...t, ...standingLegs(), rElbow, lElbow, rWrist, lWrist, rFingertip, lFingertip }, view: 'side', track: ['rHip', 'rShoulder', 'rWrist'], labels: ['hip', 'shoulder', 'wrist'], z: P.shoulderHalf + 0.42, reach: upperArm }
+    },
+    // Side on, both hands push straight forward at chest height; the elbow opens to `m`.
+    chest_press: (m) => {
+      const t = trunk('side', [0, P.hipY], 90)
+      const drop = 0.3 * armK
+      const reachLen = Math.sqrt(upperArm ** 2 + forearm ** 2 - 2 * upperArm * forearm * Math.cos(rad(m)))
+      const toWrist = deg(Math.atan2(-drop, Math.sqrt(reachLen ** 2 - drop ** 2)))
+      const spread = deg(Math.acos((upperArm ** 2 + reachLen ** 2 - forearm ** 2) / (2 * upperArm * reachLen)))
+      const press = (shoulder: V3) => {
+        const elbow = at(shoulder, toWrist - spread, upperArm)
+        const wrist: V3 = [shoulder[0] + Math.cos(rad(toWrist)) * reachLen, shoulder[1] + Math.sin(rad(toWrist)) * reachLen, shoulder[2]]
+        const fore = angleOf(xy(elbow), xy(wrist))
+        return [elbow, wrist, at(wrist, fore, hand)] as const
+      }
+      const [rElbow, rWrist, rFingertip] = press(t.rShoulder)
+      const [lElbow, lWrist, lFingertip] = press(t.lShoulder)
+      return { joints: { ...t, ...standingLegs(), rElbow, lElbow, rWrist, lWrist, rFingertip, lFingertip }, view: 'side', track: ['rShoulder', 'rElbow', 'rWrist'], ...armRing }
+    },
+    // Face on: measured at the left shoulder between the two wrists, as the camera app does.
+    pec_fly: (m) => {
+      const { joints } = flyAt(solve((s) => flyAt(s).closed, m, 0, FLY_MAX))
+      return { joints, view: 'front', track: ['lWrist', 'lShoulder', 'rWrist'], labels: ['left wrist', 'left shoulder', 'right wrist'], z: 2.4, reach: upperArm }
+    },
+    // Face on, both elbows pull down from overhead; the hands come to shoulder height.
+    lat_pulldown: (m) => {
+      const inner = 180 - m
+      return frontShoulders(inner, lerp(90, 105, (inner - 50) / 110), true)
+    },
+    // Side on, hinged forward with soft knees; the right elbow pulls up and back, the forearm hangs.
+    bent_over_row: (m) => {
+      const legs = plantedLegs(20, 8)
+      const t = trunk('side', legs.hip, 30)
+      const [rElbow, rWrist, rFingertip] = arm(t.rShoulder, -90 - m, -90)
+      const [lElbow, lWrist, lFingertip] = arm(t.lShoulder, -88, -88)
+      return { joints: { ...t, ...legsOnly(legs), rElbow, lElbow, rWrist, lWrist, rFingertip, lFingertip }, view: 'side', track: ['rShoulder', 'rElbow', 'rWrist'], ...armRing }
+    },
+    // Side on: the hips hinge from `m` (the shoulder-hip-knee angle) to standing tall; the knees soften at the bottom.
+    deadlift: (m) => {
+      const knee = 0.45 * (180 - m)
+      const legs = plantedLegs(knee, 0.4 * knee)
+      const t = trunk('side', legs.hip, legs.thighDown + m + shoulderLean)
+      const [rElbow, rWrist, rFingertip] = arm(t.rShoulder, -90, -90)
+      const [lElbow, lWrist, lFingertip] = arm(t.lShoulder, -90, -90)
+      return { joints: { ...t, ...legsOnly(legs), rElbow, lElbow, rWrist, lWrist, rFingertip, lFingertip }, view: 'side', track: ['rShoulder', 'rHip', 'rKnee'], labels: ['shoulder', 'hip', 'knee'], z: P.hipHalf + 0.55, reach: thigh * 0.75 }
+    },
+    // Side on: the knees bend `m`, the hips sit back, the trunk leans and the arms reach forward to balance.
+    squat: (m) => {
+      const legs = plantedLegs(m, 0.38 * m)
+      const t = trunk('side', legs.hip, 90 - 0.4 * m)
+      const reach = Math.min(-5, -90 + 0.8 * m)
+      const [rElbow, rWrist, rFingertip] = arm(t.rShoulder, reach, reach)
+      const [lElbow, lWrist, lFingertip] = arm(t.lShoulder, reach, reach)
+      return { joints: { ...t, ...legsOnly(legs), rElbow, lElbow, rWrist, lWrist, rFingertip, lFingertip }, view: 'side', track: ['rHip', 'rKnee', 'rAnkle'], ...legRing }
+    },
+    // Side on, the right foot forward: the hips lower until the front knee bends `m`.
+    lunge: (m) => {
+      const hipY = solve((y) => lungeAt(y).flexion, m, ankleY + 1.2 * legK, ankleY + 2.68 * legK)
+      const { rHip, lHip, rKnee, lKnee } = lungeAt(hipY)
+      const t = trunk('side', [lungeHipX, hipY], 90)
+      const [rElbow, rWrist, rFingertip] = arm(t.rShoulder, -90, -80)
+      const [lElbow, lWrist, lFingertip] = arm(t.lShoulder, -90, -80)
+      const joints = { ...t, rHip, lHip, rKnee, lKnee, rAnkle: lungeFront, lAnkle: lungeBack, rToe: toeOf(lungeFront), lToe: toeOf(lungeBack), rElbow, lElbow, rWrist, lWrist, rFingertip, lFingertip }
+      return { joints, view: 'side', track: ['rHip', 'rKnee', 'rAnkle'], ...legRing }
+    },
+    // Seated on the stool, side on: thighs level, the left shin hanging with the foot on the floor,
+    // the right shin swinging out; the trunk leans back a little and the hands rest on the thighs.
+    seated_knee_extension: (m) => {
+      const hipY = ankleY + shin
+      const rHip: V3 = [0, hipY, P.hipHalf]
+      const lHip: V3 = [0, hipY, -P.hipHalf]
+      const [rKnee, rAnkle, rToe] = leg(rHip, 0, m - 180)
+      const [lKnee, lAnkle, lToe] = leg(lHip, 0, -90)
+      const t = trunk('side', [0, hipY], 96)
+      const zs: [number, number, number] = [P.shoulderHalf - 0.06, P.hipHalf + 0.11, P.hipHalf + 0.07]
+      const [rElbow, rWrist, rFingertip] = arm(t.rShoulder, -80, -30, -15, zs)
+      const [lElbow, lWrist, lFingertip] = arm(t.lShoulder, -80, -30, -15, [-zs[0], -zs[1], -zs[2]])
+      const joints = { ...t, rElbow, lElbow, rWrist, lWrist, rFingertip, lFingertip, rHip, lHip, rKnee, lKnee, rAnkle, lAnkle, rToe, lToe }
+      const k = thigh / 1.6
+      return { joints, view: 'side', seat: { top: hipY - P.room.seat, x: [-0.55 * k, 1.05 * k], z: [-0.75, 0.75] }, track: ['rHip', 'rKnee', 'rAnkle'], ...legRing }
+    },
+    // Lying on the back, side on, legs out with soft knees: the trunk curls up off the floor. At
+    // rest the shoulders lie level with the hips.
+    crunch: (m) => {
+      const hip: V2 = [0, P.room.lying]
+      const trunkDeg = 195 - m + shoulderLean
+      const t = trunk('side', hip, trunkDeg)
+      // The heels rest on the floor: the ankle as high as it stands.
+      const heel = P.room.ankle
+      const lyingLeg = (z: number) => {
+        const h: V3 = [hip[0], hip[1], z]
+        const knee = at(h, 15, thigh)
+        const shinDeg = deg(Math.asin((heel - knee[1]) / shin))
+        const [, ankle, toe] = leg(h, 15, shinDeg)
+        return { hip: h, knee, ankle, toe }
+      }
+      const r = lyingLeg(P.hipHalf)
+      const l = lyingLeg(-P.hipHalf)
+      // Arms crossed on the chest: each upper arm down the side toward the hips, each forearm across
+      // the chest to the other shoulder, the left one over the right.
+      const across = (fwd: number, up: number, lat: number): V3 => {
+        const [x, y] = turn([fwd, up], trunkDeg - 90)
+        return unit([x, y, -lat])
+      }
+      const [rElbow, rWrist, rFingertip] = arm3(t.rShoulder, across(0.3, -0.85, 0.25), across(0.15, 0.28, 0.9))
+      const [lElbow, lWrist, lFingertip] = arm3(t.lShoulder, across(0.36, -0.8, -0.25), across(0.26, 0.24, -0.9))
+      const joints = { ...t, rHip: r.hip, lHip: l.hip, rKnee: r.knee, lKnee: l.knee, rAnkle: r.ankle, lAnkle: l.ankle, rToe: r.toe, lToe: l.toe, rElbow, lElbow, rWrist, lWrist, rFingertip, lFingertip }
+      // The pelvis stays flat on the floor while the trunk curls up from it.
+      const flat = rad(180 + shoulderLean)
+      return { joints, view: 'side', track: ['rShoulder', 'rHip', 'rKnee'], labels: ['shoulder', 'hip', 'knee'], z: P.hipHalf + 0.55, reach: thigh * 0.75, pelvisUp: [Math.cos(flat), Math.sin(flat), 0] }
+    },
+    // Face on: the shoulders lean and turn to the right, `m` degrees off level; the hands stay together in front.
+    ab_twist: (m) => {
+      const t = trunk('front', [0, P.hipY], 90 + m)
+      const spin = (v: V3): V3 => {
+        const [x, y] = turn([v[0], v[1]], m)
+        return [x, y, v[2]]
+      }
+      const [rElbow, rWrist, rFingertip] = arm3(t.rShoulder, spin(unit([0.3, -0.75, 0.6])), spin(unit([0.29, 0.42, 0.86])))
+      const [lElbow, lWrist, lFingertip] = arm3(t.lShoulder, spin(unit([-0.3, -0.75, 0.6])), spin(unit([-0.29, 0.42, 0.86])))
+      return {
+        joints: { ...t, ...frontLegs(), rElbow, lElbow, rWrist, lWrist, rFingertip, lFingertip },
+        view: 'front',
+        track: ['rShoulder', 'rShoulder', 'lShoulder'],
+        labels: ['level', 'right shoulder', 'left shoulder'],
+        // The level: a horizontal line out from the right shoulder.
+        base: [t.rShoulder[0] + 2 * P.shoulderHalf, t.rShoulder[1]],
+        z: 1.6,
+        reach: P.shoulderHalf,
+      }
+    },
+  }
 }
 
 /** Where each movement starts: the metric in the start position. */
@@ -483,34 +574,61 @@ function overlayOf(p: Pose): { base: V2; mid: V2; end: V2 } {
   return { base: p.base ?? xy(p.joints[p.track[0]]), mid: xy(p.joints[p.track[1]]), end: xy(p.joints[p.track[2]]) }
 }
 
-/** For each movement: the moving segment's direction against the base at rest, and which way it sweeps. */
-const SWEEP = Object.fromEntries(
-  EXERCISE_IDS.map((e) => {
-    const rel = (m: number) => {
-      const { base, mid, end } = overlayOf(POSES[e](m))
-      return wrap(angleOf(mid, end) - angleOf(mid, base))
-    }
-    const rest = restFor(e)
-    return [e, { restRel: rel(rest), sign: Math.sign(wrap(rel(rest + 1) - rel(rest))) || 1 }]
-  }),
-) as Record<ExerciseId, { restRel: number; sign: number }>
+/** Visible height of the stage in scene units, with a margin; the width follows the canvas's shape. */
+const VIEW_H = 2.55
+/** The stage's usual shape (width over height), and the share of the visible width the body may use. */
+const STAGE_ASPECT = 1.45
+const WIDTH_SHARE = 0.84
+/** The thickest parts (the head, the fingers past the knuckles) beyond their joints, so nothing is cut at the edge. */
+const MARGIN = 0.45
 
-/** How far the moving segment has swept from rest for a reading, signed the way the movement turns. */
-export function sweepFor(exercise: ExerciseId, metricDeg: number): number {
-  return SWEEP[exercise].sign * (clampMetric(exercise, metricDeg) - restFor(exercise))
+/** A figure's poses with what follows from them: each movement's sweep from rest and its framing. */
+interface FigurePoses {
+  poses: Record<ExerciseId, (m: number) => Pose>
+  sweep: Record<ExerciseId, { restRel: number; sign: number }>
+  /** The box every reading of a movement fills, joints and stool, with a margin. */
+  bounds: Partial<Record<ExerciseId, { minX: number; maxX: number; minY: number; maxY: number }>>
+}
+const FIGURES = new Map<FigureKey, FigurePoses>()
+function figurePoses(figure: FigureKey): FigurePoses {
+  let f = FIGURES.get(figure)
+  if (!f) {
+    const poses = posesFor(PROPORTIONS[figure])
+    // For each movement: the moving segment's direction against the base at rest, and which way it sweeps.
+    const sweep = Object.fromEntries(
+      EXERCISE_IDS.map((e) => {
+        const rel = (m: number) => {
+          const { base, mid, end } = overlayOf(poses[e](m))
+          return wrap(angleOf(mid, end) - angleOf(mid, base))
+        }
+        const rest = restFor(e)
+        return [e, { restRel: rel(rest), sign: Math.sign(wrap(rel(rest + 1) - rel(rest))) || 1 }]
+      }),
+    ) as FigurePoses['sweep']
+    f = { poses, sweep, bounds: {} }
+    FIGURES.set(figure, f)
+  }
+  return f
 }
 
-export function skeletonFor(exercise: ExerciseId, metricDeg: number): Skeleton {
+/** How far the moving segment has swept from rest for a reading, signed the way the movement turns. */
+export function sweepFor(exercise: ExerciseId, metricDeg: number, figure: FigureKey = 'neutral'): number {
+  return figurePoses(figure).sweep[exercise].sign * (clampMetric(exercise, metricDeg) - restFor(exercise))
+}
+
+export function skeletonFor(exercise: ExerciseId, metricDeg: number, figure: FigureKey = 'neutral'): Skeleton {
+  const f = figurePoses(figure)
   const m = clampMetric(exercise, metricDeg)
-  const p = POSES[exercise](m)
+  const p = f.poses[exercise](m)
   const { base, mid, end } = overlayOf(p)
-  const restDeg = angleOf(mid, base) + SWEEP[exercise].restRel
+  const restDeg = angleOf(mid, base) + f.sweep[exercise].restRel
   const skeleton: Skeleton = {
     joints: p.joints,
     view: p.view,
-    overlay: { base, mid, end, joints: p.track, labels: p.labels, z: p.z, restDeg, currentDeg: restDeg + sweepFor(exercise, m), reach: p.reach },
+    overlay: { base, mid, end, joints: p.track, labels: p.labels, z: p.z, restDeg, currentDeg: restDeg + sweepFor(exercise, m, figure), reach: p.reach },
   }
   if (p.seat) skeleton.seat = p.seat
+  if (p.pelvisUp) skeleton.pelvisUp = p.pelvisUp
   return skeleton
 }
 
@@ -530,20 +648,21 @@ export const LANDMARK_OF: Partial<Record<JointName, number>> = {
   rAnkle: LM.RIGHT_ANKLE,
 }
 
-/** Visible height and width of the stage in scene units, with a margin. */
-const VIEW_H = 2.55
-const VIEW_W = 3.7
-/** The thickest part (the head) beyond its joint, so nothing is cut at the edge. */
-const MARGIN = 0.45
-
-function computeFraming(exercise: ExerciseId): { scale: number; offset: V3 } {
-  const { restDeg, maxDeg } = EXERCISES[exercise]
+/**
+ * The box every reading of a movement fills for a figure (or just one reading, `at`): its joints and
+ * the stool, with a margin for the flesh beyond them.
+ */
+function boundsOf(exercise: ExerciseId, figure: FigureKey, at?: number) {
+  const f = figurePoses(figure)
+  const known = at == null ? f.bounds[exercise] : undefined
+  if (known) return known
+  const { restDeg, maxDeg } = at == null ? EXERCISES[exercise] : { restDeg: at, maxDeg: at }
   let minX = Infinity
   let maxX = -Infinity
   let minY = 0 // the floor is always in the picture
   let maxY = -Infinity
   for (let i = 0; i <= 24; i++) {
-    const s = skeletonFor(exercise, restDeg + ((maxDeg - restDeg) * i) / 24)
+    const s = skeletonFor(exercise, restDeg + ((maxDeg - restDeg) * i) / 24, figure)
     for (const p of Object.values(s.joints)) {
       minX = Math.min(minX, p[0])
       maxX = Math.max(maxX, p[0])
@@ -555,18 +674,25 @@ function computeFraming(exercise: ExerciseId): { scale: number; offset: V3 } {
       maxX = Math.max(maxX, s.seat.x[1])
     }
   }
-  minX -= MARGIN
-  maxX += MARGIN
-  maxY += MARGIN * 0.4
-  const scale = Math.min(VIEW_H / (maxY - minY), VIEW_W / (maxX - minX))
-  return { scale, offset: [-((minX + maxX) / 2) * scale, -((minY + maxY) / 2) * scale, 0] }
+  const box = { minX: minX - MARGIN, maxX: maxX + MARGIN, minY, maxY: maxY + MARGIN * 0.4 }
+  if (at == null) f.bounds[exercise] = box
+  return box
 }
 
-/** How each exercise is framed: a scale and an offset that keep every reading's body in view. */
-export const FRAMING = Object.fromEntries(EXERCISE_IDS.map((e) => [e, computeFraming(e)])) as Record<ExerciseId, { scale: number; offset: V3 }>
+/**
+ * How a movement is framed for a figure on a canvas of the given shape (width over height): a scale
+ * and an offset that keep every reading's body in view (or one held reading's, `at`), so a narrow
+ * phone stage shrinks the figure rather than cutting off a lying crunch's feet.
+ */
+export function framingFor(exercise: ExerciseId, figure: FigureKey = 'neutral', aspect = STAGE_ASPECT, at?: number): { scale: number; offset: V3 } {
+  const b = boundsOf(exercise, figure, at)
+  const viewW = (VIEW_H / 0.84) * aspect * WIDTH_SHARE
+  const scale = Math.min(VIEW_H / (b.maxY - b.minY), viewW / (b.maxX - b.minX))
+  return { scale, offset: [-((b.minX + b.maxX) / 2) * scale, -((b.minY + b.maxY) / 2) * scale, 0] }
+}
 
 /** A point of the body as it lands in the scene after framing. */
-export function framed(exercise: ExerciseId, p: V3): V3 {
-  const f = FRAMING[exercise]
+export function framed(exercise: ExerciseId, p: V3, figure: FigureKey = 'neutral'): V3 {
+  const f = framingFor(exercise, figure)
   return [p[0] * f.scale + f.offset[0], p[1] * f.scale + f.offset[1], p[2] * f.scale]
 }

@@ -6,7 +6,8 @@ import type { ProgressSceneProps } from './ProgressScene'
  * three.js is code-split: these wrappers load the scenes on demand and show a lightweight
  * fallback meanwhile (and forever, in environments without WebGL such as the test runner).
  */
-const JointSceneImpl = lazy(() => import('./JointScene'))
+// The body (body.bin) loads with the scene's code, so a figure never draws before its body arrives.
+const JointSceneImpl = lazy(() => Promise.all([import('./JointScene'), import('./body/load').then((m) => m.loadBody())]).then(([m]) => m))
 const ProgressSceneImpl = lazy(() => import('./ProgressScene'))
 
 export function LazyJointScene({ fallback = null, ...props }: JointSceneProps & { fallback?: ReactNode }) {

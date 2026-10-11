@@ -1,7 +1,7 @@
 # ADR-0025: An anatomical body, painted with the muscles each exercise works
 
 - Date: 2026-10-10
-- Status: accepted; amends ADR-0014 and ADR-0021
+- Status: accepted; amends ADR-0014 and ADR-0021. The figure's geometry is superseded by ADR-0030 (a real human mesh); the muscle catalog and the colours stay.
 
 ## Context
 

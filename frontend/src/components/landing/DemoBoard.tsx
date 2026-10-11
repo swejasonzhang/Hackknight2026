@@ -1,6 +1,8 @@
-import { buildProgress, EXERCISE_IDS, EXERCISES, generateDemoSessions, leaderboard, type ExerciseId, type LeaderboardMetric } from '@arc/dependencies'
+import { bodyGrowth, buildProgress, EXERCISE_IDS, EXERCISES, generateDemoSessions, leaderboard, type BodyDto, type ExerciseId, type Figure, type LeaderboardMetric } from '@arc/dependencies'
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react'
 import { useMemo, useState } from 'react'
+import { BodyGrowthView } from '../../body/BodyGrowth'
+import { DEMO_GROWTH } from '../three/body/figure'
 import { fatigueLabel, formatDate } from '../../format'
 import { BoardRows, MetricChips } from '../../profiles/Leaderboard'
 import { ExercisePicker } from '../ExercisePicker'
@@ -11,7 +13,7 @@ import { LazyJointScene, LazyProgressScene } from '../three/lazy'
 import { useRepLoop } from '../three/useRepLoop'
 import { Lamp, Segmented, Tag, type SegmentedOption } from '../ui'
 
-type View = 'trend' | 'reps' | 'fatigue' | 'weekly' | '3d' | 'muscles' | 'board'
+type View = 'trend' | 'reps' | 'fatigue' | 'weekly' | '3d' | 'muscles' | 'grow' | 'board'
 
 const VIEWS: SegmentedOption<View>[] = [
   { value: 'trend', label: 'Trend' },
@@ -20,6 +22,7 @@ const VIEWS: SegmentedOption<View>[] = [
   { value: 'weekly', label: 'Weekly', short: 'Week' },
   { value: '3d', label: '3D' },
   { value: 'muscles', label: 'Muscles', short: 'Body' },
+  { value: 'grow', label: 'Growth', short: 'Grow' },
   { value: 'board', label: 'Household', short: 'Board' },
 ]
 const CAPTION: Record<View, string> = {
@@ -29,16 +32,19 @@ const CAPTION: Record<View, string> = {
   weekly: 'Sessions per week: consistency moves every other number.',
   '3d': 'The same sessions as 3D bars, lighter is higher. Drag to orbit.',
   muscles: 'The movement done right, to the goal and back, with the muscles it works: red where it targets, yellow where they help. Drag to orbit.',
+  grow: 'Each body as six weeks of training built it: Maya works her upper body and core, Theo his legs and back, Nana Rose a little of each. Press play to watch it grow week by week.',
   board: 'A household of three on the leaderboard this week: reps, sets, weight moved and steadiness, and the Arc score that factors them all in.',
 }
 const FIRST_SEED = 2026
 
 /** The demo household: each trains a different part of the catalog, so the board tells a story. */
-const HOUSEHOLD: { id: string; name: string; keep: (e: ExerciseId) => boolean }[] = [
-  { id: 'maya', name: 'Maya', keep: (e) => EXERCISES[e].area === 'upper' || EXERCISES[e].area === 'core' },
-  { id: 'theo', name: 'Theo', keep: (e) => EXERCISES[e].area === 'legs' || EXERCISES[e].area === 'back' },
-  { id: 'rose', name: 'Nana Rose', keep: (e) => ['elbow_flexion', 'shoulder_abduction', 'seated_knee_extension', 'squat'].includes(e) },
+const HOUSEHOLD: { id: string; name: string; figure: Figure; keep: (e: ExerciseId) => boolean }[] = [
+  { id: 'maya', name: 'Maya', figure: 'female', keep: (e) => EXERCISES[e].area === 'upper' || EXERCISES[e].area === 'core' },
+  { id: 'theo', name: 'Theo', figure: 'male', keep: (e) => EXERCISES[e].area === 'legs' || EXERCISES[e].area === 'back' },
+  { id: 'rose', name: 'Nana Rose', figure: 'female', keep: (e) => ['elbow_flexion', 'shoulder_abduction', 'seated_knee_extension', 'squat'].includes(e) },
 ]
+/** Each member's sessions, as the board and the growth view both read them. */
+const householdSessions = (now: number, seed: number, tz: number) => HOUSEHOLD.map((p, i) => generateDemoSessions(p.id, now, seed + i + 1, tz).filter((s) => p.keep(s.exercise)))
 
 /** The Muscles view: reps from rest to the goal, painted with what they work, beside the key and the cue. */
 function MuscleFigure({ exercise }: { exercise: ExerciseId }) {
@@ -47,7 +53,7 @@ function MuscleFigure({ exercise }: { exercise: ExerciseId }) {
   return (
     <div className="grid gap-5 sm:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)] sm:items-center">
       <div className="stage h-[300px]">
-        <LazyJointScene exercise={exercise} angle={angle ?? cfg.targetDeg} goalDeg={cfg.targetDeg} className="h-full" label={`A figure doing ${cfg.name.toLowerCase()} reps to the ${cfg.targetDeg} degree goal, the muscles it works coloured`} fallback={<div className="hatch h-full" />} />
+        <LazyJointScene exercise={exercise} angle={angle ?? cfg.targetDeg} goalDeg={cfg.targetDeg} growth={DEMO_GROWTH} className="h-full" label={`A figure doing ${cfg.name.toLowerCase()} reps to the ${cfg.targetDeg} degree goal, the muscles it works coloured`} fallback={<div className="hatch h-full" />} />
       </div>
       <div>
         <div className="t-label text-navy">{cfg.name}</div>
@@ -58,10 +64,35 @@ function MuscleFigure({ exercise }: { exercise: ExerciseId }) {
   )
 }
 
+/** The Growth view: one member of the demo household at a time, their body built by their own demo weeks. */
+function DemoGrowth({ now, seed, tz }: { now: number; seed: number; tz: number }) {
+  const [who, setWho] = useState(0)
+  const [figures, setFigures] = useState<Record<string, Figure | null>>({})
+  const member = HOUSEHOLD[who]!
+  const body = useMemo<BodyDto>(() => {
+    const sessions = householdSessions(now, seed, tz)[who]!
+    return { profileId: member.id, figure: member.figure, ...bodyGrowth(sessions, { now }) }
+  }, [member, now, seed, tz, who])
+  const figure = member.id in figures ? figures[member.id]! : member.figure
+  return (
+    <div>
+      <div role="group" aria-label="Whose body" className="mb-4 flex flex-wrap gap-2">
+        {HOUSEHOLD.map((p, i) => (
+          <button key={p.id} type="button" className="chip" aria-pressed={i === who} onClick={() => setWho(i)}>
+            {p.name}
+          </button>
+        ))}
+      </div>
+      <BodyGrowthView name={member.name} body={body} figure={figure} onFigure={(f) => setFigures((all) => ({ ...all, [member.id]: f }))} />
+    </div>
+  )
+}
+
 /**
  * The landing's readouts: real charts from the dashboard fed by Arc's own demo generator. Pick any
- * of the fifteen movements by body area, flip between seven views (the trend, every rep, fatigue,
- * weeks, 3D bars, the body with the muscles it works, and a demo household's leaderboard), or
+ * of the fifteen movements by body area, flip between eight views (the trend, every rep, fatigue,
+ * weeks, 3D bars, the body with the muscles it works, a demo household's bodies growing with their
+ * training, and its leaderboard), or
  * draw a new random six weeks; the charts animate between datasets and the readings count to
  * their new values.
  */
@@ -83,10 +114,7 @@ export function DemoBoard() {
     [exercise, seed, now, tz],
   )
   const progress = useMemo(() => buildProgress('demo', exercise, sessions, cfg.targetDeg), [exercise, sessions, cfg.targetDeg])
-  const board = useMemo(() => {
-    const all = HOUSEHOLD.flatMap((p, i) => generateDemoSessions(p.id, now, seed + i + 1, tz).filter((s) => p.keep(s.exercise)))
-    return leaderboard(HOUSEHOLD, all, { window: 'week', now })
-  }, [seed, now, tz])
+  const board = useMemo(() => leaderboard(HOUSEHOLD, householdSessions(now, seed, tz).flat(), { window: 'week', now }), [seed, now, tz])
 
   const points = progress.sessions
   const first = points[0]
@@ -146,7 +174,7 @@ export function DemoBoard() {
             <Segmented label="Chart" options={VIEWS} value={view} onChange={setView} />
           </div>
           <span className="t-meta flex items-center gap-2">
-            {view === 'board' ? 'This week' : cfg.name} <Tag soft>Demo · seed {seed.toString(16).toUpperCase().padStart(4, '0')}</Tag>
+            {view === 'board' ? 'This week' : view === 'grow' ? 'Six weeks' : cfg.name} <Tag soft>Demo · seed {seed.toString(16).toUpperCase().padStart(4, '0')}</Tag>
           </span>
         </div>
 
@@ -169,6 +197,7 @@ export function DemoBoard() {
                 </div>
               )}
               {view === 'muscles' && <MuscleFigure exercise={exercise} />}
+              {view === 'grow' && <DemoGrowth now={now} seed={seed} tz={tz} />}
               {view === 'board' && (
                 <div>
                   <MetricChips value={metric} onChange={setMetric} />

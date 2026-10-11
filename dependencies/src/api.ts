@@ -52,12 +52,22 @@ export interface AuthResponse {
 
 // ---- profiles, plans, sessions ----
 
+/** Which body the profile's figure is drawn as; a profile need not pick one. */
+export const FIGURES = ['female', 'male'] as const
+export type Figure = (typeof FIGURES)[number]
+export const FigureSchema = z.enum(FIGURES)
+
 export const CreateProfileSchema = z.object({
   name: NameSchema,
   email: EmailSchema.optional(),
   notes: z.string().max(500).optional(),
+  figure: FigureSchema.optional(),
 })
 export type CreateProfileInput = z.infer<typeof CreateProfileSchema>
+
+/** Body of PATCH /api/profiles/:id: the figure to draw, or null to clear it. Any other field is refused. */
+export const UpdateProfileSchema = z.object({ figure: FigureSchema.nullable() }).strict()
+export type UpdateProfileInput = z.infer<typeof UpdateProfileSchema>
 
 export const PlanInputSchema = z.object({
   exercise: ExerciseIdSchema,
@@ -145,6 +155,8 @@ export interface ProfileDto {
   notes?: string
   /** What Arc learned in the onboarding chat. */
   intake?: CoachIntake
+  /** The body the figure is drawn as, once the member picked one. */
+  figure?: Figure
   createdAt: number
 }
 

@@ -4,6 +4,7 @@ import mongoose from 'mongoose'
 import { authenticate } from './auth.ts'
 import { errorHandler, notFound } from './http.ts'
 import { authRouter } from './routes/auth.ts'
+import { bodyRouter } from './routes/body.ts'
 import { coachRouter } from './routes/coach.ts'
 import { devRouter } from './routes/dev.ts'
 import { leaderboardRouter } from './routes/leaderboard.ts'
@@ -57,6 +58,7 @@ export function createApp(opts: AppOptions = {}): Express {
   app.use('/api/profiles', authenticate, profilesRouter)
   app.use('/api/profiles', plansRouter)
   app.use('/api/profiles', progressRouter)
+  app.use('/api/profiles', bodyRouter)
   app.use('/api/profiles', profileSessionsRouter)
   app.use('/api/sessions', authenticate, sessionsRouter)
   app.use('/api/coach', authenticate, coachRouter)

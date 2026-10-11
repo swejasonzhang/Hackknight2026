@@ -1,7 +1,7 @@
-import { CreateProfileSchema } from '@arc/dependencies'
+import { CreateProfileSchema, UpdateProfileSchema } from '@arc/dependencies'
 import { Router } from 'express'
 import { principalOf, requireUser } from '../auth.ts'
-import { validate } from '../http.ts'
+import { HttpError, validate } from '../http.ts'
 import { Plan } from '../models/Plan.ts'
 import { Program } from '../models/Program.ts'
 import { Profile, toProfileDto, type ProfileShape } from '../models/Profile.ts'
@@ -25,6 +25,20 @@ profilesRouter.post('/', async (req, res) => {
 
 profilesRouter.get('/:id', async (req, res) => {
   res.json(toProfileDto(await requireProfile(req.params.id, principalOf(req))))
+})
+
+/**
+ * Which body the profile's figure is drawn as; null clears it. Members only, and only their own
+ * profiles: the camera app reads profiles but never changes them.
+ */
+profilesRouter.patch('/:id', async (req, res) => {
+  requireUser(req)
+  const { figure } = validate(UpdateProfileSchema, req.body)
+  const existing = await requireProfile(req.params.id, principalOf(req))
+  const profile = await Profile.findByIdAndUpdate(existing._id, figure ? { $set: { figure } } : { $unset: { figure: 1 } }, { returnDocument: 'after', runValidators: true }).lean<ProfileShape>()
+  // Deleted in another tab between the two queries.
+  if (!profile) throw new HttpError(404, 'Profile not found')
+  res.json(toProfileDto(profile))
 })
 
 profilesRouter.delete('/:id', async (req, res) => {

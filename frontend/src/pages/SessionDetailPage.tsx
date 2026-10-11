@@ -14,6 +14,9 @@ import { useStickyTop } from '../components/useStickyTop'
 import { MuscleKey } from '../components/MuscleKey'
 import { dayKey } from '../plan/days'
 import { DayWorkout } from '../plan/DayWorkout'
+import { figureKey, growthNow } from '../body/growth'
+import { useBody } from '../body/useBody'
+import { useProfiles } from '../hooks/useProfiles'
 
 const MONO = "'IBM Plex Mono', ui-monospace, monospace"
 
@@ -83,6 +86,8 @@ export function SessionDetailPage() {
   const arcRead = Boolean((useLocation().state as { arcRead?: boolean } | null)?.arcRead)
   const [stageRef, stageTop] = useStickyTop<HTMLElement>(24)
   const [session, setSession] = useState<SessionDto | null>(null)
+  const { profiles } = useProfiles()
+  const { body } = useBody(session?.profileId)
   const [error, setError] = useState<string | null>(null)
   // The figure works through the range, rep after rep: from rest to this session's best and back,
   // never past the goal's tick on its arc.
@@ -226,6 +231,8 @@ export function SessionDetailPage() {
                 rangeDeg={Math.min(best, goal)}
                 goalDeg={goal}
                 mirrored={exercise.sided && session.side === 'left'}
+                figure={figureKey(profiles.find((p) => p.id === session.profileId)?.figure)}
+                growth={body ? growthNow(body) : null}
                 className="h-full w-full"
                 label={`A 3D figure doing ${exercise.name.toLowerCase()} through its whole range, from rest to this session's best rep of ${deg(best)}`}
                 fallback={<div aria-hidden="true" className="hatch absolute inset-8" />}

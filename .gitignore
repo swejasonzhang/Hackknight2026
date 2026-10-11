@@ -30,3 +30,6 @@ computer-vision/workout_session.json
 * 2
 * 2.*
 
+
+# the 3D body bake downloads MakeHuman assets here
+frontend/scripts/body/.cache/

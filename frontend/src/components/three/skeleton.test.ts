@@ -1,6 +1,6 @@
 import { EXERCISE_IDS, EXERCISES, type ExerciseId } from '@arc/dependencies'
 import { describe, expect, it } from 'vitest'
-import { BONES, clampMetric, framed, JOINT_NAMES, restFor, skeletonFor, sweepFor, type JointName, type V3 } from './skeleton'
+import { BONES, clampMetric, framed, JOINT_NAMES, PROPORTIONS, restFor, skeletonFor, sweepFor, type JointName, type V3 } from './skeleton'
 
 /** Seven readings from rest to the furthest each movement shows. */
 const RANGE = Object.fromEntries(
@@ -19,6 +19,12 @@ const inner = (a: [number, number], mid: [number, number], b: [number, number]) 
 }
 const xy = (p: V3): [number, number] => [p[0], p[1]]
 const wrap = (d: number) => ((((d + 180) % 360) + 360) % 360) - 180
+
+/** Where the toes rest standing: the straight leg's ankle plus the foot's drop. */
+const STANDING_TOE = (() => {
+  const P = PROPORTIONS.neutral
+  return P.hipY - P.limb.thigh - P.limb.shin + P.foot[1]
+})()
 
 /** The three classics move one limb; everything else stays put. */
 const MOVING: Partial<Record<ExerciseId, JointName[]>> = {
@@ -132,7 +138,7 @@ describe('skeletonFor: a whole body for every exercise', () => {
       for (const deg of RANGE[exercise]) {
         const j = skeletonFor(exercise, deg).joints
         for (const name of JOINT_NAMES) expect(j[name][1], `${exercise} ${deg}° ${name}`).toBeGreaterThanOrEqual(0)
-        if (exercise !== 'crunch') expect(Math.min(j.lToe[1], j.rToe[1]), `${exercise} ${deg}° a foot on the floor`).toBeCloseTo(0.05, 6)
+        if (exercise !== 'crunch') expect(Math.min(j.lToe[1], j.rToe[1]), `${exercise} ${deg}° a foot on the floor`).toBeCloseTo(STANDING_TOE, 6)
       }
     }
     for (const exercise of ['elbow_flexion', 'shoulder_abduction', 'ab_twist'] as const) expect(skeletonFor(exercise, 10).joints.headTop[1]).toBeGreaterThan(6)

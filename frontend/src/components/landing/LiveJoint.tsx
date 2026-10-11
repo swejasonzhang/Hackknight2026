@@ -1,6 +1,7 @@
 import { EXERCISES } from '@arc/dependencies'
 import { animate, motion, useMotionValue, useMotionValueEvent, useReducedMotion, useTransform } from 'motion/react'
 import { useEffect, useLayoutEffect, useMemo, useState } from 'react'
+import { DEMO_GROWTH } from '../three/body/figure'
 import { LazyJointScene, SceneBoundary } from '../three/lazy'
 import { Lamp } from '../ui'
 import { createRepCycle } from './repCycle'
@@ -106,6 +107,7 @@ export function LiveJoint() {
             exercise="elbow_flexion"
             angle={angle}
             goalDeg={GOAL}
+            growth={DEMO_GROWTH}
             className="h-full w-full"
             label={`A 3D figure of a whole body doing elbow flexion reps toward a ${GOAL} degree goal, its shoulder, elbow and wrist tracked and the angle read out live in degrees`}
             fallback={<Pending onPending={setPending} />}

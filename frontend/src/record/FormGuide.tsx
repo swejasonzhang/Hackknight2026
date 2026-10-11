@@ -2,13 +2,16 @@ import { EXERCISES, sideLabel, type ExerciseId, type Side } from '@arc/dependenc
 import { MuscleKey } from '../components/MuscleKey'
 import { LazyJointScene, SceneBoundary } from '../components/three/lazy'
 import { useRepLoop } from '../components/three/useRepLoop'
+import type { Growth } from '../components/three/body/figure'
+import type { FigureKey } from '../components/three/skeleton'
 
 /**
  * Beside the camera: the movement done right. A figure loops full reps from the start position to
  * the goal, painted with the muscles it works, and drawn as the member sees themselves in the
- * mirrored camera view (working on the side they picked); under it, the key and the cue.
+ * mirrored camera view (working on the side they picked), on their own body as their training has
+ * built it; under it, the key and the cue.
  */
-export function FormGuide({ exercise, side, targetDeg }: { exercise: ExerciseId; side: Side; targetDeg: number }) {
+export function FormGuide({ exercise, side, targetDeg, figure = 'neutral', growth = null }: { exercise: ExerciseId; side: Side; targetDeg: number; figure?: FigureKey; growth?: Growth | null }) {
   const cfg = EXERCISES[exercise]
   const angle = useRepLoop(exercise, targetDeg)
   const still = (
@@ -26,6 +29,8 @@ export function FormGuide({ exercise, side, targetDeg }: { exercise: ExerciseId;
             angle={angle ?? targetDeg}
             goalDeg={targetDeg}
             mirrored={side === 'right'}
+            figure={figure}
+            growth={growth}
             className="h-full w-full"
             label={`A figure doing ${cfg.name.toLowerCase()} reps the right way, from the start position to the ${targetDeg} degree goal, with the muscles it works coloured`}
             fallback={still}

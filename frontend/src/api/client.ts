@@ -1,6 +1,7 @@
 import type {
   AskInput,
   AuthResponse,
+  BodyDto,
   CoachMessageDto,
   CoachStatus,
   OnboardingInput,
@@ -22,6 +23,7 @@ import type {
   SessionDto,
   SignupInput,
   UpdatePlanInput,
+  UpdateProfileInput,
   UserDto,
 } from '@arc/dependencies'
 import { getToken, signOutLocally } from '../auth/token'
@@ -87,6 +89,8 @@ export const api = {
     list: () => request<ProfileDto[]>('/api/profiles'),
     get: (id: string) => request<ProfileDto>(`/api/profiles/${id}`),
     create: (input: CreateProfileInput) => request<ProfileDto>('/api/profiles', { method: 'POST', body: input }),
+    /** Which body the figure is drawn as; `{ figure: null }` clears it. */
+    update: (id: string, input: UpdateProfileInput) => request<ProfileDto>(`/api/profiles/${id}`, { method: 'PATCH', body: input }),
     delete: (id: string) => request<void>(`/api/profiles/${id}`, { method: 'DELETE' }),
   },
   plan: {
@@ -115,6 +119,8 @@ export const api = {
   },
   progress: (profileId: string, exercise: ExerciseId) =>
     request<ProgressDto>(`/api/profiles/${profileId}/progress?exercise=${exercise}`),
+  /** The body the profile's training has grown: each muscle group's level, and week by week. */
+  body: (profileId: string) => request<BodyDto>(`/api/profiles/${profileId}/body`),
   /** Arc, the coach: onboarding chat, reads after a set and a session, and Arc's voice. */
   coach: {
     status: () => request<CoachStatus>('/api/coach/status'),

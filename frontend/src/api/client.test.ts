@@ -68,6 +68,29 @@ describe('api client', () => {
     expect(fetchMock.mock.calls[0]![0]).toBe('/api/profiles/p1/progress?exercise=elbow_flexion')
   })
 
+  it("changes a profile's figure with PATCH, and clears it with null", async () => {
+    const fetchMock = vi.fn().mockImplementation(() => Promise.resolve(jsonResponse({ id: 'p1', name: 'Ada', figure: 'female', createdAt: 1 })))
+    vi.stubGlobal('fetch', fetchMock)
+    const profile = await api.profiles.update('p1', { figure: 'female' })
+    expect(profile.figure).toBe('female')
+    const [url, init] = fetchMock.mock.calls[0]!
+    expect(url).toBe('/api/profiles/p1')
+    expect(init.method).toBe('PATCH')
+    expect(JSON.parse(init.body)).toEqual({ figure: 'female' })
+    await api.profiles.update('p1', { figure: null })
+    expect(JSON.parse(fetchMock.mock.calls[1]![1].body)).toEqual({ figure: null })
+  })
+
+  it('fetches the body the training grew', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse({ profileId: 'p1', figure: null, asOf: 1, overall: 0, muscles: {}, weeks: [] }))
+    vi.stubGlobal('fetch', fetchMock)
+    const body = await api.body('p1')
+    expect(body).toMatchObject({ profileId: 'p1', figure: null, weeks: [] })
+    const [url, init] = fetchMock.mock.calls[0]!
+    expect(url).toBe('/api/profiles/p1/body')
+    expect(init.method).toBe('GET')
+  })
+
   it('throws ApiRequestError with the server message on non-2xx', async () => {
     vi.stubGlobal('fetch', vi.fn().mockImplementation(() => Promise.resolve(jsonResponse({ error: 'Invalid request', issues: [] }, 400))))
     await expect(api.profiles.create({ name: '' })).rejects.toMatchObject({ status: 400, message: 'Invalid request' })
