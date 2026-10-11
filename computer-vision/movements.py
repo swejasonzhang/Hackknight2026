@@ -523,35 +523,37 @@ class ExerciseTracker:
         return routine
 
     def _get_default_routine(self):
+        # The catalog's thresholds (Arc's, once main.py has aligned it), so the fallback counts like the rest.
+        curl, tricep, squat = (self.get_exercise_by_id(i) for i in ("1", "2", "11"))
         return [
             RoutineExercise(
                 "Bicep Curls (Right)",
                 (self.LEFT_SHOULDER, self.LEFT_ELBOW, self.LEFT_WRIST),
-                flex_threshold=40.0,
-                extend_threshold=150.0,
+                flex_threshold=curl["flex_threshold"],
+                extend_threshold=curl["extend_threshold"],
                 target_reps=3,
                 target_sets=2,
-                invert_logic=False,
+                invert_logic=curl["invert_logic"],
                 max_allowed_extension=175.0,
             ),
             RoutineExercise(
                 "Tricep Extension (Down) (Right)",
                 (self.LEFT_SHOULDER, self.LEFT_ELBOW, self.LEFT_WRIST),
-                flex_threshold=60.0,
-                extend_threshold=140.0,
+                flex_threshold=tricep["flex_threshold"],
+                extend_threshold=tricep["extend_threshold"],
                 target_reps=3,
                 target_sets=2,
-                invert_logic=True,
+                invert_logic=tricep["invert_logic"],
                 max_allowed_extension=180.0,
             ),
             RoutineExercise(
                 "Squats",
                 (self.LEFT_HIP, self.LEFT_KNEE, self.LEFT_ANKLE),
-                flex_threshold=90.0,
-                extend_threshold=160.0,
+                flex_threshold=squat["flex_threshold"],
+                extend_threshold=squat["extend_threshold"],
                 target_reps=3,
                 target_sets=2,
-                invert_logic=False,
+                invert_logic=squat["invert_logic"],
                 max_allowed_extension=180.0,
             ),
         ]
@@ -573,7 +575,9 @@ class ExerciseTracker:
         dy = right_shoulder[1] - left_shoulder[1]
         radians = math.atan2(dy, dx)
         angle = abs(radians * 180.0 / math.pi)
-        return angle
+        # The tilt off the level either way (0-90), as Arc measures it: in the mirrored frame the
+        # right shoulder can sit left of the left one, which reads a level line as 180.
+        return 180.0 - angle if angle > 90.0 else angle
 
     def advance_set_or_exercise(self):
         """Advances to the next set or moves to the next exercise once all sets are complete."""
@@ -1137,5 +1141,9 @@ class ExerciseTracker:
 
 
 if __name__ == "__main__":
+    from arc_routine import align_catalog
+
+    # Count at Arc's thresholds, the same angles as in the browser (as main.py does).
+    align_catalog(ExerciseTracker.get_exercise_by_id)
     tracker = ExerciseTracker()
     tracker.run()

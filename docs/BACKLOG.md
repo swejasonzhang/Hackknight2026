@@ -40,8 +40,8 @@ Owners: **FS** = full-stack (this repo), **CV** = computer-vision camera app, **
 | D4 | As a user I get helpful errors when the API is down | toast + retry; status dot already exists | 2 | Backlog |
 | D5 | As a user I can reset a forgotten password | email link, token expiry, tests | 5 | Backlog |
 | D6 | As a first-time visitor the site opens fast | split the app's pages from the landing bundle (the main chunk is 1.2 MB before gzip); 3D and pose tracking already load on demand | 3 | Backlog |
-| D7 | As a member my reps count the same in the browser and the camera app | one set of rep thresholds agreed with the CV team (`exercises.ts` ↔ `movements.py`) | 3 | Backlog (needs CV) |
-| D8 | As a member Arc speaks in its ElevenLabs voice and Gemini's words on the live site | `GEMINI_API_KEY` and `ELEVENLABS_API_KEY` set on `getarc-api`; record page says "ElevenLabs" | 1 | Ops (keys not set yet) |
+| D7 | As a member my reps count the same in the browser and the camera app | the camera app counts at `exercises.ts`'s thresholds via `arc_catalog.json`, kept in step by a test; the twist reads the same tilt | 3 | Done (ADR-0029); CV to try each movement on camera |
+| D8 | As a member Arc speaks in its ElevenLabs voice and Gemini's words on the live site | `GEMINI_API_KEY` and `ELEVENLABS_API_KEY` set on `getarc-api`; record page says "ElevenLabs" | 1 | Ops (keys set; check the record page says ElevenLabs) |
 
 ## Epic E: Arc, the coach (FS + AI) — Done
 

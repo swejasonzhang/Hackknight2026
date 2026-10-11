@@ -2,7 +2,8 @@ import type { RejectedRep } from './form.ts'
 
 /**
  * Domain types shared by the server and the browser (recorder, dashboard, Arc's pages); the
- * Python camera app maps its own catalog onto the same exercise ids.
+ * Python camera app maps its own catalog onto the same exercise ids and counts reps at the same
+ * thresholds (computer-vision/arc_catalog.json).
  * Everything in dependencies/src/engine is pure TypeScript: no DOM, no Node, no MediaPipe.
  */
 

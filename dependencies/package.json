@@ -9,6 +9,7 @@
   "scripts": {
     "test": "vitest run",
     "test:watch": "vitest",
+    "catalog": "vitest run src/engine/cameraCatalog.test.ts -u",
     "typecheck": "tsc -p tsconfig.json"
   },
   "dependencies": {
