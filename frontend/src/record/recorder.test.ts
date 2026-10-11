@@ -115,6 +115,32 @@ describe('SessionRecorder voice commands', () => {
     expect(rec.view.totalReps).toBe(2)
   })
 
+  it('never counts a rep caught half done: resuming with the arm up, lowering it alone is not a rep', () => {
+    const rec = new SessionRecorder({ exercise: 'elbow_flexion', side: 'right', plan })
+    let t = run(rec, T0, READY_MS + 100, () => 10)
+    // Up into a rep, pause at the top, resume there, and only lower the arm.
+    t = run(rec, t, 1000, (x) => 10 + (130 * x) / 1000)
+    rec.command('pause', t)
+    t = run(rec, t, 500, () => 140)
+    rec.command('resume', t)
+    t = run(rec, t, 1000, (x) => 140 - (130 * x) / 1000)
+    t = run(rec, t, 500, () => 10)
+    expect(rec.view.totalReps).toBe(0)
+    // A whole rep after that counts.
+    t = run(rec, t, 2400, (x) => curl(x, 130, 2000))
+    expect(rec.view.totalReps).toBe(1)
+  })
+
+  it('"start" during the rest starts the next set now', () => {
+    const rec = new SessionRecorder({ exercise: 'elbow_flexion', side: 'right', plan })
+    let t = run(rec, T0, READY_MS + 100, () => 10)
+    t = run(rec, t, 3 * 2000 + 400, (x) => curl(x))
+    expect(rec.view.phase).toBe('rest')
+    rec.command('start', t)
+    expect(rec.view.phase).toBe('active')
+    expect(rec.view.setNumber).toBe(2)
+  })
+
   it('"pause" during the rest freezes the countdown', () => {
     const rec = new SessionRecorder({ exercise: 'elbow_flexion', side: 'right', plan })
     let t = run(rec, T0, READY_MS + 100, () => 10)

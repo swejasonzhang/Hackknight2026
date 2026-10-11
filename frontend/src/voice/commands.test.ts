@@ -57,4 +57,15 @@ describe('isForArc: what Arc answers when it is not a command', () => {
   it('lets talk that is not for Arc go by', () => {
     for (const said of ['yeah', 'okay so anyway the game starts at eight', 'mm hmm', '']) expect(isForArc(said), said).toBe(false)
   })
+
+  it('answers a question rather than obeying it: "am I done?" never ends the session', () => {
+    expect(parseCommand('Am I done?')).toBeNull()
+    expect(parseCommand("What's next?")).toBeNull()
+    expect(parseCommand('Is it rest time?')).toBeNull()
+    expect(isForArc('Am I done yet')).toBe(true)
+    // A request put as a question is still a request; asking how many is still the status.
+    expect(parseCommand('Arc, can we pause')).toBe('pause')
+    expect(parseCommand('Arc, can you skip the rest')).toBe('skip')
+    expect(parseCommand('how many')).toBe('status')
+  })
 })

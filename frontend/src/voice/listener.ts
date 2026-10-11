@@ -37,6 +37,11 @@ export function createListener(onPhrase: (text: string) => void, onState?: (stat
   let rec: Recognition | null = null
   let wanted = false
   let muted = false
+  let unmuteAt: ReturnType<typeof setTimeout> | undefined
+  /** Why listening stopped for good (no permission, no microphone), reported once it ends. */
+  let fatal: ListenerState | null = null
+  /** How long to wait before listening again after a network error, growing each time. */
+  let retryMs = 250
 
   const boot = () => {
     if (!Ctor || !wanted) return
@@ -51,18 +56,21 @@ export function createListener(onPhrase: (text: string) => void, onState?: (stat
       }
     }
     rec.onerror = (e) => {
-      if (e.error === 'not-allowed' || e.error === 'service-not-allowed') {
+      if (e.error === 'not-allowed' || e.error === 'service-not-allowed' || e.error === 'audio-capture') {
         wanted = false
+        fatal = 'blocked'
         onState?.('blocked')
-      }
+      } else if (e.error === 'network') retryMs = Math.min(10_000, retryMs * 2)
     }
     rec.onend = () => {
       rec = null
-      if (wanted) setTimeout(boot, 250)
-      else onState?.('off')
+      if (wanted) setTimeout(boot, retryMs)
+      // The end that follows a refusal must not paper over it with "off".
+      else onState?.(fatal ?? 'off')
     }
     try {
       rec.start()
+      retryMs = 250
       onState?.('listening')
     } catch {
       /* already started */
@@ -78,6 +86,7 @@ export function createListener(onPhrase: (text: string) => void, onState?: (stat
       }
       if (wanted) return
       wanted = true
+      fatal = null
       boot()
     },
     stop() {
@@ -85,7 +94,11 @@ export function createListener(onPhrase: (text: string) => void, onState?: (stat
       rec?.stop()
     },
     mute(value) {
-      muted = value
+      // Arc's own last words reach the recogniser a moment after its voice stops: stay deaf a
+      // little longer, so "Rest." or "Back to it." is never heard as the member's command.
+      clearTimeout(unmuteAt)
+      if (value) muted = true
+      else unmuteAt = setTimeout(() => (muted = false), 1200)
     },
   }
 }
