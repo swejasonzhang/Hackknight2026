@@ -64,7 +64,8 @@ function seen(landmarks: readonly Landmark[], exercise: ExerciseId, side: Side):
  * gives them, so a curl done facing the camera reads true: on the flat picture the forearm coming
  * toward the lens shortens to a stub and its angle swings wildly. Without them it is measured on
  * the real picture (`aspect` = video width / height, since x and y are both 0..1). A tilt (the ab
- * twist's shoulder line against the level) is always measured on the picture, where level is.
+ * twist's shoulder line against the level) and a reading across the body (the pec fly's wrists
+ * through a shoulder) are always measured on the picture, as the camera app defines them.
  *
  * A movement with no side to pick (a squat, a deadlift) is read on whichever side the camera sees
  * better. `prefer` is the side read last time: it is kept until the other is seen clearly better,
@@ -81,7 +82,10 @@ export function readJoint(landmarks: readonly Landmark[] | null | undefined, exe
   if (marks.some((m) => !m || (m.visibility ?? 1) < MIN_VISIBILITY)) return untracked(side)
   const points = marks.map((m) => [m!.x, m!.y]) as JointReading['points'] & object
   const [a, b, c] = points.map(([x, y]) => [x * aspect, y] as [number, number]) as [[number, number], [number, number], [number, number]]
-  const inSpace = cfg.measure !== 'tilt' && world ? indices.map((i) => world[i]) : null
+  // In space only along one limb (the same side's landmarks): a reading across the body, both
+  // wrists through a shoulder (the pec fly), is defined on the picture, as the camera app reads it.
+  const oneSide = indices.every((i) => i % 2 === indices[0]! % 2)
+  const inSpace = cfg.measure !== 'tilt' && oneSide && world ? indices.map((i) => world[i]) : null
   const innerDeg =
     cfg.measure === 'tilt'
       ? tiltDeg(a, b)

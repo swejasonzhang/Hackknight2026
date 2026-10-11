@@ -3,9 +3,10 @@ import { Grid, Line, OrbitControls } from '@react-three/drei'
 import { Canvas, useFrame, useThree } from '@react-three/fiber'
 import { useReducedMotion, type MotionValue } from 'motion/react'
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
-import { Bone, BoxGeometry, BufferAttribute, BufferGeometry, CircleGeometry, Color, DoubleSide, Group, Matrix4, MeshBasicMaterial, MeshStandardMaterial, Object3D, Quaternion, Skeleton as ThreeSkeleton, SkinnedMesh, TorusGeometry, Vector3 } from 'three'
+import { Bone, BoxGeometry, BufferAttribute, BufferGeometry, CircleGeometry, Color, CylinderGeometry, DoubleSide, Group, Matrix4, MeshBasicMaterial, MeshStandardMaterial, Object3D, Quaternion, Skeleton as ThreeSkeleton, SkinnedMesh, TorusGeometry, Vector3 } from 'three'
 import { HELPER_YELLOW, TARGET_RED } from './colors'
-import { bodyPositions, BONE_NAMES, facingFor, GARMENT_LIFT, garmentPositions, garmentSkin, garmentsOf, paintBody, paintGarment, skinMatrices, vertexNormals, visibleTriangles, type BodyAsset, type GarmentName, type Growth, type Palette, type Rgb, type Show } from './body/figure'
+import { applyMat, bodyPositions, BONE_NAMES, handleOf, facingFor, GARMENT_LIFT, garmentPositions, garmentSkin, garmentsOf, paintBody, paintGarment, skinMatrices, vertexNormals, visibleTriangles, type BodyAsset, type GarmentName, type Grip, type Growth, type Palette, type Rgb, type Show } from './body/figure'
+import { HOLDS, RELAXED_HANDS, type Hold } from './body/hold'
 import { bodyAsset, loadBody } from './body/load'
 import { framingFor, restFor, skeletonFor, sweepFor, type FigureKey, type Skeleton, type V3 } from './skeleton'
 
@@ -35,6 +36,10 @@ export interface JointSceneProps {
   spin?: boolean
   /** Frame only this reading (a figure that holds one pose) rather than the movement's whole range. */
   frameAt?: number
+  /** Hold the movement's weight (body/hold.ts): the hands closed round a dumbbell, a cable's handle or a bar. On by default; off, the hands hang relaxed and empty. */
+  holding?: boolean
+  /** How closed each hand is, overriding the movement's own. */
+  grip?: Grip
   className?: string
   /** What the picture shows, for assistive tech. */
   label: string
@@ -78,12 +83,22 @@ function build() {
     dot: new MeshBasicMaterial({ color: NAVY }),
     arc: new MeshBasicMaterial({ color: COBALT, side: DoubleSide, transparent: true, opacity: 0.85 }),
     band: new MeshBasicMaterial({ color: COBALT, side: DoubleSide, transparent: true, opacity: 0.16, depthWrite: false }),
+    // The weights the hands hold: graphite iron, black rubber grips.
+    iron: new MeshStandardMaterial({ color: '#3a4152', roughness: 0.38, metalness: 0.65 }),
+    rubber: new MeshStandardMaterial({ color: '#16181d', roughness: 0.85, metalness: 0 }),
+    rod: new CylinderGeometry(1, 1, 1, 16),
+    hex: new CylinderGeometry(1, 1, 1, 6),
     torus: new TorusGeometry(1, 0.14, 12, 40),
     disc: new CircleGeometry(0.38, 24),
     box: new BoxGeometry(1, 1, 1),
   }
 }
 const parts = () => (shared ??= build())
+
+type HandSide = 'r' | 'l'
+const EMPTY_HANDS: Hold = { grip: RELAXED_HANDS, right: null, left: null }
+const HAND_BONE: Record<HandSide, number> = { r: BONE_NAMES.indexOf('rHand'), l: BONE_NAMES.indexOf('lHand') }
+const tmpA = new Vector3()
 
 /** This mount's body: a skinned mesh over Arc's bones and its clothes on the same bones, sharing the decoded arrays. */
 function makeBody(asset: BodyAsset) {
@@ -186,6 +201,8 @@ function useBinder() {
 }
 
 type BodyProps = Pick<JointSceneProps, 'exercise' | 'angle' | 'goalDeg' | 'rangeDeg' | 'idle' | 'frameAt'> & {
+  grip: Grip
+  holding: boolean
   asset: BodyAsset
   reduce: boolean
   muscles: boolean
@@ -197,7 +214,7 @@ type BodyProps = Pick<JointSceneProps, 'exercise' | 'angle' | 'goalDeg' | 'range
   spin: boolean
 }
 
-function Body({ asset, exercise, angle, goalDeg, rangeDeg, idle, reduce, muscles, mirrored, figure, growth, growthShade, instrument, spin, frameAt }: BodyProps) {
+function Body({ asset, exercise, angle, goalDeg, rangeDeg, idle, reduce, muscles, mirrored, figure, growth, growthShade, instrument, spin, frameAt, grip, holding }: BodyProps) {
   const p = parts()
   const sway = useRef<Group>(null)
   const { objects, bind } = useBinder()
@@ -224,6 +241,9 @@ function Body({ asset, exercise, angle, goalDeg, rangeDeg, idle, reduce, muscles
   const ring = 0.05 / frame.scale
   const facing = facingFor(exercise)
   const growthKey = growth ? JSON.stringify(growth) : ''
+  const gripKey = `${grip.right}|${grip.left}`
+  const hold = holding ? HOLDS[exercise] : EMPTY_HANDS
+  const handles = useMemo(() => ({ r: handleOf(figure, 'r'), l: handleOf(figure, 'l') }), [figure])
 
   useEffect(
     () => () => {
@@ -241,7 +261,7 @@ function Body({ asset, exercise, angle, goalDeg, rangeDeg, idle, reduce, muscles
   const positions = useMemo(() => {
     const attr = body.geometry.getAttribute('position') as BufferAttribute
     const normals = body.geometry.getAttribute('normal') as BufferAttribute
-    bodyPositions(asset, figure, growth, attr.array as Float32Array)
+    bodyPositions(asset, figure, growth, attr.array as Float32Array, grip)
     vertexNormals(attr.array as Float32Array, asset.index, normals.array as Float32Array)
     attr.needsUpdate = true
     normals.needsUpdate = true
@@ -256,7 +276,7 @@ function Body({ asset, exercise, angle, goalDeg, rangeDeg, idle, reduce, muscles
     }
     return attr.array as Float32Array
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [asset, body, figure, growthKey])
+  }, [asset, body, figure, growthKey, gripKey])
 
   // What a figure wears: its garments shown, and the skin they cover left undrawn.
   useEffect(() => {
@@ -287,13 +307,38 @@ function Body({ asset, exercise, angle, goalDeg, rangeDeg, idle, reduce, muscles
   }, [invalidate, exercise, angle, goalDeg, rangeDeg, figure, positions])
 
   const apply = (s: Skeleton) => {
-    const matrices = skinMatrices(figure, s)
+    // The hands that hold something turn to hold it the way the movement does.
+    const matrices = skinMatrices(figure, s, hold.line ? { r: hold.right || hold.bar ? hold.line : null, l: hold.left || hold.bar ? hold.line : null } : undefined)
     body.bones.forEach((bone, i) => {
       bone.matrix.fromArray(matrices[i]!)
       bone.matrixWorldNeedsUpdate = true
     })
 
     const o = objects.current
+    // The weights, in the closed hands: each handle's centre and line carried by its hand.
+    const held: Partial<Record<HandSide, { at: V3; axis: V3 }>> = {}
+    for (const side of ['r', 'l'] as const) {
+      const m = matrices[HAND_BONE[side]]!
+      const h = handles[side]
+      const at = applyMat(m, h.at)
+      const tip = applyMat(m, [h.at[0] + h.axis[0], h.at[1] + h.axis[1], h.at[2] + h.axis[2]])
+      held[side] = { at, axis: [tip[0] - at[0], tip[1] - at[1], tip[2] - at[2]] }
+      const weight = o[`held-${side}`]
+      if (weight) {
+        weight.position.set(at[0], at[1], at[2])
+        weight.quaternion.copy(tmpQuat.setFromUnitVectors(UP, tmpA.set(...held[side]!.axis).normalize()))
+      }
+    }
+    const bar = o['bar']
+    if (bar && held.r && held.l) {
+      // A bar through both hands, a hand's width past each.
+      const r = held.r.at
+      const l = held.l.at
+      const d: V3 = [l[0] - r[0], l[1] - r[1], l[2] - r[2]]
+      const n = Math.hypot(...d) || 1
+      const over = 0.75 / n
+      place(bar, [r[0] - d[0] * over, r[1] - d[1] * over, r[2] - d[2] * over], [l[0] + d[0] * over, l[1] + d[1] * over, l[2] + d[2] * over], true)
+    }
     const ov = s.overlay
     const z = ov.z
     o['ring-base']?.position.set(ov.base[0], ov.base[1], z + 0.01)
@@ -346,6 +391,27 @@ function Body({ asset, exercise, angle, goalDeg, rangeDeg, idle, reduce, muscles
       <group scale={[mirrored ? -1 : 1, 1, 1]}>
         <group position={frame.offset} scale={frame.scale}>
           <primitive object={body.mesh} />
+
+          {/* What the hands hold: a dumbbell, a cable's handle, or a bar across both. */}
+          {(['r', 'l'] as const).map((side) => {
+            const what = side === 'r' ? hold.right : hold.left
+            return (
+              <group key={side} ref={bind(`held-${side}`)} visible={what != null}>
+                {what === 'dumbbell' && (
+                  <>
+                    <mesh geometry={p.rod} material={p.iron} scale={[0.055, 0.62, 0.055]} />
+                    {[-1, 1].map((end) => (
+                      <mesh key={end} geometry={p.hex} material={p.rubber} position={[0, end * 0.42, 0]} scale={[0.2, 0.22, 0.2]} />
+                    ))}
+                  </>
+                )}
+                {what === 'handle' && <mesh geometry={p.rod} material={p.rubber} scale={[0.07, 0.5, 0.07]} />}
+              </group>
+            )
+          })}
+          <group ref={bind('bar')} visible={hold.bar === true}>
+            <mesh geometry={p.rod} material={p.iron} position={[0, 0.5, 0]} scale={[0.05, 1, 0.05]} />
+          </group>
 
           {/* The stool: always built, shown only for the seated exercise. */}
           <group visible={rest.seat != null}>
@@ -408,7 +474,7 @@ function Floor({ exercise, figure, frameAt }: { exercise: ExerciseId; figure: Fi
  * it (`growth`). Drive `angle` with `useRepLoop` to sweep the limb through the range rep after
  * rep. Never rendered in tests: use `LazyJointScene`, which loads the body with the code.
  */
-export default function JointScene({ exercise, angle, goalDeg, rangeDeg, idle = true, muscles = true, mirrored = false, figure = 'neutral', growth = null, growthShade = false, instrument = true, spin = false, frameAt, className = '', label, fallback = null }: JointSceneProps) {
+export default function JointScene({ exercise, angle, goalDeg, rangeDeg, idle = true, muscles = true, mirrored = false, figure = 'neutral', growth = null, growthShade = false, instrument = true, spin = false, frameAt, holding = true, grip, className = '', label, fallback = null }: JointSceneProps) {
   const reduce = useReducedMotion() ?? false
   const fixed = typeof angle === 'number' ? angle : angle.get()
   // The body loads with the scene's code; if that download failed, show the fallback and try again.
@@ -429,7 +495,7 @@ export default function JointScene({ exercise, angle, goalDeg, rangeDeg, idle = 
           <hemisphereLight args={['#ffffff', '#9aa8c2', 1.0]} />
           <directionalLight position={[3, 4, 5]} intensity={2.2} />
           <directionalLight position={[-4, 1.5, -3]} intensity={1.4} color="#c9d6ff" />
-          <Body asset={asset} exercise={exercise} angle={reduce ? fixed : angle} goalDeg={goalDeg} rangeDeg={rangeDeg} idle={!reduce && idle} reduce={reduce} muscles={muscles} mirrored={mirrored} figure={figure} growth={growth} growthShade={growthShade} instrument={instrument} spin={!reduce && spin} frameAt={frameAt} />
+          <Body asset={asset} exercise={exercise} angle={reduce ? fixed : angle} goalDeg={goalDeg} rangeDeg={rangeDeg} idle={!reduce && idle} reduce={reduce} muscles={muscles} mirrored={mirrored} figure={figure} growth={growth} growthShade={growthShade} instrument={instrument} spin={!reduce && spin} frameAt={frameAt} holding={holding} grip={grip ?? (holding ? HOLDS[exercise].grip : RELAXED_HANDS)} />
           <Floor exercise={exercise} figure={figure} frameAt={frameAt} />
           <OrbitControls enableZoom={false} enablePan={false} minPolarAngle={Math.PI / 3} maxPolarAngle={Math.PI / 1.7} />
         </Canvas>

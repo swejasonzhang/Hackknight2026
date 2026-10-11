@@ -54,6 +54,8 @@ export interface BodyAsset {
   maskIndex: Uint8Array
   maskWeight: Float32Array
   garments: Record<GarmentName, Garment>
+  /** The closed hand: the finger vertices, which hand each is on (0 right, 1 left), and per sex how far each moves to close round a handle. */
+  grip: { index: Uint16Array; side: Uint8Array; offsets: Record<Sex, Float32Array> }
 }
 
 type Section = (typeof BODY_META.sections)[number]
@@ -83,6 +85,14 @@ export function decodeBody(buffer: ArrayBuffer): BodyAsset {
     shapes[sex] = { skinny, growth: Float32Array.from(view(`${sex}.growth`, Int16Array), (x) => x * step) }
   }
   const unitBytes = (name: string) => Float32Array.from(view(name, Uint8Array), (x) => x / 255)
+  const gripIndex = view('gripIndex', Uint16Array)
+  const gripOffsets = {} as Record<Sex, Float32Array>
+  for (const sex of ['female', 'male'] as const) {
+    const step = (section(`${sex}.grip`) as Section & { step: number }).step
+    gripOffsets[sex] = Float32Array.from(view(`${sex}.grip`, Int16Array), (x) => x * step)
+  }
+  // The right hand is on the figure's −X side in the bind pose.
+  const gripSide = Uint8Array.from(gripIndex, (v) => (shapes.female.skinny[v * 3]! < 0 ? 0 : 1))
   const garment = (name: GarmentName): Garment => {
     const a = view(`${name}.a`, Uint16Array)
     const faces = view(`${name}.faces`, Uint16Array)
@@ -118,6 +128,7 @@ export function decodeBody(buffer: ArrayBuffer): BodyAsset {
     maskIndex: view('maskIndex', Uint8Array),
     maskWeight: unitBytes('maskWeight'),
     garments: { shorts: garment('shorts'), top: garment('top') },
+    grip: { index: gripIndex, side: gripSide, offsets: gripOffsets },
   }
 }
 
@@ -160,6 +171,13 @@ export interface Growth {
   overall: number
 }
 
+/** How closed each hand is: 0 open and relaxed, 1 closed round a handle. */
+export interface Grip {
+  right: number
+  left: number
+}
+export const OPEN_HANDS: Grip = { right: 0, left: 0 }
+
 /** A body a few months into steady training, for the landing page's figures. */
 export const DEMO_GROWTH: Growth = { levels: Object.fromEntries(MUSCLE_IDS.map((m) => [m, 0.45])), overall: 0.45 }
 
@@ -171,7 +189,7 @@ const clamp01 = (x: number) => Math.min(1, Math.max(0, x))
  * elsewhere, so the hands, the face and the joints follow the body as a whole and nothing creases
  * at a group's edge.
  */
-export function bodyPositions(asset: BodyAsset, figure: FigureKey, growth: Growth | null, out: Float32Array = new Float32Array(asset.vertices * 3)): Float32Array {
+export function bodyPositions(asset: BodyAsset, figure: FigureKey, growth: Growth | null, out: Float32Array = new Float32Array(asset.vertices * 3), grip: Grip = OPEN_HANDS): Float32Array {
   const V = asset.vertices
   const groups = MUSCLE_IDS.map((m) => clamp01(growth?.levels[m] ?? 0))
   const overall = clamp01(growth?.overall ?? 0)
@@ -191,6 +209,16 @@ export function bodyPositions(asset: BodyAsset, figure: FigureKey, growth: Growt
       }
     }
   }
+  // The hands, closed as far as the movement holds something.
+  if (grip.right || grip.left) {
+    const { index, side, offsets } = asset.grip
+    for (let n = 0; n < index.length; n++) {
+      const k = clamp01(side[n] ? grip.left : grip.right)
+      if (!k) continue
+      const v = index[n]!
+      for (const [sex, share] of sexes) for (let c = 0; c < 3; c++) out[v * 3 + c] = out[v * 3 + c]! + share * k * offsets[sex][n * 3 + c]!
+    }
+  }
   return out
 }
 
@@ -206,6 +234,7 @@ const unitV = (a: Vec): Vec => {
   return [a[0] / l, a[1] / l, a[2] / l]
 }
 const scaleV = (a: Vec, k: number): Vec => [a[0] * k, a[1] * k, a[2] * k]
+const addV = (a: Vec, b: Vec): Vec => [a[0] + b[0], a[1] + b[1], a[2] + b[2]]
 /** `v` turned by the rotation that takes unit `from` onto unit `to`; a half turn goes round +Z, as every movement does. */
 function carry(from: Vec, to: Vec, v: Vec): Vec {
   const c = dotV(from, to)
@@ -257,11 +286,12 @@ const LEG_CHAIN: [SkinBone, JointName, JointName][] = [
  * turns with the trunk side on (a hinge), stays level face on (a twist), and stays where the pose
  * says when it says (flat on the floor for a crunch).
  */
-export function frames(pose: Pick<Skeleton, 'joints' | 'view' | 'pelvisUp'>): Partial<Record<SkinBone, Frame>> {
+export function frames(pose: Pick<Skeleton, 'joints' | 'view' | 'pelvisUp' | 'twist'>): Partial<Record<SkinBone, Frame>> {
   const j = pose.joints as JointSet
   const side = pose.view === 'side'
   const up = unitV(subV(j.neck, j.pelvis))
-  const fwd: Vec = side ? [up[1], -up[0], 0] : [0, 0, 1]
+  // Face on, the trunk's front is the camera's way, turned about the upright when the pose twists.
+  const fwd: Vec = side ? [up[1], -up[0], 0] : pose.twist ? [Math.sin(pose.twist), 0, Math.cos(pose.twist)] : [0, 0, 1]
   const pUp: Vec = pose.pelvisUp ? [pose.pelvisUp[0], pose.pelvisUp[1], pose.pelvisUp[2]] : side ? up : [0, 1, 0]
   const pFwd: Vec = side ? [pUp[1], -pUp[0], 0] : [0, 0, 1]
   const hips: Vec = [(j.rHip[0] + j.lHip[0]) / 2, (j.rHip[1] + j.lHip[1]) / 2, (j.rHip[2] + j.lHip[2]) / 2]
@@ -388,11 +418,54 @@ const HELPERS: { bone: SkinBone; from: SkinBone; to: SkinBone; joint: JointName;
 ]
 
 /**
+ * Which way a closed hand's handle lies, as the movement holds it: across the body (parallel to
+ * the shoulders: a press, a front raise, a bar), pointing forward (a neutral grip: a row, a lateral
+ * raise), or upright (palms facing each other: a fly's handles). Null leaves the hand as the arm
+ * carries it.
+ */
+export type HandleLine = 'across' | 'forward' | 'upright' | null
+
+/** Each hand's handle in its bind pose, for a figure: the centre and the line across the palm. */
+export function handleOf(figure: FigureKey, side: 'r' | 'l'): { at: Vec; axis: Vec } {
+  const f: { at: readonly number[]; axis: readonly number[] } = BODY_META.handle.female[side]
+  const m: { at: readonly number[]; axis: readonly number[] } = BODY_META.handle.male[side]
+  const mix = (a: readonly number[], b: readonly number[]): Vec => (figure === 'female' ? [a[0]!, a[1]!, a[2]!] : figure === 'male' ? [b[0]!, b[1]!, b[2]!] : [(a[0]! + b[0]!) / 2, (a[1]! + b[1]!) / 2, (a[2]! + b[2]!) / 2])
+  return { at: mix(f.at, m.at), axis: unitV(mix(f.axis, m.axis)) }
+}
+
+/** The matrix that turns space by `angle` about the line through `o` along the unit `axis`. */
+function turnMatrix(o: Vec, axis: Vec, angle: number): Mat4 {
+  const [x, y, z] = axis
+  const c = Math.cos(angle)
+  const sn = Math.sin(angle)
+  const t = 1 - c
+  const m = new Float32Array(16)
+  m[0] = t * x * x + c
+  m[1] = t * x * y + sn * z
+  m[2] = t * x * z - sn * y
+  m[4] = t * x * y - sn * z
+  m[5] = t * y * y + c
+  m[6] = t * y * z + sn * x
+  m[8] = t * x * z + sn * y
+  m[9] = t * y * z - sn * x
+  m[10] = t * z * z + c
+  m[15] = 1
+  for (let r = 0; r < 3; r++) m[12 + r] = o[r]! - (m[r]! * o[0] + m[4 + r]! * o[1] + m[8 + r]! * o[2])
+  return m
+}
+function multiply(a: Mat4, b: Mat4): Mat4 {
+  const m = new Float32Array(16)
+  for (let c = 0; c < 4; c++) for (let r = 0; r < 4; r++) m[c * 4 + r] = a[r]! * b[c * 4]! + a[4 + r]! * b[c * 4 + 1]! + a[8 + r]! * b[c * 4 + 2]! + a[12 + r]! * b[c * 4 + 3]!
+  return m
+}
+
+/**
  * The skin matrix of every bone (in BONE_NAMES order) for a pose: what carries a point of the
  * figure's bind pose to where that pose puts it. The scene hands these to the GPU; the tests skin
- * on the CPU with the same numbers.
+ * on the CPU with the same numbers. `lines` turns each hand (and its forearm, half as far, as a
+ * wrist turns) about the forearm so its handle lies the way the movement holds it.
  */
-export function skinMatrices(figure: FigureKey, pose: Pick<Skeleton, 'joints' | 'view' | 'pelvisUp'>): Mat4[] {
+export function skinMatrices(figure: FigureKey, pose: Pick<Skeleton, 'joints' | 'view' | 'pelvisUp' | 'twist'>, lines?: { r?: HandleLine; l?: HandleLine }): Mat4[] {
   const bind = bindFrames(figure)
   const now = frames(pose)
   const out = new Map<SkinBone, Mat4>()
@@ -402,6 +475,33 @@ export function skinMatrices(figure: FigureKey, pose: Pick<Skeleton, 'joints' | 
     if (b && n) out.set(name, carryFrame(b, n, name !== 'pelvis' && name !== 'neck'))
   }
   for (const h of HELPERS) out.set(h.bone, between(out.get(h.from)!, out.get(h.to)!, bind.joints[h.joint] as unknown as Vec, h.share))
+  if (lines) {
+    const j = pose.joints as JointSet
+    const across = unitV(subV(j.lShoulder, j.rShoulder))
+    const upright = unitV(subV(j.neck, j.pelvis))
+    const forward = unitV(crossV(across, upright))
+    for (const side of ['r', 'l'] as const) {
+      const line = lines[side]
+      if (!line) continue
+      const handBone = side === 'r' ? 'rHand' : 'lHand'
+      const foreBone = side === 'r' ? 'rForearm' : 'lForearm'
+      const elbow = side === 'r' ? j.rElbow : j.lElbow
+      const wrist = side === 'r' ? j.rWrist : j.lWrist
+      const f = unitV(subV(wrist, elbow))
+      const flat = (v: Vec) => unitV(subV(v, scaleV(f, dotV(v, f))))
+      const hand = out.get(handBone)!
+      const h = handleOf(figure, side)
+      const now = flat(subV(applyMat(hand, addV(h.at, h.axis)), applyMat(hand, h.at)))
+      const want = flat(line === 'across' ? across : line === 'forward' ? forward : upright)
+      // A handle is a line, not a direction: turn the shorter way to it.
+      let angle = Math.atan2(dotV(crossV(now, want), f), dotV(now, want))
+      if (angle > Math.PI / 2) angle -= Math.PI
+      if (angle < -Math.PI / 2) angle += Math.PI
+      const at = wrist as unknown as Vec
+      out.set(handBone, multiply(turnMatrix(at, f, angle), hand))
+      out.set(foreBone, multiply(turnMatrix(at, f, angle / 2), out.get(foreBone)!))
+    }
+  }
   return BONE_NAMES.map((name) => out.get(name)!)
 }
 

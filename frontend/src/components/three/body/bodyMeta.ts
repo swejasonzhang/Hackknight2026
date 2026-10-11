@@ -77,7 +77,7 @@ export const BODY_META = {
       "triangles": 1312
     }
   },
-  "sha256": "a212ee701d778eb85f9646b23a8b163752ea8778ccf6b908323ddacf46a669ec",
+  "sha256": "3a4c82df159278a81bd01fabab423e96f851bb60719edc066eb3d6a40ac9f882",
   "sections": [
     {
       "name": "female.skinny",
@@ -126,93 +126,113 @@ export const BODY_META = {
       "step": 0.0000053164374
     },
     {
-      "name": "index",
+      "name": "gripIndex",
       "type": "Uint16",
       "offset": 324576,
+      "length": 3012
+    },
+    {
+      "name": "female.grip",
+      "type": "Int16",
+      "offset": 330600,
+      "length": 9036,
+      "step": 0.0000098987204
+    },
+    {
+      "name": "male.grip",
+      "type": "Int16",
+      "offset": 348672,
+      "length": 9036,
+      "step": 0.000011208929
+    },
+    {
+      "name": "index",
+      "type": "Uint16",
+      "offset": 366744,
       "length": 81108
     },
     {
       "name": "skinIndex",
       "type": "Uint8",
-      "offset": 486792,
+      "offset": 528960,
       "length": 54096
     },
     {
       "name": "skinWeight",
       "type": "Uint8",
-      "offset": 540888,
+      "offset": 583056,
       "length": 54096
     },
     {
       "name": "maskIndex",
       "type": "Uint8",
-      "offset": 594984,
+      "offset": 637152,
       "length": 40572
     },
     {
       "name": "maskWeight",
       "type": "Uint8",
-      "offset": 635556,
+      "offset": 677724,
       "length": 40572
     },
     {
       "name": "shorts.a",
       "type": "Uint16",
-      "offset": 676128,
+      "offset": 718296,
       "length": 672
     },
     {
       "name": "shorts.b",
       "type": "Uint16",
-      "offset": 677472,
+      "offset": 719640,
       "length": 672
     },
     {
       "name": "shorts.s",
       "type": "Uint16",
-      "offset": 678816,
+      "offset": 720984,
       "length": 672
     },
     {
       "name": "shorts.faces",
       "type": "Uint16",
-      "offset": 680160,
+      "offset": 722328,
       "length": 3501
     },
     {
       "name": "shorts.hem",
       "type": "Uint8",
-      "offset": 687164,
+      "offset": 729332,
       "length": 672
     },
     {
       "name": "top.a",
       "type": "Uint16",
-      "offset": 687836,
+      "offset": 730004,
       "length": 757
     },
     {
       "name": "top.b",
       "type": "Uint16",
-      "offset": 689352,
+      "offset": 731520,
       "length": 757
     },
     {
       "name": "top.s",
       "type": "Uint16",
-      "offset": 690868,
+      "offset": 733036,
       "length": 757
     },
     {
       "name": "top.faces",
       "type": "Uint16",
-      "offset": 692384,
+      "offset": 734552,
       "length": 3936
     },
     {
       "name": "top.hem",
       "type": "Uint8",
-      "offset": 700256,
+      "offset": 742424,
       "length": 757
     }
   ],
@@ -472,6 +492,80 @@ export const BODY_META = {
         0.2418,
         0.3438
       ]
+    }
+  },
+  "handle": {
+    "female": {
+      "r": {
+        "at": [
+          -1.59196,
+          3.36506,
+          0.7057
+        ],
+        "axis": [
+          -0.38214,
+          -0.376,
+          -0.84415
+        ],
+        "palm": [
+          0.74806,
+          -0.66219,
+          -0.04369
+        ]
+      },
+      "l": {
+        "at": [
+          1.59196,
+          3.36506,
+          0.7057
+        ],
+        "axis": [
+          0.38214,
+          -0.376,
+          -0.84415
+        ],
+        "palm": [
+          -0.74806,
+          -0.66219,
+          -0.04369
+        ]
+      }
+    },
+    "male": {
+      "r": {
+        "at": [
+          -1.8476,
+          3.6651,
+          1.03775
+        ],
+        "axis": [
+          -0.38598,
+          -0.44409,
+          -0.80858
+        ],
+        "palm": [
+          0.74859,
+          -0.663,
+          0.00679
+        ]
+      },
+      "l": {
+        "at": [
+          1.8476,
+          3.6651,
+          1.03775
+        ],
+        "axis": [
+          0.38598,
+          -0.44409,
+          -0.80858
+        ],
+        "palm": [
+          -0.74859,
+          -0.663,
+          0.00679
+        ]
+      }
     }
   }
 } as const

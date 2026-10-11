@@ -108,6 +108,18 @@ describe('readJoint in space', () => {
     expect(readJoint(picture, 'ab_twist', 'left', 1, world).metricDeg).toBeCloseTo(25, 6)
   })
 
+  it('measures a reading across the body (the pec fly) on the picture, where its thresholds are set', () => {
+    // Arms open wide, the wrists level with the shoulders and a little in front of them.
+    const picture = pose({ 15: [0.85, 0.42], 11: [0.6, 0.4], 16: [0.15, 0.42] })
+    const world = pose({})
+    world[15] = { x: 0.7, y: 0.05, z: -0.35, visibility: 0.99 }
+    world[11] = { x: 0.18, y: 0, z: 0, visibility: 0.99 }
+    world[16] = { x: -0.7, y: 0.05, z: -0.35, visibility: 0.99 }
+    const flat = readJoint(picture, 'pec_fly', 'right', 1)
+    expect(readJoint(picture, 'pec_fly', 'right', 1, world).metricDeg).toBeCloseTo(flat.metricDeg, 9)
+    expect(flat.metricDeg).toBeLessThan(EXERCISES.pec_fly.exitDeg)
+  })
+
   it('keeps reading one side of a movement with no side until the other is clearly better seen', () => {
     // A squat seen side on: both legs' hip, knee and ankle, the right a little clearer than the left.
     const legs = (right: number, left: number) => {

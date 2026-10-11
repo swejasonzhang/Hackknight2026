@@ -11,7 +11,7 @@ ADR-0025's figure was swept in code from cross-sections, one tube per bone, with
 
 ## Decision
 
-- **A real mesh.** The figure is MakeHuman's young adult: its base mesh, targets and rig were released as CC0 1.0. `frontend/scripts/body/bake.mjs` turns those assets, at a pinned commit, into `body.bin` (about 690 KB, loaded with the 3D code).
+- **A real mesh.** The figure is MakeHuman's young adult: its base mesh, targets and rig were released as CC0 1.0. `frontend/scripts/body/bake.mjs` turns those assets, at a pinned commit, into `body.bin` (about 730 KB with the closed hand of ADR-0033, loaded with the 3D code).
 - **Female, male or between.** A profile picks its `figure` (`PATCH /api/profiles/:id`). A profile that has not picked one gets the figure between the two.
   - Each figure has its own proportions: `skeleton.ts` reads them off the mesh's joints, so every pose bends exactly where that mesh bends.
   - Every pose still puts the tracked joint at exactly the reading.
@@ -48,7 +48,7 @@ ADR-0025's figure was swept in code from cross-sections, one tube per bone, with
 
 ## Consequences
 
-- The body is a 690 KB download on pages with a 3D figure, cached by the browser. If the download fails, the scene shows its fallback and tries again the next time a figure is drawn.
+- The body is a 730 KB download on pages with a 3D figure, cached by the browser. If the download fails, the scene shows its fallback and tries again the next time a figure is drawn.
 - Linear blend skinning still thins a joint at its extremes (an elbow at full curl), but the helpers keep the shoulders and hips believable through every movement here.
 - The growth model is for drawing the figure, not a measurement of the member's body; the page says so.
 - To change the body, edit `bake.mjs`, run it and commit both outputs. `figure.test.ts` checks the asset, the skinning and the growth.

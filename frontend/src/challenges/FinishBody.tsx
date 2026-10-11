@@ -78,6 +78,7 @@ export function FinishBody({ challenge, name, figure, body, loading = false, fai
             idle={false}
             spin
             instrument={false}
+            holding={false}
             muscles={false}
             figure={figure}
             growth={loading ? null : view === 'now' ? now : finish}

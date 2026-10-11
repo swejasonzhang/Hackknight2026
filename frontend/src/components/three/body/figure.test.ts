@@ -3,7 +3,8 @@ import { describe, expect, it } from 'vitest'
 import { bindJoints, BONES, PROPORTIONS, restFor, skeletonFor, type FigureKey, type JointName, type V3 } from '../skeleton'
 import bodyData from './body.bin?inline'
 import { BODY_META } from './bodyMeta'
-import { applyMat, bodyPositions, BONE_NAMES, decodeBody, facingFor, GARMENT_LIFT, garmentPositions, garmentsOf, muscleLoad, paintBody, paintGarment, skin, skinMatrices, vertexNormals, visibleTriangles, wearsTop, type Growth, type Mat4, type Palette } from './figure'
+import { applyMat, bodyPositions, BONE_NAMES, decodeBody, facingFor, GARMENT_LIFT, garmentPositions, garmentsOf, handleOf, muscleLoad, paintBody, paintGarment, skin, skinMatrices, vertexNormals, visibleTriangles, wearsTop, type Growth, type Mat4, type Palette } from './figure'
+import { HOLDS } from './hold'
 
 // body.bin as a data URL, decoded the way the browser receives it.
 const bytes = Uint8Array.from(atob(bodyData.slice(bodyData.indexOf(',') + 1)), (c) => c.charCodeAt(0))
@@ -277,6 +278,83 @@ describe('the skin', () => {
         expect(gap, `${figure} ${fill}`).toBeGreaterThan(-0.06)
         expect(gap, `${figure} ${fill}`).toBeLessThan(0.02)
       }
+    }
+  })
+})
+
+describe('the hands: closed round what they hold', () => {
+  /** The real fingertips: the hand's vertices farthest from the wrist. */
+  const tips = (side: 'r' | 'l') => {
+    const wrist = bindJoints('male')[side === 'r' ? 'rWrist' : 'lWrist']
+    const hand = [...asset.grip.index].filter((_, n) => asset.grip.side[n] === (side === 'r' ? 0 : 1))
+    return hand.sort((a, b) => dist(at(asset.shapes.male.skinny, b), wrist) - dist(at(asset.shapes.male.skinny, a), wrist)).slice(0, 40)
+  }
+
+  it('closes each hand round its handle, the other hand untouched', () => {
+    const open = bodyPositions(asset, 'male', null)
+    const closed = bodyPositions(asset, 'male', null, undefined, { right: 1, left: 0 })
+    const handle = handleOf('male', 'r').at
+    const right = tips('r')
+    const left = tips('l')
+    expect(right.length).toBeGreaterThan(5)
+    // The fingertips come in to the handle, within a hand's breadth of its centre.
+    for (const v of right) {
+      expect(dist(at(closed, v), handle), `vertex ${v}`).toBeLessThan(dist(at(open, v), handle))
+      expect(dist(at(closed, v), handle), `vertex ${v}`).toBeLessThan(0.45)
+    }
+    for (const v of left) expect(at(closed, v)).toEqual(at(open, v))
+    // Nothing above the wrist moves.
+    const forearm = ofBone('rForearm')
+    for (const v of forearm.slice(0, 200)) expect(at(closed, v)).toEqual(at(open, v))
+  })
+
+  it('turns each hand about its forearm so the handle lies as the movement holds it, the wrist where it was', () => {
+    for (const [exercise, deg] of [
+      ['shoulder_press', 150],
+      ['front_raise', 80],
+      ['bent_over_row', 100],
+      ['pec_fly', 150],
+    ] as const) {
+      for (const figure of ['female', 'male', 'neutral'] as FigureKey[]) {
+        const pose = skeletonFor(exercise, deg, figure)
+        const line = HOLDS[exercise].line!
+        const plain = skinMatrices(figure, pose)
+        const turned = skinMatrices(figure, pose, { r: line })
+        const hand = BONE_NAMES.indexOf('rHand')
+        const h = handleOf(figure, 'r')
+        const a = applyMat(turned[hand]!, h.at)
+        const b = applyMat(turned[hand]!, [h.at[0] + h.axis[0], h.at[1] + h.axis[1], h.at[2] + h.axis[2]])
+        const axis: V3 = [b[0] - a[0], b[1] - a[1], b[2] - a[2]]
+        const j = pose.joints
+        const across: V3 = [j.lShoulder[0] - j.rShoulder[0], j.lShoulder[1] - j.rShoulder[1], j.lShoulder[2] - j.rShoulder[2]]
+        const upright: V3 = [j.neck[0] - j.pelvis[0], j.neck[1] - j.pelvis[1], j.neck[2] - j.pelvis[2]]
+        const forward: V3 = [across[1] * upright[2] - across[2] * upright[1], across[2] * upright[0] - across[0] * upright[2], across[0] * upright[1] - across[1] * upright[0]]
+        const fore: V3 = [j.rWrist[0] - j.rElbow[0], j.rWrist[1] - j.rElbow[1], j.rWrist[2] - j.rElbow[2]]
+        // Compared square to the forearm, where a wrist can turn it: the handle along the wanted line.
+        const flat = (v: V3) => {
+          const n = Math.hypot(...fore)
+          const k = (v[0] * fore[0] + v[1] * fore[1] + v[2] * fore[2]) / (n * n)
+          const w: V3 = [v[0] - fore[0] * k, v[1] - fore[1] * k, v[2] - fore[2] * k]
+          const l = Math.hypot(...w)
+          return w.map((x) => x / l) as V3
+        }
+        const want = flat(line === 'across' ? across : line === 'forward' ? forward : upright)
+        const got = flat(axis)
+        expect(Math.abs(got[0] * want[0] + got[1] * want[1] + got[2] * want[2]), `${figure} ${exercise}`).toBeGreaterThan(0.999)
+        // The turn is about the forearm: the wrist and the elbow stay where the pose puts them.
+        const bind = bindJoints(figure)
+        expect(dist(applyMat(turned[hand]!, bind.rWrist), applyMat(plain[hand]!, bind.rWrist))).toBeLessThan(1e-4)
+        expect(dist(applyMat(turned[BONE_NAMES.indexOf('rForearm')]!, bind.rElbow), pose.joints.rElbow)).toBeLessThan(1e-4)
+      }
+    }
+  })
+
+  it('holds weights in the working hand of a one-arm movement and in both for a two-arm one', () => {
+    for (const exercise of EXERCISE_IDS) {
+      const hold = HOLDS[exercise]
+      if (EXERCISES[exercise].sided) expect(hold.left, exercise).toBeNull()
+      if (hold.right || hold.left || hold.bar) expect(hold.grip.right, exercise).toBe(1)
+      if (hold.left || hold.bar) expect(hold.grip.left, exercise).toBe(1)
     }
   })
 })

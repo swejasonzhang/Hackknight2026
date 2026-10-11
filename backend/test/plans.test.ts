@@ -1,9 +1,24 @@
 import { describe, expect, it } from 'vitest'
+import mongoose from 'mongoose'
+import { Plan } from '../src/models/Plan.ts'
+import { Program } from '../src/models/Program.ts'
 import { createProfile, signup } from './helpers.ts'
 
 const plan = { exercise: 'elbow_flexion', side: 'right', sets: 3, reps: 8, restSeconds: 45, targetDeg: 140 }
 
 describe('plans', () => {
+  it('serves a goal saved before its movement\'s range was narrowed inside the range it has now', async () => {
+    const c = await signup()
+    const id = await createProfile(c)
+    // A front raise's goal from when it ran to 135°; its end is 110° now.
+    await Plan.collection.insertOne({ profileId: new mongoose.Types.ObjectId(id), exercise: 'front_raise', side: 'right', sets: 3, reps: 10, restSeconds: 45, targetDeg: 135, active: true, createdAt: Date.now() })
+    expect((await c.get(`/api/profiles/${id}/plan`)).body.targetDeg).toBe(110)
+    const day = { weekday: 1, title: 'Shoulders', items: [{ exercise: 'front_raise', side: 'right', sets: 3, reps: 10, restSeconds: 45, targetDeg: 95 }] }
+    await c.put(`/api/profiles/${id}/program`).send({ days: [day] })
+    await Program.collection.updateMany({}, { $set: { 'days.0.items.0.targetDeg': 135 } })
+    expect((await c.get(`/api/profiles/${id}/program`)).body.days[0].items[0].targetDeg).toBe(110)
+  })
+
   it('GET /api/profiles/:id/plan is 404 before a plan is assigned', async () => {
     const c = await signup()
     const id = await createProfile(c)

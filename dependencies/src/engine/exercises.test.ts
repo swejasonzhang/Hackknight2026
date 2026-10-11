@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { BODY_AREAS, EXERCISE_LIST, EXERCISES, exercisesFor, exercisesIn, MUSCLES, sideLabel } from './exercises.ts'
+import { BODY_AREAS, EXERCISE_LIST, EXERCISES, exercisesFor, exercisesIn, goalRange, MUSCLES, reachableGoal, sideLabel } from './exercises.ts'
 import { EXERCISE_IDS, LM, MUSCLE_IDS } from './types.ts'
 
 describe('the exercise catalog', () => {
@@ -72,5 +72,20 @@ describe('the exercise catalog', () => {
     expect(sideLabel('elbow_flexion', 'left')).toBe('left')
     expect(sideLabel('deadlift', 'right')).toBe('both sides')
     expect(sideLabel('ab_twist', 'left')).toBe('both sides')
+  })
+})
+
+describe('reachableGoal', () => {
+  it('brings a goal inside its movement\'s range and leaves one inside it alone', () => {
+    // A front raise's goal from when it ran to 135°, against its 110° end now.
+    expect(reachableGoal('front_raise', 135)).toBe(EXERCISES.front_raise.maxDeg)
+    expect(reachableGoal('front_raise', 20)).toBe(EXERCISES.front_raise.enterDeg)
+    expect(reachableGoal('front_raise', 95)).toBe(95)
+    for (const id of EXERCISE_IDS) {
+      const { min, max } = goalRange(id)
+      expect(reachableGoal(id, EXERCISES[id].targetDeg), id).toBe(EXERCISES[id].targetDeg)
+      expect(reachableGoal(id, max + 30)).toBe(max)
+      expect(reachableGoal(id, min - 30)).toBe(min)
+    }
   })
 })

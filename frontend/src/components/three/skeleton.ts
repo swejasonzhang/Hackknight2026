@@ -185,6 +185,8 @@ export interface Skeleton {
   seat?: { top: number; x: [number, number]; z: [number, number] }
   /** Which way the pelvis points up the body when it stays put while the trunk moves (lying for a crunch). */
   pelvisUp?: V3
+  /** Face on, how far the trunk turns about the upright, in radians (the ab twist): its front turns with it. */
+  twist?: number
 }
 
 const rad = (d: number) => (d * Math.PI) / 180
@@ -240,6 +242,7 @@ interface Pose {
   base?: V2
   seat?: Skeleton['seat']
   pelvisUp?: V3
+  twist?: number
 }
 
 type TrunkJoints = Pick<Joints, 'pelvis' | 'neck' | 'headBase' | 'headTop' | 'rShoulder' | 'lShoulder' | 'rClavicle' | 'lClavicle'>
@@ -399,16 +402,22 @@ function posesFor(P: Proportions): Record<ExerciseId, (m: number, fill: number) 
   }
 
   // ---- the pec fly: both arms sweep in front of the chest, at shoulder height ----
-  const FLY_MAX = 100
   function flyAt(sweep: number) {
     const t = trunk('front', [0, P.hipY], 90)
-    const up = (s: number): V3 => [Math.cos(rad(sweep)) * Math.cos(rad(8)) * s, -Math.sin(rad(8)), Math.sin(rad(sweep)) * Math.cos(rad(8))]
-    const fore = (s: number): V3 => [Math.cos(rad(sweep + 20)) * Math.cos(rad(22)) * s, -Math.sin(rad(22)), Math.sin(rad(sweep + 20)) * Math.cos(rad(22))]
+    // Open, the arms are near level with the shoulders; they come down to chest height as they close.
+    const k = Math.min(1, Math.max(0, sweep / 90))
+    const upDrop = lerp(2, 8, k)
+    const foreDrop = lerp(5, 22, k)
+    const up = (s: number): V3 => [Math.cos(rad(sweep)) * Math.cos(rad(upDrop)) * s, -Math.sin(rad(upDrop)), Math.sin(rad(sweep)) * Math.cos(rad(upDrop))]
+    const fore = (s: number): V3 => [Math.cos(rad(sweep + 20)) * Math.cos(rad(foreDrop)) * s, -Math.sin(rad(foreDrop)), Math.sin(rad(sweep + 20)) * Math.cos(rad(foreDrop))]
     const [rElbow, rWrist, rFingertip] = arm3(t.rShoulder, up(-1), fore(-1))
     const [lElbow, lWrist, lFingertip] = arm3(t.lShoulder, up(1), fore(1))
     const closed = 180 - innerAt(xy(lWrist), xy(t.lShoulder), xy(rWrist))
     return { joints: { ...t, ...frontLegs(), rElbow, lElbow, rWrist, lWrist, rFingertip, lFingertip }, closed }
   }
+  // The sweep ends where the hands meet, on the body's middle line in front of the chest: never
+  // past it, crossing the arms.
+  const FLY_MAX = solve((s) => flyAt(s).joints.lWrist[0], 0, 0, 140)
 
   return {
     // The forearm swings forward and up from hanging.
@@ -451,6 +460,7 @@ function posesFor(P: Proportions): Record<ExerciseId, (m: number, fill: number) 
     },
     // Face on: measured at the left shoulder between the two wrists, as the camera app does.
     pec_fly: (m) => {
+      // Open wide, then the hands sweep together until they meet in front of the chest.
       const { joints } = flyAt(solve((s) => flyAt(s).closed, m, 0, FLY_MAX))
       return { joints, view: 'front', track: ['lWrist', 'lShoulder', 'rWrist'], labels: ['left wrist', 'left shoulder', 'right wrist'], z: 2.4, reach: upperArm }
     },
@@ -463,7 +473,10 @@ function posesFor(P: Proportions): Record<ExerciseId, (m: number, fill: number) 
     bent_over_row: (m) => {
       const legs = plantedLegs(20, 8)
       const t = trunk('side', legs.hip, 30)
-      const [rElbow, rWrist, rFingertip] = arm(t.rShoulder, -90 - m, -90)
+      // The elbow drives back along the body, the forearm bending toward the hip: the elbow ends
+      // level with the back, not raised above it. The bend at the elbow is exactly the reading.
+      const back = 0.62 * (m - EXERCISES.bent_over_row.restDeg)
+      const [rElbow, rWrist, rFingertip] = arm(t.rShoulder, -90 - back, -90 - back + m)
       const [lElbow, lWrist, lFingertip] = arm(t.lShoulder, -88, -88)
       return { joints: { ...t, ...legsOnly(legs), rElbow, lElbow, rWrist, lWrist, rFingertip, lFingertip }, view: 'side', track: ['rShoulder', 'rElbow', 'rWrist'], ...armRing }
     },
@@ -542,21 +555,33 @@ function posesFor(P: Proportions): Record<ExerciseId, (m: number, fill: number) 
       return { joints, view: 'side', track: ['rShoulder', 'rHip', 'rKnee'], labels: ['shoulder', 'hip', 'knee'], z: P.hipHalf + 0.55, reach: thigh * 0.75, pelvisUp: [Math.cos(flat), Math.sin(flat), 0] }
     },
     // Face on: the shoulders lean and turn to the right, `m` degrees off level; the hands stay together in front.
+    // A twist down to the side, like a woodchop: the shoulders turn about the upright and lean, the
+    // hands together in front. Seen face on, the shoulder line tilts by exactly the reading: the
+    // turn foreshortens it, so the lean is what is left of the tilt.
     ab_twist: (m) => {
-      const t = trunk('front', [0, P.hipY], 90 + m)
+      const yaw = rad(Math.min(50, 1.5 * m))
+      const lean = deg(Math.atan(Math.tan(rad(m)) * Math.cos(yaw)))
+      const t = trunk('front', [0, P.hipY], 90 + lean)
       const spin = (v: V3): V3 => {
-        const [x, y] = turn([v[0], v[1]], m)
+        const [x, y] = turn([v[0], v[1]], lean)
         return [x, y, v[2]]
       }
       const [rElbow, rWrist, rFingertip] = arm3(t.rShoulder, spin(unit([0.3, -0.75, 0.6])), spin(unit([0.29, 0.42, 0.86])))
       const [lElbow, lWrist, lFingertip] = arm3(t.lShoulder, spin(unit([-0.3, -0.75, 0.6])), spin(unit([-0.29, 0.42, 0.86])))
+      // The upper body turns toward the side it leans to: the right shoulder back, the left forward.
+      const c = Math.cos(-yaw)
+      const sn = Math.sin(-yaw)
+      const turned = (p: V3): V3 => [p[0] * c + p[2] * sn, p[1], -p[0] * sn + p[2] * c]
+      const upper = { ...t, rElbow, lElbow, rWrist, lWrist, rFingertip, lFingertip }
+      const joints = Object.fromEntries(Object.entries(upper).map(([k, p]) => [k, turned(p)])) as typeof upper
       return {
-        joints: { ...t, ...frontLegs(), rElbow, lElbow, rWrist, lWrist, rFingertip, lFingertip },
+        joints: { ...joints, ...frontLegs() },
         view: 'front',
+        twist: -yaw,
         track: ['rShoulder', 'rShoulder', 'lShoulder'],
         labels: ['level', 'right shoulder', 'left shoulder'],
         // The level: a horizontal line out from the right shoulder.
-        base: [t.rShoulder[0] + 2 * P.shoulderHalf, t.rShoulder[1]],
+        base: [joints.rShoulder[0] + 2 * P.shoulderHalf, joints.rShoulder[1]],
         z: 1.6,
         reach: P.shoulderHalf,
       }
@@ -638,6 +663,7 @@ export function skeletonFor(exercise: ExerciseId, metricDeg: number, figure: Fig
   }
   if (p.seat) skeleton.seat = p.seat
   if (p.pelvisUp) skeleton.pelvisUp = p.pelvisUp
+  if (p.twist) skeleton.twist = p.twist
   return skeleton
 }
 
