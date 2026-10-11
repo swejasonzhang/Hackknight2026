@@ -1,7 +1,18 @@
-import { EXERCISE_LIST, EXERCISES, MUSCLE_IDS } from '@arc/dependencies'
+import { EXERCISE_LIST, EXERCISES, MUSCLE_IDS, type ExerciseId } from '@arc/dependencies'
 import { useSearchParams } from 'react-router-dom'
 import { LazyJointScene } from '../../components/three/lazy'
 import type { FigureKey } from '../../components/three/skeleton'
+import { useRepLoop } from '../../components/three/useRepLoop'
+
+/** ?camera=<movement>: one figure doing reps to the goal and back, filling the screen and bare (no instrument, no colours), to film as a pretend webcam for the real pose model. */
+function CameraSubject({ exercise, figure }: { exercise: ExerciseId; figure: FigureKey }) {
+  const angle = useRepLoop(exercise, EXERCISES[exercise].targetDeg) ?? 0
+  return (
+    <main className="h-screen w-screen bg-white">
+      <LazyJointScene exercise={exercise} angle={angle} idle={false} muscles={false} instrument={false} figure={figure} className="h-full w-full" label="Camera subject" />
+    </main>
+  )
+}
 
 /**
  * /dev/bodies, in development only: every movement's figure at once, to check the body and its
@@ -19,6 +30,8 @@ export function BodyGallery() {
   const grown = Number(params.get('grown') ?? 0)
   const growth = { levels: Object.fromEntries(MUSCLE_IDS.map((m) => [m, grown])), overall: grown }
   const list = only ? EXERCISE_LIST.filter((e) => only.includes(e.id)) : EXERCISE_LIST.slice(set * 8, set * 8 + 8)
+  const camera = params.get('camera') as ExerciseId | null
+  if (camera && camera in EXERCISES) return <CameraSubject exercise={camera} figure={figure} />
   return (
     <main className={`grid gap-2 bg-paper p-2 ${only ? 'grid-cols-2' : 'grid-cols-4'}`}>
       {list.map((e) => {

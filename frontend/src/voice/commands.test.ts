@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { isForArc, parseCommand } from './commands'
+import { afterWakeWord, isForArc, parseCommand } from './commands'
 
 describe('parseCommand', () => {
   it.each([
@@ -69,3 +69,24 @@ describe('isForArc: what Arc answers when it is not a command', () => {
     expect(parseCommand('how many')).toBe('status')
   })
 })
+
+describe('afterWakeWord: only what is said to Arc by name is heard', () => {
+  it('hears a phrase that opens with Arc or Hey listen, and hands over the rest', () => {
+    expect(afterWakeWord('Arc, pause')).toBe('pause')
+    expect(afterWakeWord('Hey Arc how many')).toBe('how many')
+    expect(afterWakeWord('hey listen, skip the rest')).toBe('skip the rest')
+    expect(afterWakeWord('OK Arc. Is my form right?')).toBe('is my form right')
+    // How the speech service tends to write the name.
+    expect(afterWakeWord('Ark stop')).toBe('stop')
+    expect(afterWakeWord('arch next set')).toBe('next set')
+    // The name alone: Arc answers and listens for the next phrase.
+    expect(afterWakeWord('Arc')).toBe('')
+  })
+
+  it('lets everything else go by: talk in the room, the television, Arc\'s own voice', () => {
+    for (const said of ['pause', 'go a little deeper', 'that was too easy', 'how am I doing', "That's the set. Rest 45 seconds.", 'the arc of the story', 'listening to music', 'search architecture']) {
+      expect(afterWakeWord(said), said).toBeNull()
+    }
+  })
+})
+

@@ -101,6 +101,20 @@ describe('readJoint in space', () => {
     expect(Math.abs(a.space - b.space)).toBeLessThan(3)
   })
 
+  it('reads a curl filmed side on from the picture, where the model\'s depth would flatten its top', () => {
+    // Side on: the arm bends across the picture. In space the model flattens the bend (140° reads
+    // about 120°), as a real webcam run through the pose model showed.
+    const r = (d: number) => (d * Math.PI) / 180
+    const flex = 140
+    const picture = pose({ 12: [0.5, 0.3], 14: [0.5, 0.45], 16: [0.5 + (0.12 * Math.sin(r(flex))) / (16 / 9), 0.45 - 0.12 * Math.cos(r(180 - flex))] })
+    const flat = readJoint(picture, 'elbow_flexion', 'right', 16 / 9).metricDeg
+    const world = pose({})
+    world[12] = { x: 0, y: -0.3, z: 0.01, visibility: 0.99 }
+    world[14] = { x: 0, y: 0, z: 0, visibility: 0.99 }
+    world[16] = { x: 0.25 * Math.sin(r(120)), y: -0.25 * Math.cos(r(180 - 120)), z: -0.01, visibility: 0.99 }
+    expect(readJoint(picture, 'elbow_flexion', 'right', 16 / 9, world).metricDeg).toBeCloseTo(flat, 3)
+  })
+
   it('measures a tilt on the picture, where level is, even with the landmarks in space', () => {
     const rise = 0.2 * Math.tan((25 * Math.PI) / 180)
     const picture = pose({ 11: [0.6, 0.3 - rise], 12: [0.4, 0.3] })

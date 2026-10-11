@@ -10,7 +10,7 @@ import type { PoseTracker } from './pose'
 import { SessionSaver } from './saver'
 import { SessionRecorder, type RecorderView } from './recorder'
 import { SteadyPose } from './steady'
-import { COMMAND_LABEL, isForArc, parseCommand } from '../voice/commands'
+import { afterWakeWord, COMMAND_LABEL, parseCommand, WAKE_WINDOW_MS } from '../voice/commands'
 import { createListener, type Listener, type ListenerState } from '../voice/listener'
 import { createSpeaker, type Speaker, type SpokenLine } from '../voice/speaker'
 import { elevenLabsVoice } from '../voice/status'
@@ -267,10 +267,24 @@ export function LiveRecorder({ profileId, config, simulate = false, below, figur
         listenerRef.current?.mute(speaking)
       },
     })
+    // Only what is said to Arc by name ("Arc, …" or "Hey listen, …") is heard: everything else in
+    // the room, and Arc's own voice, goes by. The name alone opens a few seconds for the next phrase.
+    let awakeUntil = 0
     listenerRef.current = createListener((text) => {
-      const command = parseCommand(text)
+      let said = afterWakeWord(text)
+      if (said == null) {
+        if (performance.now() > awakeUntil) return
+        said = text.trim()
+      }
+      awakeUntil = 0
+      if (!said) {
+        awakeUntil = performance.now() + WAKE_WINDOW_MS
+        void speakerRef.current?.say({ text: 'Yes?' })
+        return
+      }
+      const command = parseCommand(`arc ${said}`)
       if (command) runCommand(command)
-      else if (isForArc(text)) void askArcRef.current(text)
+      else void askArcRef.current(said)
     }, setListenState)
     return () => {
       cancelled = true
@@ -365,10 +379,12 @@ export function LiveRecorder({ profileId, config, simulate = false, below, figur
         }
         const now = performance.now()
         const videoAspect = !simulate && video?.videoWidth ? video.videoWidth / video.videoHeight : 16 / 9
-        const pose = steady.feed(tracker.detect(video!, now), now)
+        const raw = tracker.detect(video!, now)
+        const pose = steady.feed(raw, now)
         const reading = readJoint(pose?.landmarks, config.exercise, config.side, videoAspect, pose?.world, side)
         side = reading.side
         const next = recorder.feed({ tracked: reading.tracked, metricDeg: reading.metricDeg, tMs: performance.timeOrigin + now, pose: pose?.landmarks, aspect: videoAspect })
+        if (import.meta.env.DEV) Object.assign(window, { __arcDebug: { raw, pose, reading, view: next } })
         if (canvasRef.current) draw(canvasRef.current, videoAspect, reading, { exercise: config.exercise, repPhase: next.repPhase, metricDeg: next.metricDeg, goalDeg: config.plan.targetDeg, live: next.phase === 'active' && !next.paused })
         // Re-render only when something on screen changes.
         const key = `${next.phase}|${next.setNumber}|${next.repsInSet}|${next.totalReps}|${Math.round(next.metricDeg ?? -1)}|${Math.ceil(next.restLeftMs / 1000)}|${next.tracked}|${Math.round(next.bestDeg ?? -1)}`
@@ -583,7 +599,7 @@ export function LiveRecorder({ profileId, config, simulate = false, below, figur
               )}
             </div>
             <p className="t-meta mt-2 normal-case">
-              Say start, pause, resume, skip, rest, stop, how many or repeat, or just talk to Arc: ask how you're doing, about your form, or say how it feels.
+              Start with "Arc" or "Hey listen", and Arc does the rest: "Arc, pause", "Arc, skip the rest", "Hey listen, how many?", "Arc, is my form right?" Everything else in the room is ignored.
             </p>
             {voiceName && (
               <p className="t-meta mt-1 normal-case">

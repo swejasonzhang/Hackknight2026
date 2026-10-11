@@ -40,6 +40,26 @@ export function innerAngle3Deg(a: readonly [number, number, number], b: readonly
   return (Math.acos(Math.max(-1, Math.min(1, cos))) * 180) / Math.PI
 }
 
+/**
+ * The angle at a joint from both readings, weighed by how the limb is turned to the camera. Side
+ * on, the plane it bends in faces the lens and the picture's angle is exact (the model's depth
+ * flattens a deep bend: a 140° curl reads about 120° in space). Turned toward the camera, that
+ * plane is edge on and the picture loses the angle, so the reading in space takes over. In
+ * between, the two are blended.
+ */
+function byFacing(picture: [[number, number], [number, number], [number, number]], space: Landmark[]): number {
+  const [a, b, c] = space.map((m) => [m.x, m.y, m.z ?? 0] as const) as [readonly [number, number, number], readonly [number, number, number], readonly [number, number, number]]
+  const u = [a[0] - b[0], a[1] - b[1], a[2] - b[2]]
+  const v = [c[0] - b[0], c[1] - b[1], c[2] - b[2]]
+  const n = [u[1]! * v[2]! - u[2]! * v[1]!, u[2]! * v[0]! - u[0]! * v[2]!, u[0]! * v[1]! - u[1]! * v[0]!]
+  const size = Math.hypot(n[0]!, n[1]!, n[2]!)
+  // A straight limb has no plane: either reading will do, and the picture's is steadier.
+  const facing = size < 1e-6 ? 1 : Math.abs(n[2]!) / size
+  const share = Math.min(1, Math.max(0, (facing - 0.3) / 0.4))
+  const flat = innerAngleDeg(...picture)
+  return share === 1 ? flat : share * flat + (1 - share) * innerAngle3Deg(a, b, c)
+}
+
 /** How far the line from `a` to `b` slopes off the level, either way, in degrees (0..90). */
 export function tiltDeg(a: [number, number], b: [number, number]): number {
   const slope = Math.abs((Math.atan2(b[1] - a[1], b[0] - a[0]) * 180) / Math.PI)
@@ -60,10 +80,11 @@ function seen(landmarks: readonly Landmark[], exercise: ExerciseId, side: Side):
  * chosen side (MediaPipe names sides from the person's point of view, on the unmirrored frame),
  * and the config's conversion to the metric the rep counter and dashboard use.
  *
- * The angle is measured in space from the model's world landmarks (`world`, in metres) when it
- * gives them, so a curl done facing the camera reads true: on the flat picture the forearm coming
- * toward the lens shortens to a stub and its angle swings wildly. Without them it is measured on
- * the real picture (`aspect` = video width / height, since x and y are both 0..1). A tilt (the ab
+ * The angle is measured on the real picture (`aspect` = video width / height, since x and y are
+ * both 0..1) when the limb bends across the camera's view, as the cues ask (side on), and in
+ * space from the model's world landmarks (`world`, in metres) as it turns toward the lens, where
+ * the forearm coming at the camera shortens to a stub on the picture and its angle swings wildly
+ * (`byFacing`). A tilt (the ab
  * twist's shoulder line against the level) and a reading across the body (the pec fly's wrists
  * through a shoulder) are always measured on the picture, as the camera app defines them.
  *
@@ -86,11 +107,6 @@ export function readJoint(landmarks: readonly Landmark[] | null | undefined, exe
   // wrists through a shoulder (the pec fly), is defined on the picture, as the camera app reads it.
   const oneSide = indices.every((i) => i % 2 === indices[0]! % 2)
   const inSpace = cfg.measure !== 'tilt' && oneSide && world ? indices.map((i) => world[i]) : null
-  const innerDeg =
-    cfg.measure === 'tilt'
-      ? tiltDeg(a, b)
-      : inSpace && inSpace.every(Boolean)
-        ? innerAngle3Deg(...(inSpace.map((m) => [m!.x, m!.y, m!.z ?? 0] as const) as [readonly [number, number, number], readonly [number, number, number], readonly [number, number, number]]))
-        : innerAngleDeg(a, b, c)
+  const innerDeg = cfg.measure === 'tilt' ? tiltDeg(a, b) : inSpace && inSpace.every(Boolean) ? byFacing([a, b, c], inSpace as Landmark[]) : innerAngleDeg(a, b, c)
   return { tracked: true, innerDeg, metricDeg: cfg.metricFromInnerAngle(innerDeg), points, side }
 }

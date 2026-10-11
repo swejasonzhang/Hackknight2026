@@ -65,3 +65,19 @@ export function isForArc(transcript: string): boolean {
   if (text.split(' ').filter(Boolean).length < 2) return false
   return /\barc\b/.test(text) || QUESTION.test(text) || FEELING.test(text)
 }
+
+/** How long after a bare "Arc" or "Hey listen" the next phrase still counts as addressed to Arc. */
+export const WAKE_WINDOW_MS = 6000
+
+/**
+ * What the member said to Arc, or null when the phrase was not for Arc: only a phrase that opens
+ * with "Arc" or "Hey listen" is heard ("Arc, pause", "Hey listen, how many?"), so talk in the room,
+ * a television or Arc's own voice never sets anything off. The speech service often writes the
+ * name as "Ark" or "Arch", and "hey" or "okay" may come first. "" is the wake word alone: Arc
+ * answers and listens to the next phrase as addressed (WAKE_WINDOW_MS).
+ */
+export function afterWakeWord(transcript: string): string | null {
+  const text = transcript.toLowerCase().replace(/[^\p{L}\p{N}' ]+/gu, ' ').replace(/\s+/g, ' ').trim()
+  const wake = text.match(/^(?:(?:hey|hi|okay|ok)\s+)?(?:arc|ark|arch|listen)\b\s*(.*)$/)
+  return wake ? wake[1]! : null
+}
