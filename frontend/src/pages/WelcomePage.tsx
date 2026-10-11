@@ -74,11 +74,21 @@ export function WelcomePage() {
   const sendRef = useRef<(text: string) => void>(() => {})
   const listener = useMemo(() => createListener((text) => sendRef.current(text), setMic), [])
 
+  // False once the member has left the page: a reply that arrives later is not spoken on another page.
+  const alive = useRef(true)
   const turn = async (next: ChatTurn[], finish = false) => {
     setThinking(true)
     setError(null)
     try {
       const reply = await api.coach.onboarding({ messages: next, ...(profileId ? { profileId } : {}), ...(finish ? { finish } : {}) })
+      if (!alive.current) {
+        // Gone already: a finished week still becomes the profile shown, silently.
+        if (reply.done) {
+          await reload()
+          if (reply.profileId) setSelectedId(reply.profileId)
+        }
+        return
+      }
       // Arc's line keeps the topic it asked, so each answer is read for its own question.
       setMessages([...next, reply.topic ? { role: 'arc', text: reply.reply, topic: reply.topic } : { role: 'arc', text: reply.reply }])
       setTopic(reply.topic ?? null)
@@ -108,8 +118,10 @@ export function WelcomePage() {
   sendRef.current = send
 
   useEffect(() => {
+    alive.current = true
     void turn([])
     return () => {
+      alive.current = false
       speaker.stop()
       listener.stop()
     }

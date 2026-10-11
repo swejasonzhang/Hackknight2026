@@ -1,6 +1,6 @@
 import type { LoginInput, SignupInput, UserDto } from '@arc/dependencies'
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
-import { api } from '../api/client'
+import { api, ApiRequestError } from '../api/client'
 import { clearToken, getToken, setToken, SIGNED_OUT_EVENT } from './token'
 
 export type AuthStatus = 'loading' | 'signedOut' | 'signedIn'
@@ -19,25 +19,36 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<UserDto | null>(null)
   const [status, setStatus] = useState<AuthStatus>(() => (getToken() ? 'loading' : 'signedOut'))
 
-  // A stored token is only trusted once the API confirms it.
+  // A stored token is only trusted once the API confirms it. Only a refused token signs the member
+  // out: an API that is waking up or briefly down is asked again (after 1, 2 and 4 seconds), and if
+  // it still does not answer the token is kept, so the next visit picks the session up again.
   useEffect(() => {
     if (!getToken()) return
     let cancelled = false
-    api.auth
-      .me()
-      .then((u) => {
-        if (cancelled) return
-        setUser(u)
-        setStatus('signedIn')
-      })
-      .catch(() => {
-        if (cancelled) return
-        clearToken()
-        setUser(null)
-        setStatus('signedOut')
-      })
+    let timer = 0
+    const check = (attempt: number) => {
+      api.auth
+        .me()
+        .then((u) => {
+          if (cancelled) return
+          setUser(u)
+          setStatus('signedIn')
+        })
+        .catch((err: unknown) => {
+          if (cancelled) return
+          const refused = err instanceof ApiRequestError && err.status === 401
+          if (!refused && attempt < 3) {
+            timer = window.setTimeout(() => check(attempt + 1), 1000 * 2 ** attempt)
+            return
+          }
+          setUser(null)
+          setStatus('signedOut')
+        })
+    }
+    check(0)
     return () => {
       cancelled = true
+      window.clearTimeout(timer)
     }
   }, [])
 
