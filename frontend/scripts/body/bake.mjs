@@ -15,6 +15,7 @@ import { createHash } from 'node:crypto'
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { gzipSync } from 'node:zlib'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const CACHE = join(HERE, '.cache')
@@ -743,6 +744,8 @@ const bin = Buffer.concat(chunks)
 
 mkdirSync(OUT, { recursive: true })
 writeFileSync(join(OUT, 'body.bin'), bin)
+// The copy the browser downloads: gzipped, unpacked on arrival (load.ts), a little over half the size.
+writeFileSync(join(OUT, 'body.bin.gz'), gzipSync(bin, { level: 9, mtime: 0 }))
 const meta = {
   source: { project: 'MakeHuman', license: 'CC0 1.0', commit: MH_COMMIT },
   unitCm: 27,

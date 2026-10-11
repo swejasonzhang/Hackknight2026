@@ -1,17 +1,20 @@
 import { BODY_AREAS, EXERCISE_LIST, exercisesIn, generateDemoSessions, MUSCLE_IDS } from '@arc/dependencies'
 import * as Accordion from '@radix-ui/react-accordion'
 import { motion, useReducedMotion, useScroll, useSpring } from 'motion/react'
-import { useMemo } from 'react'
+import { lazy, Suspense, useEffect, useMemo } from 'react'
 import { Link, useLocation } from 'react-router-dom'
+import { api } from '../api/client'
 import { APP_NAME, SITE_URL } from '../brand'
 import { Logo } from '../components/icons'
-import { DemoBoard } from '../components/landing/DemoBoard'
 import { LiveJoint } from '../components/landing/LiveJoint'
 import { Sparkline } from '../components/landing/Sparkline'
 import { useAccountLinks } from '../components/landing/accountLinks'
 import { useScrollSpy } from '../components/landing/useScrollSpy'
 import { ease, Item, MaskLines, Page, parentVariants, Reveal, riseVariants, RuleDraw } from '../components/motion'
 import { Alert, Strip } from '../components/ui'
+
+// The readouts board (and the chart library under it) loads after the page's first screen.
+const DemoBoard = lazy(() => import('../components/landing/DemoBoard').then((m) => ({ default: m.DemoBoard })))
 
 /*
  * The landing page as a datasheet: a sticky title block whose index is a measuring scale with
@@ -162,6 +165,11 @@ export function LandingPage() {
   // Set by the account page after a deletion, so the member sees it went through.
   const notice = (useLocation().state as { notice?: string } | null)?.notice
   const reduce = useReducedMotion()
+  // The API sleeps when nobody has used it for a while: wake it now, quietly, so it is ready by
+  // the time a visitor signs up or logs in.
+  useEffect(() => {
+    void api.health().catch(() => {})
+  }, [])
   const sparkline = useMemo(
     () =>
       generateDemoSessions('demo', Date.now(), 2026, new Date().getTimezoneOffset())
@@ -267,7 +275,9 @@ export function LandingPage() {
 
           {/* ---- 03 READOUTS: the app's own charts on random demo data ---- */}
           <Strip id="readouts" index="03" title="Readouts" className="mt-12 scroll-mt-6 sm:mt-16" aside="Eight views · random demo data">
-            <DemoBoard />
+            <Suspense fallback={<div className="hatch min-h-[820px]" role="status" aria-label="Loading the readouts" />}>
+              <DemoBoard />
+            </Suspense>
           </Strip>
 
           {/* ---- 04 HOUSEHOLD: ruled rows that slide in ---- */}

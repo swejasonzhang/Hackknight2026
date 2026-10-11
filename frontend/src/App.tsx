@@ -1,22 +1,64 @@
-import { Navigate, Route, Routes } from 'react-router-dom'
+import { lazy, Suspense, useEffect, type ComponentType } from 'react'
+import { Navigate, Route, Routes, useLocation } from 'react-router-dom'
 import { PublicOnly, RequireAuth } from './auth/RequireAuth'
 import { ScrollToTop } from './components/ScrollToTop'
+import { PageLoading } from './components/ui'
 import { AppShell } from './layouts/AppShell'
 import { AuthLayout } from './layouts/AuthLayout'
-import { AccountPage } from './pages/AccountPage'
-import { ChallengesPage } from './pages/ChallengesPage'
-import { BodyGallery } from './pages/dev/BodyGallery'
-import { DashboardPage } from './pages/DashboardPage'
 import { LandingPage } from './pages/LandingPage'
-import { LeaderboardPage } from './pages/LeaderboardPage'
-import { LoginPage } from './pages/LoginPage'
-import { PlanPage } from './pages/PlanPage'
-import { ProfilesPage } from './pages/ProfilesPage'
-import { RecordPage } from './pages/RecordPage'
-import { SessionDetailPage } from './pages/SessionDetailPage'
-import { SignupPage } from './pages/SignupPage'
-import { WelcomePage } from './pages/WelcomePage'
 import { ProfilesProvider } from './profiles/ProfilesContext'
+
+/** A page loaded when it is first visited: only the landing page ships with the first download. */
+const page = <K extends string>(load: () => Promise<Record<K, ComponentType>>, name: K) => lazy(() => load().then((m) => ({ default: m[name] })))
+const SignupPage = page(() => import('./pages/SignupPage'), 'SignupPage')
+const LoginPage = page(() => import('./pages/LoginPage'), 'LoginPage')
+const WelcomePage = page(() => import('./pages/WelcomePage'), 'WelcomePage')
+const DashboardPage = page(() => import('./pages/DashboardPage'), 'DashboardPage')
+const PlanPage = page(() => import('./pages/PlanPage'), 'PlanPage')
+const ChallengesPage = page(() => import('./pages/ChallengesPage'), 'ChallengesPage')
+const RecordPage = page(() => import('./pages/RecordPage'), 'RecordPage')
+const ProfilesPage = page(() => import('./pages/ProfilesPage'), 'ProfilesPage')
+const LeaderboardPage = page(() => import('./pages/LeaderboardPage'), 'LeaderboardPage')
+const SessionDetailPage = page(() => import('./pages/SessionDetailPage'), 'SessionDetailPage')
+const AccountPage = page(() => import('./pages/AccountPage'), 'AccountPage')
+const BodyGallery = page(() => import('./pages/dev/BodyGallery'), 'BodyGallery')
+
+/** Each page's title, for the browser's tab, its history and search results. */
+const TITLES: [RegExp, string][] = [
+  [/^\/$/, 'Arc · Every rep, in degrees: a webcam range-of-motion coach'],
+  [/^\/signup/, 'Create an account · Arc'],
+  [/^\/login/, 'Log in · Arc'],
+  [/^\/welcome/, 'Getting to know you · Arc'],
+  [/^\/dashboard/, 'Dashboard · Arc'],
+  [/^\/plan/, 'Your week · Arc'],
+  [/^\/challenges/, 'Challenges · Arc'],
+  [/^\/record/, 'Record · Arc'],
+  [/^\/profiles/, 'Profiles · Arc'],
+  [/^\/leaderboard/, 'Leaderboard · Arc'],
+  [/^\/sessions\//, 'Session · Arc'],
+  [/^\/account/, 'Account · Arc'],
+]
+function usePageTitle() {
+  const { pathname } = useLocation()
+  useEffect(() => {
+    document.title = TITLES.find(([path]) => path.test(pathname))?.[1] ?? 'Arc'
+  }, [pathname])
+}
+
+/** Once the first page is up and the browser is idle, the pages a visitor most likely opens next are fetched ahead. */
+function usePrefetch() {
+  useEffect(() => {
+    const next = () => {
+      void import('./pages/DashboardPage')
+      void import('./pages/SignupPage')
+      void import('./pages/LoginPage')
+    }
+    // Safari before 17.4 has no requestIdleCallback.
+    const idle = 'requestIdleCallback' in window
+    const id = idle ? window.requestIdleCallback(next, { timeout: 4000 }) : window.setTimeout(next, 2500)
+    return () => (idle ? window.cancelIdleCallback(id) : window.clearTimeout(id))
+  }, [])
+}
 
 /**
  * URL map
@@ -37,9 +79,13 @@ import { ProfilesProvider } from './profiles/ProfilesContext'
  *   /dev/bodies     development only: every movement's figure and the muscles it works
  */
 export default function App() {
+  usePrefetch()
+  usePageTitle()
   return (
     <>
       <ScrollToTop />
+      {/* The app shell and the sign-up layout hold their own boundary, so their frame stays while a page loads. */}
+      <Suspense fallback={<PageLoading />}>
       <Routes>
         <Route path="/" element={<LandingPage />} />
 
@@ -88,6 +134,7 @@ export default function App() {
         {import.meta.env.DEV && <Route path="/dev/bodies" element={<BodyGallery />} />}
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
+      </Suspense>
     </>
   )
 }

@@ -10,6 +10,7 @@ import { dayStart, firstDay, groupByDay, progressFor, shiftDay, weekOf, type Day
 import { TodayList } from './TodayList'
 
 const long = (key: DayKey) => dayStart(key).toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' })
+const short = (key: DayKey) => dayStart(key).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })
 const monthDay = (key: DayKey) => dayStart(key).toLocaleDateString(undefined, { month: 'long', day: 'numeric' })
 const weekday = (key: DayKey) => dayStart(key).toLocaleDateString(undefined, { weekday: 'short' })
 const time = (ms: number) => new Date(ms).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })
@@ -71,7 +72,9 @@ export function DayLog({ sessions, day, today, onDayChange, program }: Props) {
         </button>
         <div className="min-w-0 flex-1 text-center">
           <h3 id={titleId} className="t-strip truncate" aria-live="polite">
-            {long(day)}
+            {/* The narrowest phones get the short date, so it is never cut off. */}
+            <span className="min-[400px]:hidden">{short(day)}</span>
+            <span className="hidden min-[400px]:inline">{long(day)}</span>
           </h3>
           <div className="t-meta mt-1">{day === today ? 'Today' : day === shiftDay(today, -1) ? 'Yesterday' : dayStart(day).getFullYear()}</div>
         </div>
