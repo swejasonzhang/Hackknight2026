@@ -1,4 +1,4 @@
-import { EXERCISE_IDS, type ExerciseId, type PlanDto, type Side } from '@arc/dependencies'
+import { EXERCISE_IDS, reachableGoal, type ExerciseId, type PlanDto, type Side } from '@arc/dependencies'
 import { model, Schema, type Types } from 'mongoose'
 
 export interface PlanShape {
@@ -37,7 +37,7 @@ export function toPlanDto(p: PlanShape): PlanDto {
     sets: p.sets,
     reps: p.reps,
     restSeconds: p.restSeconds,
-    targetDeg: p.targetDeg,
+    targetDeg: reachableGoal(p.exercise, p.targetDeg),
     active: p.active,
     createdAt: p.createdAt,
   }

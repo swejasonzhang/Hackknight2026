@@ -151,6 +151,7 @@ export function BodyGrowthView({ name, body, error = null, onRetry, figure, onFi
                 idle={false}
                 spin
                 instrument={false}
+              holding={false}
                 muscles={false}
                 growthShade={shade === 'growth'}
                 figure={key}

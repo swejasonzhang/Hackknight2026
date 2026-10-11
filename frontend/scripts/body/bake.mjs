@@ -256,7 +256,7 @@ for (const sex of SEXES) {
     out[k] = a
   }
   const joints = Object.fromEntries(Object.entries(JOINTS).map(([name, group]) => [name, place(centre(avg, group)).map((x) => +x.toFixed(5))]))
-  figures[sex] = { states: out, joints }
+  figures[sex] = { states: out, joints, avg, place }
 }
 
 // ---- skin weights onto Arc's bones ----
@@ -285,6 +285,107 @@ for (let i = 0; i < V; i++) {
     skinWeight[i * 4 + k] = bytes[k]
   })
 }
+
+// ---- the grip: the fingers closed round a handle ----
+
+// MakeHuman's own finger bones (three to a finger, the thumb first) and their skin weights curl
+// the fingers toward the palm by these angles, knuckle to tip, round a handle about 3.5 cm across:
+// a hand holding a dumbbell, a cable handle or a bar. The app blends the closed hand in for the
+// movements that hold a weight; the handle's centre and its line across the palm tell it where
+// to put the weight.
+const rig = JSON.parse(read('rigs/default.mhskel'))
+const CURL = { 1: [28, 30, 38], 2: [70, 88, 48], 3: [74, 90, 48], 4: [76, 90, 48], 5: [74, 88, 48] }
+const deg = (d) => (d * Math.PI) / 180
+/** `p` turned about the line through `o` along the unit `axis` by `angle`. */
+function turnAbout(p, o, axis, angle) {
+  const v = sub(p, o)
+  const c = Math.cos(angle)
+  const sn = Math.sin(angle)
+  const kv = cross(axis, v)
+  const kd = dot(axis, v) * (1 - c)
+  return [o[0] + v[0] * c + kv[0] * sn + axis[0] * kd, o[1] + v[1] * c + kv[1] * sn + axis[1] * kd, o[2] + v[2] * c + kv[2] * sn + axis[2] * kd]
+}
+/** A rig joint (the mean of its vertices) in a figure's space and Arc's units. */
+const rigPoint = (sex, name) => {
+  const f = figures[sex]
+  const vs = rig.joints[name]
+  const c = [0, 0, 0]
+  for (const v of vs) for (let k = 0; k < 3; k++) c[k] += f.avg[v * 3 + k] / vs.length
+  return f.place(c)
+}
+const SIDES = { r: 'R', l: 'L' }
+/** Each finger bone of a hand as MakeHuman names it, with the turns that close it: its own and its parents'. */
+function closingTurns(sex, side) {
+  const S = SIDES[side]
+  const bone = (f, k) => ({ head: rigPoint(sex, `finger${f}-${k}.${S}____head`), tail: rigPoint(sex, `finger${f}-${k}.${S}____tail`) })
+  const fingers = Object.fromEntries([1, 2, 3, 4, 5].map((f) => [f, [1, 2, 3].map((k) => bone(f, k))]))
+  const wrist = rigPoint(sex, `wrist.${S}____head`)
+  const along = unit(sub(fingers[3][0].head, wrist))
+  const knuckles = unit(sub(fingers[5][0].head, fingers[2][0].head))
+  let palm = unit(cross(along, knuckles))
+  // The palm is the side the relaxed fingers already curl toward.
+  const reach = sub(fingers[3][2].tail, fingers[3][0].head)
+  if (dot(reach, palm) < 0) palm = scale(palm, -1)
+  const turns = new Map()
+  for (const f of [1, 2, 3, 4, 5]) {
+    const chain = []
+    fingers[f].forEach((b, k) => {
+      chain.push({ o: b.head, axis: unit(cross(unit(sub(b.tail, b.head)), palm)), angle: deg(CURL[f][k]) })
+      turns.set(`finger${f}-${k + 1}.${S}`, [...chain])
+    })
+  }
+  return { turns, fingers, palm, knuckles }
+}
+/** A point carried by one finger bone's closing turns, the tip's turn first. */
+const close = (p, chain) => chain.reduceRight((q, t) => turnAbout(q, t.o, t.axis, t.angle), p)
+
+// Which vertices each finger bone moves, and by how much (MakeHuman's weights, original indices).
+const fingerWeights = new Map()
+for (const [mh, list] of Object.entries(mhWeights)) {
+  if (!/^finger\d-\d\.[LR]$/.test(mh)) continue
+  for (const [v, w] of list) {
+    const i = newIndex.get(v)
+    if (i == null || i >= BODY_V) continue
+    if (!fingerWeights.has(i)) fingerWeights.set(i, [])
+    fingerWeights.get(i).push([mh, w])
+  }
+}
+const totalWeight = new Map()
+for (const [, list] of Object.entries(mhWeights)) for (const [v, w] of list) totalWeight.set(v, (totalWeight.get(v) ?? 0) + w)
+const GRIP_VERTICES = [...fingerWeights.keys()].sort((a, b) => a - b)
+for (const sex of SEXES) {
+  const pos = figures[sex].states.average
+  const hands = { r: closingTurns(sex, 'r'), l: closingTurns(sex, 'l') }
+  const offsets = new Float64Array(GRIP_VERTICES.length * 3)
+  GRIP_VERTICES.forEach((i, n) => {
+    const p = [pos[i * 3], pos[i * 3 + 1], pos[i * 3 + 2]]
+    const total = totalWeight.get(used[i]) ?? 1
+    // The fingers' share moves with them; the rest of the vertex (palm, wrist) stays.
+    const moved = [0, 0, 0]
+    let share = 0
+    for (const [mh, w] of fingerWeights.get(i)) {
+      const side = mh.endsWith('.R') ? 'r' : 'l'
+      const q = close(p, hands[side].turns.get(mh))
+      for (let k = 0; k < 3; k++) moved[k] += (q[k] - p[k]) * (w / total)
+      share += w / total
+    }
+    for (let k = 0; k < 3; k++) offsets[n * 3 + k] = moved[k]
+  })
+  figures[sex].grip = offsets
+  // The handle: through the middle of the closed fingers, across the palm from the index finger to the little finger.
+  figures[sex].handle = Object.fromEntries(
+    Object.entries(hands).map(([side, h]) => {
+      const pts = []
+      for (const f of [2, 3, 4, 5]) {
+        const chain = h.turns.get(`finger${f}-3.${SIDES[side]}`)
+        for (const b of h.fingers[f]) pts.push(close(b.head, chain), close(b.tail, chain))
+      }
+      const mid = pts.reduce((c, q) => [c[0] + q[0] / pts.length, c[1] + q[1] / pts.length, c[2] + q[2] / pts.length], [0, 0, 0])
+      return [side, { at: mid.map((x) => +x.toFixed(5)), axis: h.knuckles.map((x) => +x.toFixed(5)), palm: h.palm.map((x) => +x.toFixed(5)) }]
+    }),
+  )
+}
+console.log('grip', GRIP_VERTICES.length, 'finger vertices; handle', JSON.stringify(figures.male.handle.r))
 
 // ---- how much room the body needs lying on its back and sitting ----
 
@@ -621,6 +722,11 @@ for (const sex of SEXES) {
   const growth = quantizeOffsets(s.built.map((x, i) => x - s.skinny[i]))
   put(`${sex}.growth`, growth.q, { step: growth.step })
 }
+put('gripIndex', Uint16Array.from(GRIP_VERTICES))
+for (const sex of SEXES) {
+  const grip = quantizeOffsets(figures[sex].grip)
+  put(`${sex}.grip`, grip.q, { step: grip.step })
+}
 put('index', Uint16Array.from([...bodyTris, ...eyeTris]))
 put('skinIndex', skinIndex)
 put('skinWeight', skinWeight)
@@ -654,6 +760,8 @@ const meta = {
   joints: Object.fromEntries(SEXES.map((sex) => [sex, figures[sex].joints])),
   /** For each figure (the two sexes and their mean): the hip joints' height that keeps the back off the floor lying flat, and the thigh's depth below its bone: [skinny, built]. */
   room: rooms,
+  /** For each sex and hand, in its bind pose: the handle's centre when the hand is closed, its line across the palm, and the palm's facing. */
+  handle: Object.fromEntries(SEXES.map((sex) => [sex, figures[sex].handle])),
 }
 const ts = `// Written by scripts/body/bake.mjs from MakeHuman's CC0 assets; do not edit by hand.
 // The layout of body.bin and each figure's joints in its bind pose, in body units of 27 cm.

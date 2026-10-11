@@ -6,7 +6,7 @@ import type { FigureKey } from '../../components/three/skeleton'
 /**
  * /dev/bodies, in development only: every movement's figure at once, to check the body and its
  * muscle colours. ?set=0 or 1 picks a half (a browser runs out of 3D canvases near sixteen),
- * ?at=0..1 how far through the range, ?mirror draws the left-sided figure, ?plain hides the muscles,
+ * ?at=0..1 how far through the range (?goal: at each movement's goal), ?mirror draws the left-sided figure, ?plain hides the muscles,
  * ?only=a,b shows just those movements, larger, ?figure=female|male|neutral picks the body and
  * ?grown=0..1 grows every muscle group that far.
  */
@@ -23,7 +23,7 @@ export function BodyGallery() {
     <main className={`grid gap-2 bg-paper p-2 ${only ? 'grid-cols-2' : 'grid-cols-4'}`}>
       {list.map((e) => {
         const { restDeg, maxDeg } = EXERCISES[e.id]
-        const deg = restDeg + (maxDeg - restDeg) * at
+        const deg = params.has('goal') ? e.targetDeg : restDeg + (maxDeg - restDeg) * at
         return (
           <figure key={e.id} className="border border-rule">
             <LazyJointScene exercise={e.id} angle={deg} goalDeg={e.targetDeg} idle={false} muscles={!params.has('plain')} mirrored={params.has('mirror')} figure={figure} growth={growth} growthShade={params.has('shade')} className={only ? 'h-[640px]' : 'h-[300px]'} label={e.name} />

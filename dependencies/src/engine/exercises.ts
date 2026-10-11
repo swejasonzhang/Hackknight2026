@@ -152,7 +152,7 @@ export const EXERCISES: Record<ExerciseId, ExerciseConfig> = {
     enterDeg: 150,
     exitDeg: 105,
     targetDeg: 160,
-    restDeg: 40,
+    restDeg: 15,
     maxDeg: 165,
     minRepMs: 1000,
   },
@@ -374,6 +374,17 @@ export function sideLabel(exercise: ExerciseId, side: Side): string {
 export function goalRange(exercise: ExerciseId): { min: number; max: number } {
   const { enterDeg, maxDeg } = EXERCISES[exercise]
   return { min: enterDeg, max: maxDeg }
+}
+
+/**
+ * A goal the movement can reach: inside its goal range. A goal saved before a movement's range was
+ * narrowed (a front raise's 135° from before its end came down to 110°) is brought inside it, so no
+ * figure is shown chasing a goal past where the movement ends and no member is told they fall short
+ * of one.
+ */
+export function reachableGoal(exercise: ExerciseId, targetDeg: number): number {
+  const { min, max } = goalRange(exercise)
+  return Math.min(max, Math.max(min, targetDeg))
 }
 
 /** Why a goal does not suit a movement, or null when it does. */

@@ -165,6 +165,32 @@ describe('skeletonFor: a whole body for every exercise', () => {
     }
   })
 
+  it("moves like the real thing: a fly's hands meet in front and never cross, a row's elbow stays level with the back, a twist turns", () => {
+    for (const figure of FIGURES) {
+      for (const deg of RANGE.pec_fly) {
+        const j = skeletonFor('pec_fly', deg, figure).joints
+        expect(j.lWrist[0], `${figure} fly ${deg}°`).toBeGreaterThanOrEqual(j.rWrist[0] - 1e-6)
+        // At shoulder to chest height, in front of the body.
+        expect(j.lWrist[1]).toBeLessThan(j.lShoulder[1] + 0.05)
+        expect(j.lWrist[1]).toBeGreaterThan(j.lShoulder[1] - 0.6)
+      }
+      const open = skeletonFor('pec_fly', EXERCISES.pec_fly.restDeg, figure).joints
+      // Open, the arms reach wide, the hands well outside the shoulders.
+      expect(open.lWrist[0]).toBeGreaterThan(open.lShoulder[0] + 1)
+      const closed = skeletonFor('pec_fly', EXERCISES.pec_fly.maxDeg, figure).joints
+      expect(closed.lWrist[2]).toBeGreaterThan(0.8)
+      for (const deg of RANGE.bent_over_row) {
+        const j = skeletonFor('bent_over_row', deg, figure).joints
+        // The elbow comes back along the body, never up above the shoulder.
+        expect(j.rElbow[1], `${figure} row ${deg}°`).toBeLessThan(j.rShoulder[1] + 0.05)
+      }
+      const twist = skeletonFor('ab_twist', EXERCISES.ab_twist.targetDeg, figure)
+      expect(Math.abs(twist.twist ?? 0)).toBeGreaterThan(0.5)
+      // Turned, the right shoulder is behind the left.
+      expect(twist.joints.rShoulder[2]).toBeLessThan(twist.joints.lShoulder[2])
+    }
+  })
+
   it('starts the three classics from rest: the forearm, the arm and the shin hanging straight down', () => {
     expect(restFor('elbow_flexion')).toBe(0)
     expect(restFor('shoulder_abduction')).toBe(0)

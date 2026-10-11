@@ -1,4 +1,4 @@
-import { EXERCISE_IDS, MUSCLE_IDS, PROGRAM_SOURCES, type ProgramDay, type ProgramDto, type ProgramItem, type ProgramSource } from '@arc/dependencies'
+import { EXERCISE_IDS, MUSCLE_IDS, PROGRAM_SOURCES, reachableGoal, type ProgramDay, type ProgramDto, type ProgramItem, type ProgramSource } from '@arc/dependencies'
 import { model, Schema, type Types } from 'mongoose'
 
 export interface ProgramShape {
@@ -53,7 +53,7 @@ export function toProgramDto(p: ProgramShape): ProgramDto {
     days: p.days.map((d) => ({
       weekday: d.weekday,
       title: d.title,
-      items: d.items.map(({ exercise, side, sets, reps, restSeconds, targetDeg, muscle }) => ({ exercise, side, sets, reps, restSeconds, targetDeg, ...(muscle ? { muscle } : {}) })),
+      items: d.items.map(({ exercise, side, sets, reps, restSeconds, targetDeg, muscle }) => ({ exercise, side, sets, reps, restSeconds, targetDeg: reachableGoal(exercise, targetDeg), ...(muscle ? { muscle } : {}) })),
     })),
     source: p.source,
     active: p.active,

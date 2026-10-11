@@ -79,7 +79,7 @@
       "sided": false,
       "measure": "angle",
       "metric": "bend",
-      "restDeg": 40,
+      "restDeg": 15,
       "exitDeg": 105,
       "enterDeg": 150,
       "targetDeg": 160,
