@@ -41,7 +41,7 @@ function phaseWeek(profile: ProfileShape, challenge: Challenge, phase: number): 
     .sort((a, b) => mondayFirst(a.weekday, b.weekday))
     .map((d) => ({ ...d, items: d.items.map((item) => (side && EXERCISES[item.exercise].sided ? { ...item, side } : item)) }))
   const weeks = fromWeek === toWeek ? `week ${fromWeek}` : `weeks ${fromWeek}–${toWeek}`
-  const summary = `${challenge.name}, ${weeks} of ${challenge.weeks}: ${name}. ${describeWeek(sorted)}`
+  const summary = `${challenge.name}, ${weeks} of ${challenge.weeks}: ${name}. ${describeWeek(sorted, '')}`
   return { summary: summary.length <= 800 ? summary : `${summary.slice(0, 797)}…`, days: sorted }
 }
 

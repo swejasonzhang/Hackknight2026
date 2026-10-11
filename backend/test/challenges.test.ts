@@ -63,7 +63,7 @@ describe('starting a challenge (POST /api/profiles/:id/challenge)', () => {
       ['elbow_flexion', 'left'],
     ])
     // The weeks the phase runs, which stay true until the next phase replaces the week.
-    expect(week.summary).toBe(`Strong arms, weeks 1–4 of 8: Pump. ${describeWeek(pump.days)}`)
+    expect(week.summary).toBe(`Strong arms, weeks 1–4 of 8: Pump. ${describeWeek(pump.days, '')}`)
     // The member's own week is kept in history, and Record starts from the challenge week's first movement.
     const history = (await c.get(`/api/profiles/${profileId}/programs`)).body
     expect(history.map((p: { source: string; active: boolean }) => [p.source, p.active])).toEqual([
@@ -172,7 +172,7 @@ describe("the profile's challenge (GET /api/profiles/:id/challenge)", () => {
       ['lunge', 'left'],
       ['crunch', 'right'],
     ])
-    expect(week.summary).toBe(`Summer body, weeks 5–8 of 12: Add volume. ${describeWeek(volume.days)}`)
+    expect(week.summary).toBe(`Summer body, weeks 5–8 of 12: Add volume. ${describeWeek(volume.days, '')}`)
     expect((await c.get(`/api/profiles/${profileId}/plan`)).body).toMatchObject({ exercise: 'chest_press', side: 'right', sets: 4, reps: 10, restSeconds: 90 })
     expect(await Program.countDocuments({ profileId })).toBe(2)
     expect(await Plan.countDocuments({ profileId })).toBe(2)
@@ -199,7 +199,7 @@ describe("the profile's challenge (GET /api/profiles/:id/challenge)", () => {
     const week = (await c.get(`/api/profiles/${profileId}/program`)).body
     expect(withoutSides(week.days)).toEqual(withoutSides(sharpen.days))
     expect(week.days[1].items[0]).toEqual({ ...sharpen.days[1]!.items[0], exercise: 'elbow_flexion', side: 'left' })
-    expect(week.summary).toBe(`Summer body, weeks 9–12 of 12: Sharpen. ${describeWeek(sharpen.days)}`)
+    expect(week.summary).toBe(`Summer body, weeks 9–12 of 12: Sharpen. ${describeWeek(sharpen.days, '')}`)
     expect(await Program.countDocuments({ profileId })).toBe(2)
     expect(await Plan.countDocuments({ profileId })).toBe(2)
 

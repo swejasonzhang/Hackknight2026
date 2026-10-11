@@ -256,6 +256,8 @@ describe('muscle groups through a day', () => {
       { weekday: 1, items: [item('lat_pulldown'), item('deadlift', 'lower_back')] },
     ])
     expect(text).toBe('Your own week: 2 days and 4 movements. Monday lats and lower back; Wednesday quads.')
+    // Without a lead, for a summary that names the week itself.
+    expect(describeWeek([{ weekday: 3, items: [item('squat')] }], '')).toBe('1 day and 1 movement. Wednesday quads.')
   })
 
   it('takes up to eight movements a day, each with the muscle it was picked for', () => {
