@@ -164,7 +164,7 @@ export function ProfilesPage() {
                 <td className={NAME}>
                   <div className="grid gap-2">
                     <span className="font-sans text-[16px] font-medium text-ink">{p.name}</span>
-                    <FigurePicker value={p.figure ?? null} onChange={(f) => changeFigure(p.id, p.name, f)} disabled={busy} />
+                    <FigurePicker value={p.figure ?? null} onChange={(f) => changeFigure(p.id, p.name, f)} disabled={busy} label={`${p.name}'s figure`} />
                   </div>
                 </td>
                 <td className={`${STACKED} font-mono text-[12.5px] text-ink-2`}>{p.email ?? `Added ${formatDate(p.createdAt)}`}</td>
@@ -231,7 +231,7 @@ export function ProfilesPage() {
                 />
                 <FieldMessage id={ids.nameMsg} rule={nameRule} requirement={NAME_REQUIREMENT} />
                 <div className="mt-3">
-                  <FigurePicker value={figure} onChange={setFigure} disabled={busy} />
+                  <FigurePicker value={figure} onChange={setFigure} disabled={busy} label="New profile's figure" />
                 </div>
               </div>
             </td>

@@ -53,7 +53,9 @@ export function DashboardPage() {
   const [seeding, setSeeding] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [panelRef, panelTop] = useStickyTop<HTMLElement>(32)
-  const { body } = useBody(selectedId)
+  // The body loads again on Retry, after it could not.
+  const [bodyTry, setBodyTry] = useState(0)
+  const { body, error: bodyError } = useBody(selectedId, bodyTry)
   const [savingFigure, setSavingFigure] = useState(false)
   const growth = body && body.profileId === selectedId ? growthNow(body) : null
   const figure = figureKey(selected?.figure)
@@ -278,7 +280,7 @@ export function DashboardPage() {
 
         {selected && !noProfiles && <PlanCalendar profileId={selected.id} exercise={exercise} />}
 
-        {selected && !noProfiles && <BodyGrowth name={selected.name} body={body && body.profileId === selected.id ? body : null} figure={selected.figure ?? null} onFigure={chooseFigure} saving={savingFigure} />}
+        {selected && !noProfiles && <BodyGrowth name={selected.name} body={body && body.profileId === selected.id ? body : null} error={bodyError} onRetry={() => setBodyTry((n) => n + 1)} figure={selected.figure ?? null} onFigure={chooseFigure} saving={savingFigure} />}
 
         {noProfiles && (
           <Strip index="00" title="Setup">

@@ -2,11 +2,11 @@ import type { ExerciseId } from '@arc/dependencies'
 import { Grid, Line, OrbitControls } from '@react-three/drei'
 import { Canvas, useFrame, useThree } from '@react-three/fiber'
 import { useReducedMotion, type MotionValue } from 'motion/react'
-import { useEffect, useMemo, useRef } from 'react'
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { Bone, BoxGeometry, BufferAttribute, BufferGeometry, CircleGeometry, Color, DoubleSide, Group, Matrix4, MeshBasicMaterial, MeshStandardMaterial, Object3D, Quaternion, Skeleton as ThreeSkeleton, SkinnedMesh, TorusGeometry, Vector3 } from 'three'
 import { HELPER_YELLOW, TARGET_RED } from './colors'
-import { bodyPositions, BONE_NAMES, facingFor, paintBody, skinMatrices, type BodyAsset, type Growth, type Palette, type Rgb } from './body/figure'
-import { bodyAsset } from './body/load'
+import { bodyPositions, BONE_NAMES, facingFor, GARMENT_LIFT, garmentPositions, garmentSkin, garmentsOf, paintBody, paintGarment, skinMatrices, vertexNormals, visibleTriangles, type BodyAsset, type GarmentName, type Growth, type Palette, type Rgb, type Show } from './body/figure'
+import { bodyAsset, loadBody } from './body/load'
 import { framingFor, restFor, skeletonFor, sweepFor, type FigureKey, type Skeleton, type V3 } from './skeleton'
 
 export interface JointSceneProps {
@@ -38,10 +38,13 @@ export interface JointSceneProps {
   className?: string
   /** What the picture shows, for assistive tech. */
   label: string
+  /** Shown in place of the figure until the body has loaded (and if it cannot). */
+  fallback?: ReactNode
 }
 
 const SKIN = '#cdd4de'
-const CLOTH = '#1d2b4b'
+const SHORTS = '#1d2b4b'
+const TOP = '#3150d4'
 const EYE = '#2a3550'
 const GROWN = '#3d6bff'
 const SEAT = '#dfe4ef'
@@ -53,7 +56,8 @@ const rgb = (hex: string): Rgb => {
   const c = new Color(hex)
   return [c.r, c.g, c.b]
 }
-const PALETTE: Palette = { skin: rgb(SKIN), cloth: rgb(CLOTH), eye: rgb(EYE), target: rgb(TARGET_RED), helper: rgb(HELPER_YELLOW), grown: rgb(GROWN) }
+const PALETTE: Palette = { skin: rgb(SKIN), eye: rgb(EYE), target: rgb(TARGET_RED), helper: rgb(HELPER_YELLOW), grown: rgb(GROWN), fabric: { shorts: rgb(SHORTS), top: rgb(TOP) } }
+const GARMENTS: GarmentName[] = ['shorts', 'top']
 
 /*
  * Materials and the instrument's shapes are built once and shared by every mount and every canvas;
@@ -64,8 +68,10 @@ const PALETTE: Palette = { skin: rgb(SKIN), cloth: rgb(CLOTH), eye: rgb(EYE), ta
 let shared: ReturnType<typeof build> | null = null
 function build() {
   return {
-    // The body: white, tinted per vertex by skin, clothes and the muscle colours.
+    // The body: white, tinted per vertex by skin and the muscle colours.
     body: new MeshStandardMaterial({ color: '#ffffff', vertexColors: true, roughness: 0.6, metalness: 0.02 }),
+    // The clothes: matt fabric, both faces drawn so the inside shows at a hem.
+    fabric: new MeshStandardMaterial({ color: '#ffffff', vertexColors: true, roughness: 0.92, metalness: 0, side: DoubleSide }),
     seat: new MeshStandardMaterial({ color: SEAT, roughness: 0.7 }),
     navy: new MeshStandardMaterial({ color: NAVY, roughness: 0.6 }),
     ink: new MeshBasicMaterial({ color: COBALT }),
@@ -79,11 +85,12 @@ function build() {
 }
 const parts = () => (shared ??= build())
 
-/** This mount's body: a skinned mesh over Arc's bones, sharing the decoded arrays. */
+/** This mount's body: a skinned mesh over Arc's bones and its clothes on the same bones, sharing the decoded arrays. */
 function makeBody(asset: BodyAsset) {
   const geometry = new BufferGeometry()
   geometry.setIndex(new BufferAttribute(asset.index, 1))
   geometry.setAttribute('position', new BufferAttribute(new Float32Array(asset.vertices * 3), 3))
+  geometry.setAttribute('normal', new BufferAttribute(new Float32Array(asset.vertices * 3), 3))
   geometry.setAttribute('color', new BufferAttribute(new Float32Array(asset.vertices * 3), 3))
   geometry.setAttribute('skinIndex', new BufferAttribute(asset.skinIndex, 4))
   geometry.setAttribute('skinWeight', new BufferAttribute(asset.skinWeight, 4))
@@ -96,10 +103,31 @@ function makeBody(asset: BodyAsset) {
     mesh.add(b)
     return b
   })
-  mesh.bind(new ThreeSkeleton(bones, bones.map(() => new Matrix4())), new Matrix4())
+  const skeleton = new ThreeSkeleton(bones, bones.map(() => new Matrix4()))
+  mesh.bind(skeleton, new Matrix4())
   // The pose moves the body far from its bind-pose bounds (lying for a crunch): never cull it.
   mesh.frustumCulled = false
-  return { mesh, bones, geometry }
+  // Each garment: its own surface, skinned like the body under it, on the same bones.
+  const garments = {} as Record<GarmentName, { mesh: SkinnedMesh; geometry: BufferGeometry }>
+  for (const name of GARMENTS) {
+    const g = asset.garments[name]
+    const geo = new BufferGeometry()
+    const count = g.a.length * 3
+    geo.setIndex(new BufferAttribute(g.faces, 1))
+    geo.setAttribute('position', new BufferAttribute(new Float32Array(count), 3))
+    geo.setAttribute('normal', new BufferAttribute(new Float32Array(count), 3))
+    geo.setAttribute('color', new BufferAttribute(new Float32Array(count), 3))
+    const skin = garmentSkin(asset, g)
+    geo.setAttribute('skinIndex', new BufferAttribute(skin.index, 4))
+    geo.setAttribute('skinWeight', new BufferAttribute(skin.weight, 4))
+    const clothing = new SkinnedMesh(geo, parts().fabric)
+    clothing.bind(skeleton, new Matrix4())
+    clothing.frustumCulled = false
+    // A child of the body, so both sit in the same space and the bones carry both alike.
+    mesh.add(clothing)
+    garments[name] = { mesh: clothing, geometry: geo }
+  }
+  return { mesh, bones, geometry, garments }
 }
 
 function gaugeGeometry(): BufferGeometry {
@@ -177,11 +205,21 @@ function Body({ asset, exercise, angle, goalDeg, rangeDeg, idle, reduce, muscles
   const band = useMemo(gaugeGeometry, [])
   const body = useMemo(() => makeBody(asset), [asset])
   const shown = useRef<{ exercise: ExerciseId; deg: number } | null>(null)
-  const applied = useRef<{ exercise: ExerciseId; deg: number; figure: FigureKey } | null>(null)
+  const applied = useRef<{ exercise: ExerciseId; deg: number; figure: FigureKey; fill: number } | null>(null)
   const invalidate = useThree((s) => s.invalidate)
   const aspect = useThree((s) => s.size.width / Math.max(1, s.size.height))
   const frame = framingFor(exercise, figure, aspect, frameAt)
-  const rest = useMemo(() => skeletonFor(exercise, restFor(exercise), figure), [exercise, figure])
+  const fill = growth?.overall ?? 0
+  const rest = useMemo(() => skeletonFor(exercise, restFor(exercise), figure, fill), [exercise, figure, fill])
+  // The stool is always in the scene, so its material is ready before the seated exercise first shows it.
+  const seat = useMemo(() => skeletonFor('seated_knee_extension', 90, figure, fill).seat!, [figure, fill])
+  const gl = useThree((s) => s.gl)
+  const scene = useThree((s) => s.scene)
+  const camera = useThree((s) => s.camera)
+  // Every material is compiled once when the scene starts, so switching movement never stalls a frame.
+  useEffect(() => {
+    gl.compile(scene, camera)
+  }, [gl, scene, camera])
   // The tracker's rings stay small so the body, not the instrument, reads first.
   const ring = 0.05 / frame.scale
   const facing = facingFor(exercise)
@@ -192,26 +230,52 @@ function Body({ asset, exercise, angle, goalDeg, rangeDeg, idle, reduce, muscles
       gauge.dispose()
       band.dispose()
       body.geometry.dispose()
+      for (const g of Object.values(body.garments)) g.geometry.dispose()
       body.mesh.skeleton.dispose()
     },
     [gauge, band, body],
   )
 
-  // The shape follows the figure and its growth; the colours follow it and what is shown on it.
+  // The shape follows the figure and its growth, the clothes follow the shape, and the colours
+  // follow what is shown on it.
   const positions = useMemo(() => {
     const attr = body.geometry.getAttribute('position') as BufferAttribute
+    const normals = body.geometry.getAttribute('normal') as BufferAttribute
     bodyPositions(asset, figure, growth, attr.array as Float32Array)
+    vertexNormals(attr.array as Float32Array, asset.index, normals.array as Float32Array)
     attr.needsUpdate = true
-    body.geometry.computeVertexNormals()
+    normals.needsUpdate = true
+    for (const name of GARMENTS) {
+      const g = body.garments[name].geometry
+      const gp = g.getAttribute('position') as BufferAttribute
+      const gn = g.getAttribute('normal') as BufferAttribute
+      garmentPositions(asset.garments[name], attr.array as Float32Array, normals.array as Float32Array, GARMENT_LIFT[name], gp.array as Float32Array)
+      vertexNormals(gp.array as Float32Array, asset.garments[name].faces, gn.array as Float32Array)
+      gp.needsUpdate = true
+      gn.needsUpdate = true
+    }
     return attr.array as Float32Array
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [asset, body, figure, growthKey])
 
+  // What a figure wears: its garments shown, and the skin they cover left undrawn.
   useEffect(() => {
+    const worn = garmentsOf(figure)
+    body.geometry.setIndex(new BufferAttribute(visibleTriangles(asset, figure), 1))
+    for (const name of GARMENTS) body.garments[name].mesh.visible = worn.includes(name)
+    invalidate()
+  }, [asset, body, figure, invalidate])
+
+  useEffect(() => {
+    const show: Show = growthShade && growth ? { growth } : muscles ? { exercise } : null
     const attr = body.geometry.getAttribute('color') as BufferAttribute
-    const show = growthShade && growth ? { growth } : muscles ? { exercise } : null
-    paintBody(asset, positions, figure, PALETTE, show, attr.array as Float32Array)
+    paintBody(asset, positions, PALETTE, show, attr.array as Float32Array)
     attr.needsUpdate = true
+    for (const name of GARMENTS) {
+      const colors = body.garments[name].geometry.getAttribute('color') as BufferAttribute
+      paintGarment(asset, name, positions, PALETTE, show, colors.array as Float32Array)
+      colors.needsUpdate = true
+    }
     invalidate()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [asset, body, positions, figure, exercise, muscles, growthShade, growthKey, invalidate])
@@ -265,9 +329,9 @@ function Body({ asset, exercise, angle, goalDeg, rangeDeg, idle, reduce, muscles
     const deg = !prev || prev.exercise !== exercise || reduce || typeof angle !== 'number' ? target : prev.deg + (target - prev.deg) * (1 - Math.exp(-dt * 6))
     shown.current = { exercise, deg }
     const last = applied.current
-    if (!last || last.exercise !== exercise || last.figure !== figure || Math.abs(last.deg - deg) > 0.01) {
-      apply(skeletonFor(exercise, deg, figure))
-      applied.current = { exercise, deg, figure }
+    if (!last || last.exercise !== exercise || last.figure !== figure || last.fill !== fill || Math.abs(last.deg - deg) > 0.01) {
+      apply(skeletonFor(exercise, deg, figure, fill))
+      applied.current = { exercise, deg, figure, fill }
     }
     // A mirrored figure turns the mirror way, so it shows the same side of the body.
     if (sway.current) {
@@ -283,22 +347,20 @@ function Body({ asset, exercise, angle, goalDeg, rangeDeg, idle, reduce, muscles
         <group position={frame.offset} scale={frame.scale}>
           <primitive object={body.mesh} />
 
-          {/* The stool: shown only for the seated exercise. */}
-          {rest.seat && (
-            <group>
-              <mesh position={[(rest.seat.x[0] + rest.seat.x[1]) / 2, rest.seat.top - 0.06, 0]} scale={[rest.seat.x[1] - rest.seat.x[0], 0.12, rest.seat.z[1] - rest.seat.z[0]]} geometry={p.box} material={p.seat} />
-              {(
-                [
-                  [rest.seat.x[0] + 0.12, rest.seat.z[0] + 0.12],
-                  [rest.seat.x[0] + 0.12, rest.seat.z[1] - 0.12],
-                  [rest.seat.x[1] - 0.12, rest.seat.z[0] + 0.12],
-                  [rest.seat.x[1] - 0.12, rest.seat.z[1] - 0.12],
-                ] as [number, number][]
-              ).map(([x, z]) => (
-                <mesh key={`${x}${z}`} position={[x, (rest.seat!.top - 0.12) / 2, z]} scale={[0.08, rest.seat!.top - 0.12, 0.08]} geometry={p.box} material={p.navy} />
-              ))}
-            </group>
-          )}
+          {/* The stool: always built, shown only for the seated exercise. */}
+          <group visible={rest.seat != null}>
+            <mesh position={[(seat.x[0] + seat.x[1]) / 2, seat.top - 0.06, 0]} scale={[seat.x[1] - seat.x[0], 0.12, seat.z[1] - seat.z[0]]} geometry={p.box} material={p.seat} />
+            {(
+              [
+                [seat.x[0] + 0.12, seat.z[0] + 0.12],
+                [seat.x[0] + 0.12, seat.z[1] - 0.12],
+                [seat.x[1] - 0.12, seat.z[0] + 0.12],
+                [seat.x[1] - 0.12, seat.z[1] - 0.12],
+              ] as [number, number][]
+            ).map(([x, z]) => (
+              <mesh key={`${x}${z}`} position={[x, (seat.top - 0.12) / 2, z]} scale={[0.08, seat.top - 0.12, 0.08]} geometry={p.box} material={p.navy} />
+            ))}
+          </group>
 
           {/* The tracker's view on top of the body: landmark rings, the tracked segments, the arc. */}
           <group visible={instrument}>
@@ -346,12 +408,22 @@ function Floor({ exercise, figure, frameAt }: { exercise: ExerciseId; figure: Fi
  * it (`growth`). Drive `angle` with `useRepLoop` to sweep the limb through the range rep after
  * rep. Never rendered in tests: use `LazyJointScene`, which loads the body with the code.
  */
-export default function JointScene({ exercise, angle, goalDeg, rangeDeg, idle = true, muscles = true, mirrored = false, figure = 'neutral', growth = null, growthShade = false, instrument = true, spin = false, frameAt, className = '', label }: JointSceneProps) {
+export default function JointScene({ exercise, angle, goalDeg, rangeDeg, idle = true, muscles = true, mirrored = false, figure = 'neutral', growth = null, growthShade = false, instrument = true, spin = false, frameAt, className = '', label, fallback = null }: JointSceneProps) {
   const reduce = useReducedMotion() ?? false
   const fixed = typeof angle === 'number' ? angle : angle.get()
-  const asset = bodyAsset()
+  // The body loads with the scene's code; if that download failed, show the fallback and try again.
+  const [asset, setAsset] = useState(bodyAsset)
+  useEffect(() => {
+    if (asset) return
+    let cancelled = false
+    void loadBody().then((a) => !cancelled && a && setAsset(a))
+    return () => {
+      cancelled = true
+    }
+  }, [asset])
   return (
     <div className={`relative ${className}`.trim()} role="img" aria-label={label}>
+      {!asset && fallback}
       {asset && (
         <Canvas dpr={[1, 1.5]} camera={{ position: [0.7, 0.35, 4.6], fov: 36 }} gl={{ antialias: true, alpha: true, powerPreference: 'high-performance' }} frameloop={reduce ? 'demand' : 'always'}>
           <hemisphereLight args={['#ffffff', '#9aa8c2', 1.0]} />

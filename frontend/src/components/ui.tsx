@@ -115,12 +115,16 @@ export interface SegmentedOption<T extends string> {
   short?: string
 }
 
-/** A selector switch: square cells on a rule, the active one navy with a cobalt top edge (Radix Tabs underneath). */
+/**
+ * A selector switch: square cells on a rule, the active one navy with a cobalt top edge (Radix Tabs
+ * underneath). More than five cells wrap into rows of four below the md breakpoint, so a long
+ * switch never runs off a phone.
+ */
 export function Segmented<T extends string>({ options, value, onChange, label }: { options: SegmentedOption<T>[]; value: T; onChange: (value: T) => void; label: string }) {
   const layoutId = useId()
   return (
     <Tabs.Root value={value} onValueChange={(v) => onChange(v as T)}>
-      <Tabs.List aria-label={label} className="switch">
+      <Tabs.List aria-label={label} className={options.length > 5 ? 'switch switch-many' : 'switch'}>
         {options.map((o) => {
           const active = o.value === value
           return (

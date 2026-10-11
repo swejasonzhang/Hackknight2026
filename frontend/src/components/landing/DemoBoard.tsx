@@ -168,7 +168,7 @@ export function DemoBoard() {
         ))}
       </dl>
 
-      <div className="panel p-4 sm:p-6">
+      <div className="panel min-w-0 p-4 sm:p-6">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="w-full lg:w-auto">
             <Segmented label="Chart" options={VIEWS} value={view} onChange={setView} />

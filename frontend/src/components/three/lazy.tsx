@@ -10,10 +10,10 @@ import type { ProgressSceneProps } from './ProgressScene'
 const JointSceneImpl = lazy(() => Promise.all([import('./JointScene'), import('./body/load').then((m) => m.loadBody())]).then(([m]) => m))
 const ProgressSceneImpl = lazy(() => import('./ProgressScene'))
 
-export function LazyJointScene({ fallback = null, ...props }: JointSceneProps & { fallback?: ReactNode }) {
+export function LazyJointScene({ fallback = null, ...props }: JointSceneProps) {
   return (
     <Suspense fallback={fallback}>
-      <JointSceneImpl {...props} />
+      <JointSceneImpl {...props} fallback={fallback} />
     </Suspense>
   )
 }

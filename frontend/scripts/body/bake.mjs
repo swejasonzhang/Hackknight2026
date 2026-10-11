@@ -6,7 +6,8 @@
 // targets for single regions), and writes what the app needs to src/components/three/body/:
 //
 // - body.bin: the mesh (the skinny positions and the offset to the built ones, per sex), triangles,
-//   skin weights onto Arc's skeleton, where each muscle group lies, and the clothing;
+//   skin weights onto Arc's skeleton, where each muscle group lies, and the clothes (the body's
+//   own triangles under each garment, which the app lifts off the skin into a separate surface);
 // - bodyMeta.ts: the layout of body.bin and each figure's joints, in Arc's body units (27 cm).
 //
 // Nothing here runs in the app; the app only decodes body.bin. Standard library only.
@@ -45,7 +46,6 @@ const REGIONAL = [
   { target: 'armslegs/{side}-lowerleg-muscle', down: 0.5, up: 1 },
   { target: 'torso/torso-muscle-pectoral', down: 0.5, up: 1 },
   { target: 'torso/torso-muscle-dorsi', down: 0.5, up: 1 },
-  { target: 'torso/torso-vshape', down: 0.3, up: 0.7 },
   { target: 'buttocks/buttocks-volume', down: 0.4, up: 0.8 },
 ]
 const regionalFiles = (r, way) => (r.target.includes('{side}') ? ['r', 'l'].map((side) => r.target.replace('{side}', side)) : [r.target]).map((t) => `targets/${t}-${way}.target`)
@@ -288,12 +288,11 @@ for (let i = 0; i < V; i++) {
 
 // ---- how much room the body needs lying on its back and sitting ----
 
-// Measured at the most muscle, so a grown figure never sinks into the floor or the stool.
+// Measured on the skinny and the built body: the skeleton takes the room between them by the
+// figure's growth, so no figure floats above the floor or sinks into the stool.
 const dominant = Array.from({ length: V }, (_, i) => BONES[[...perVertex[i].entries()].sort((a, b) => b[1] - a[1])[0][0]])
 const TRUNK_BONES = new Set(['pelvis', 'torso', 'neck', 'head', 'rClavicle', 'lClavicle', 'rGlute', 'lGlute'])
-for (const sex of SEXES) {
-  const pos = figures[sex].states.built
-  const j = figures[sex].joints
+const roomOf = (pos, j) => {
   const hipY = (j.rHip[1] + j.lHip[1]) / 2
   // Lying flat, the trunk turns until the shoulders are level with the hips (skeleton.ts, the crunch).
   const shoulder = [(j.rShoulder[2] + j.lShoulder[2]) / 2, (j.rShoulder[1] + j.lShoulder[1]) / 2 - hipY]
@@ -312,8 +311,25 @@ for (const sex of SEXES) {
       if (t > 0 && t < 0.6) seat = Math.max(seat, -sub(d, scale(axis, dot(d, axis)))[2])
     }
   }
-  figures[sex].room = { lying: +lying.toFixed(4), seat: +seat.toFixed(4) }
+  return { lying, seat }
 }
+// The figure between the sexes is their mean, mesh and joints alike (figure.ts, skeleton.ts): its
+// room is measured on that mean body, not taken from either sex's.
+const mean = (a, b) => a.map((x, i) => (x + b[i]) / 2)
+const ROOM_FIGURES = {
+  ...Object.fromEntries(SEXES.map((sex) => [sex, { states: figures[sex].states, joints: figures[sex].joints }])),
+  neutral: {
+    states: { skinny: mean(figures.female.states.skinny, figures.male.states.skinny), built: mean(figures.female.states.built, figures.male.states.built) },
+    joints: Object.fromEntries(Object.keys(figures.female.joints).map((n) => [n, mean(figures.female.joints[n], figures.male.joints[n])])),
+  },
+}
+const rooms = Object.fromEntries(
+  Object.entries(ROOM_FIGURES).map(([figure, f]) => {
+    const skinny = roomOf(f.states.skinny, f.joints)
+    const built = roomOf(f.states.built, f.joints)
+    return [figure, { lying: [+skinny.lying.toFixed(4), +built.lying.toFixed(4)], seat: [+skinny.seat.toFixed(4), +built.seat.toFixed(4)] }]
+  }),
+)
 
 // ---- where each muscle lies ----
 
@@ -473,29 +489,94 @@ for (let i = 0; i < V; i++) {
   })
 }
 
-// ---- clothing: shorts on everyone, a sports top on the female figure ----
+// ---- clothes: shorts on everyone, a sports top on the female figure and the one between ----
 
 const torsoT = (i) => local(FRAMES.torso, P(i)).t
-const shorts = new Float64Array(V)
-const top = new Float64Array(V)
+/**
+ * Each garment as a signed distance on the body, in body units: positive under it, negative off
+ * it, zero on its hem. Straight measures (height on the trunk, length down the thigh), so the hem
+ * cuts across the triangles in a clean line.
+ */
+const shorts = new Float64Array(V).fill(-1)
+const top = new Float64Array(V).fill(-1)
 // The waistband sits level a hand's width above the hip joints; the legs end a third of the way down the thigh.
 const waistY = hipMid[1] + 0.42
+const LEG_END = 0.31
+const TOP = [0.47, 0.755]
 for (let i = 0; i < BODY_V; i++) {
   const p = P(i)
-  const part = BONES[[...perVertex[i].entries()].sort((a, b) => b[1] - a[1])[0][0]]
+  const part = dominant[i]
   // Only the trunk, the hips and the thighs: never a hand or a forearm that hangs beside them.
-  if (!['pelvis', 'torso', 'rThigh', 'lThigh', 'rGlute', 'lGlute'].includes(part)) continue
-  let s = 0
-  for (const side of ['r', 'l']) {
-    const l = local(FRAMES[`${side}Thigh`], p)
-    if (l.t > -0.4 && l.t < 0.6 && l.r < 0.7) s = Math.max(s, 1 - smooth(0.27, 0.35, l.t))
+  if (['pelvis', 'torso', 'rGlute', 'lGlute'].includes(part)) shorts[i] = waistY - p[1]
+  if (part === 'rThigh' || part === 'lThigh') {
+    const l = local(FRAMES[`${part[0]}Thigh`], p)
+    shorts[i] = Math.min(waistY - p[1], (LEG_END - l.t) * FRAMES[`${part[0]}Thigh`].length)
   }
-  if (part === 'pelvis' || part === 'torso' || part === 'rGlute' || part === 'lGlute') s = Math.max(s, 1 - smooth(waistY - 0.04, waistY + 0.04, p[1]))
-  shorts[i] = s
-  // The sports top: from under the bust to above it, all the way round.
-  if (part === 'torso') top[i] = along(torsoT(i), 0.5, 0.74, 0.02)
+  // The sports top: from under the bust to well above it, all the way round, below the armpits.
+  if (part === 'torso' || part === 'rClavicle' || part === 'lClavicle') {
+    const t = torsoT(i)
+    top[i] = Math.min(t - TOP[0], TOP[1] - t) * FRAMES.torso.length
+  }
 }
-const toByte = (a) => Uint8Array.from(relax(a, 2), (x) => Math.round(Math.min(1, Math.max(0, x)) * 255))
+
+/**
+ * A garment: the surface of the body under it, cut cleanly where its coverage crosses one half,
+ * so the hem runs smooth across the triangles rather than stepping round them. Each of its
+ * vertices is a point of the body: on a body vertex, or part of the way along a body edge (a, b, s)
+ * where the hem crosses it. The app lifts it off the skin along the normals, fills the hollows
+ * under it (so nothing of the body's shape shows through where it should not), skins it with the
+ * body and stops drawing the skin it covers entirely.
+ */
+function garment(field) {
+  const m = field
+  const inside = (v) => m[v] >= 0
+  const points = []
+  const index = new Map()
+  const point = (a, b, s) => {
+    if (a === b || s <= 0) return keep(a, a, 0)
+    if (s >= 1) return keep(b, b, 0)
+    return a < b ? keep(a, b, s) : keep(b, a, 1 - s)
+  }
+  const keep = (a, b, s) => {
+    const key = a === b ? `${a}` : `${a},${b}`
+    if (!index.has(key)) {
+      index.set(key, points.length)
+      points.push([a, b, s])
+    }
+    return index.get(key)
+  }
+  const cut = (a, b) => point(a, b, -m[a] / (m[b] - m[a]))
+  const faces = []
+  for (let k = 0; k < bodyTris.length; k += 3) {
+    const t = [bodyTris[k], bodyTris[k + 1], bodyTris[k + 2]]
+    const ins = t.map(inside)
+    const n = ins.filter(Boolean).length
+    if (n === 3) faces.push(point(t[0], t[0], 0), point(t[1], t[1], 0), point(t[2], t[2], 0))
+    else if (n === 1) {
+      // The corner inside, then the two cuts, in the triangle's own winding.
+      const i = ins.indexOf(true)
+      const [x, y, z] = [t[i], t[(i + 1) % 3], t[(i + 2) % 3]]
+      faces.push(point(x, x, 0), cut(x, y), cut(x, z))
+    } else if (n === 2) {
+      // The two corners inside and the cuts toward the one outside: a quad, as two triangles.
+      const j = ins.indexOf(false)
+      const [x, y, z] = [t[(j + 1) % 3], t[(j + 2) % 3], t[j]]
+      const yz = cut(y, z)
+      const xz = cut(x, z)
+      faces.push(point(x, x, 0), point(y, y, 0), yz, point(x, x, 0), yz, xz)
+    }
+  }
+  return {
+    a: Uint16Array.from(points, (p) => p[0]),
+    b: Uint16Array.from(points, (p) => p[1]),
+    // The share of the way from a to b, in 65,535ths.
+    s: Uint16Array.from(points, (p) => Math.round(p[2] * 65535)),
+    faces: Uint16Array.from(faces),
+    // The hem: the points where the cut crosses an edge.
+    hem: Uint8Array.from(points, (p) => (p[0] !== p[1] ? 1 : 0)),
+  }
+}
+const GARMENTS = { shorts: garment(shorts), top: garment(top) }
 
 // ---- write ----
 
@@ -545,8 +626,13 @@ put('skinIndex', skinIndex)
 put('skinWeight', skinWeight)
 put('maskIndex', maskIndex)
 put('maskWeight', maskWeight)
-put('shorts', toByte(shorts))
-put('top', toByte(top))
+for (const [name, g] of Object.entries(GARMENTS)) {
+  put(`${name}.a`, g.a)
+  put(`${name}.b`, g.b)
+  put(`${name}.s`, g.s)
+  put(`${name}.faces`, g.faces)
+  put(`${name}.hem`, g.hem)
+}
 const bin = Buffer.concat(chunks)
 
 mkdirSync(OUT, { recursive: true })
@@ -562,11 +648,12 @@ const meta = {
   bones: BONES,
   muscles: MUSCLES,
   maskSlots: MASK_SLOTS,
+  garments: Object.fromEntries(Object.entries(GARMENTS).map(([name, g]) => [name, { vertices: g.a.length, triangles: g.faces.length / 3 }])),
   sha256: createHash('sha256').update(bin).digest('hex'),
   sections,
   joints: Object.fromEntries(SEXES.map((sex) => [sex, figures[sex].joints])),
-  /** The hip joints' height that keeps the back off the floor lying flat, and the thigh's depth below its bone. */
-  room: Object.fromEntries(SEXES.map((sex) => [sex, figures[sex].room])),
+  /** For each figure (the two sexes and their mean): the hip joints' height that keeps the back off the floor lying flat, and the thigh's depth below its bone: [skinny, built]. */
+  room: rooms,
 }
 const ts = `// Written by scripts/body/bake.mjs from MakeHuman's CC0 assets; do not edit by hand.
 // The layout of body.bin and each figure's joints in its bind pose, in body units of 27 cm.

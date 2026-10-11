@@ -787,6 +787,19 @@
   .switch-cell:last-child {
     border-right: 0;
   }
+  /* More than five cells: rows of four below md, each row ruled off from the one above. */
+  @media (max-width: 47.99rem) {
+    .switch-many {
+      grid-auto-flow: row;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+    }
+    .switch-many .switch-cell:nth-child(4n) {
+      border-right: 0;
+    }
+    .switch-many .switch-cell:nth-child(n + 5) {
+      border-top: 1px solid var(--rule);
+    }
+  }
   .switch-cell:hover {
     background: var(--vellum);
   }
