@@ -22,7 +22,7 @@ vi.mock('../three/lazy', () => ({
 const { LiveJoint } = await import('./LiveJoint')
 
 describe('LiveJoint, the landing hero', () => {
-  it('curls from a straight arm, 0°, up toward the goal and all the way back to 0° every rep', () => {
+  it('curls from a straight arm, 0°, up past the goal line and all the way back to 0° every rep', () => {
     render(<LiveJoint />)
     const frames = seen.frames.at(-1)!
     expect(EXERCISES.elbow_flexion.restDeg).toBe(0)
@@ -32,5 +32,7 @@ describe('LiveJoint, the landing hero', () => {
     expect(frames.filter((_, i) => i % 2 === 0).every((f) => f === 0)).toBe(true)
     expect(Math.min(...frames)).toBe(0)
     expect(Math.max(...frames)).toBeLessThanOrEqual(EXERCISES.elbow_flexion.maxDeg)
+    // Every rep's top reaches the goal line: the demo shows reps that hit their target.
+    for (const peak of frames.filter((_, i) => i % 2 === 1)) expect(peak).toBeGreaterThanOrEqual(EXERCISES.elbow_flexion.targetDeg)
   })
 })

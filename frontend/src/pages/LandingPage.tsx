@@ -117,10 +117,7 @@ function TitleBlock({ active }: { active: string | null }) {
     <header className="border-b border-rule-strong lg:sticky lg:top-0 lg:flex lg:h-screen lg:flex-col lg:border-r lg:border-b-0 lg:border-rule lg:px-6 lg:py-8">
       <div className="flex items-start justify-between gap-4 px-4 py-4 sm:px-6 sm:py-5 lg:block lg:p-0">
         <Link to="/" className="block no-underline hover:no-underline">
-          <span className="flex items-center gap-3">
-            <Logo size={28} />
-            <span className="font-display text-[28px] leading-none font-bold tracking-[-0.02em] text-navy uppercase">{APP_NAME}</span>
-          </span>
+          <Logo height={30} label={APP_NAME} />
           <span className="t-label mt-3 block text-muted">Range-of-motion readout</span>
         </Link>
         <div className="hidden gap-2 sm:flex lg:hidden">
@@ -354,8 +351,7 @@ export function LandingPage() {
           <footer className="t-meta mt-8 flex flex-wrap items-center gap-x-6 gap-y-3 border-t border-rule-strong pt-5">
             {/* The logo always leads back to the landing page: here, its top. */}
             <Link to="/" aria-label={`${APP_NAME} home page`} onClick={() => window.scrollTo({ top: 0 })} className="flex items-center gap-2 text-navy no-underline hover:no-underline">
-              <Logo size={18} />
-              {APP_NAME}
+              <Logo height={14} />
             </Link>
             <span>© 2026 {APP_NAME} · Built at Hackknight · a personal tool, not a clinical one</span>
             <nav aria-label="Footer" className="flex gap-5 sm:ml-auto">
