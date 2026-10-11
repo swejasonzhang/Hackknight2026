@@ -55,6 +55,12 @@ describe('reading answers', () => {
     expect(parseWeekdays('tue thu')).toEqual([2, 4])
     expect(parseWeekdays('weekdays')).toEqual([1, 2, 3, 4, 5])
     expect(parseWeekdays('weekends only')).toEqual([0, 6])
+    // A range is every day in it.
+    expect(parseWeekdays('Monday to Friday')).toEqual([1, 2, 3, 4, 5])
+    expect(parseWeekdays('Mon-Fri')).toEqual([1, 2, 3, 4, 5])
+    expect(parseWeekdays('tue through thu')).toEqual([2, 3, 4])
+    expect(parseWeekdays('Friday to Monday')).toEqual([0, 1, 5, 6])
+    expect(parseWeekdays('Mon–Wed and Saturday')).toEqual([1, 2, 3, 6])
     expect(parseWeekdays('every day')).toEqual([0, 1, 2, 3, 4, 5, 6])
     expect(parseWeekdays('maybe 4 days')).toEqual(spreadDays(4))
     expect(parseWeekdays('two')).toEqual(spreadDays(2))

@@ -40,9 +40,25 @@ describe('generateDemoSessions', () => {
         const mine = sessions.filter((s) => s.exercise === exercise).sort((x, y) => x.startedAt - y.startedAt)
         const first = mine.slice(0, 4).reduce((sum, s) => sum + s.summary.bestPeakDeg, 0) / 4
         const last = mine.slice(-4).reduce((sum, s) => sum + s.summary.bestPeakDeg, 0) / 4
-        // At least 6% of the movement's range better: 8 degrees on a curl, 2 on a twist.
-        const range = EXERCISES[exercise].targetDeg - EXERCISES[exercise].restDeg
-        expect(last, exercise).toBeGreaterThan(first + range * 0.06)
+        // Better by 6% of the movement's range (8 degrees on a curl), or by a good part of its counting band
+        // where that is narrower (a fly counts from 150° to its 160° goal).
+        const { targetDeg, restDeg, enterDeg } = EXERCISES[exercise]
+        expect(last, exercise).toBeGreaterThan(first + Math.min((targetDeg - restDeg) * 0.06, (targetDeg - enterDeg) * 0.4))
+      }
+    }
+  })
+
+  it('reaches the goal by the end of the six weeks, and never shows a rep Arc would not have counted', () => {
+    for (const seed of [5, 99, 2026]) {
+      const sessions = generateDemoSessions('p1', NOW, seed)
+      for (const exercise of EXERCISE_IDS) {
+        const mine = sessions.filter((s) => s.exercise === exercise)
+        const { targetDeg, enterDeg, maxDeg } = EXERCISES[exercise]
+        expect(Math.max(...mine.map((s) => s.summary.bestPeakDeg)), `${seed} ${exercise}`).toBeGreaterThanOrEqual(targetDeg)
+        for (const s of mine) for (const set of s.sets) for (const r of set.reps) {
+          expect(r.peakDeg).toBeGreaterThanOrEqual(enterDeg)
+          expect(r.peakDeg).toBeLessThanOrEqual(maxDeg)
+        }
       }
       for (const s of sessions) {
         expect(s.demo).toBe(true)

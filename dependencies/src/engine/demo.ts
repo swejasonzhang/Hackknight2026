@@ -72,14 +72,17 @@ export function generateDemoSessions(profileId: string, now = Date.now(), seed =
   const today = new Date(now - offsetMs)
   const daysSinceMonday = (today.getUTCDay() + 6) % 7
   const thisMonday = Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate() - daysSinceMonday)
+  // The first week's Monday as a real instant: progress runs from there to now.
+  const firstMonday = thisMonday - (WEEKS - 1) * 7 * DAY + offsetMs
 
   for (const exercise of EXERCISE_IDS) {
     const cfg = EXERCISES[exercise]
-    // Start a quarter to two fifths of the movement's range short of the goal, and close most of
-    // that gap over the six weeks: 32 to 52 degrees for a curl, a few degrees for a twist.
+    // Start a quarter to two fifths of the movement's range short of the goal (never below where a
+    // rep starts to count), and close the whole gap by now, a little past the goal: the six weeks
+    // end with reps that reach it, as training toward a goal should.
     const range = cfg.targetDeg - cfg.restDeg
-    const gap = range * between(0.25, 0.4)
-    const gain = (gap / WEEKS) * between(0.6, 1.1)
+    const gap = Math.min(range * between(0.25, 0.4), (cfg.targetDeg - cfg.enterDeg) * between(0.8, 1))
+    const reach = between(1.15, 1.3)
     const steadiness = between(0.7, 1.3)
     const [startKg, perWeekKg] = DEMO_LOAD[exercise]
     const strength = 0.85 + weigh() * 0.3
@@ -91,7 +94,8 @@ export function generateDemoSessions(profileId: string, now = Date.now(), seed =
         const startedAt = weekMonday + day * DAY + hour * 3_600_000 + Math.floor(rand() * 4) * 15 * 60_000 + offsetMs
         if (startedAt > now) continue
         const offDay = rand() < 0.12
-        const sessionPeak = cfg.targetDeg - gap + gain * week + noise(range * 0.02) - (offDay ? range * between(0.03, 0.07) : 0)
+        const progress = (startedAt - firstMonday) / (now - firstMonday)
+        const sessionPeak = cfg.targetDeg - gap + gap * reach * progress + noise(range * 0.02) - (offDay ? range * between(0.03, 0.07) : 0)
         const decayPerRep = Math.max(0.25, (1.6 - 0.18 * week) * steadiness) * (offDay ? 1.8 : 1)
         let t = startedAt + 5_000
         const sets: SetRecord[] = []
@@ -103,7 +107,8 @@ export function generateDemoSessions(profileId: string, now = Date.now(), seed =
           for (let i = 0; i < count; i++) {
             const durationMs = Math.round(2400 + 60 * i * (offDay ? 1.6 : 1) + noise(200))
             const peak = sessionPeak - decayPerRep * (range / 140) * i - (range / 140) * 1.5 * (setNumber - 1) + noise(range * 0.01)
-            reps.push({ index: i + 1, peakDeg: Math.round(Math.min(179, peak) * 10) / 10, startedAt: t, endedAt: t + durationMs, durationMs })
+            // A rep that did not pass the counting threshold would not have been counted: none is shown.
+            reps.push({ index: i + 1, peakDeg: Math.round(Math.max(cfg.enterDeg, Math.min(cfg.maxDeg, peak)) * 10) / 10, startedAt: t, endedAt: t + durationMs, durationMs })
             t += durationMs + 600
           }
           sets.push({ setNumber, reps, fatigue: estimateFatigue(reps), startedAt: setStart, endedAt: t - 600, endedEarly })
