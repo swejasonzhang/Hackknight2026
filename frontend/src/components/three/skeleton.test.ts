@@ -1,6 +1,6 @@
 import { EXERCISE_IDS, EXERCISES, type ExerciseId } from '@arc/dependencies'
 import { describe, expect, it } from 'vitest'
-import { BONES, clampMetric, framed, JOINT_NAMES, PROPORTIONS, restFor, skeletonFor, sweepFor, type JointName, type V3 } from './skeleton'
+import { bindJoints, BONES, clampMetric, framed, framingFor, JOINT_NAMES, PROPORTIONS, restFor, skeletonFor, sweepFor, type FigureKey, type JointName, type V3 } from './skeleton'
 
 /** Seven readings from rest to the furthest each movement shows. */
 const RANGE = Object.fromEntries(
@@ -20,11 +20,12 @@ const inner = (a: [number, number], mid: [number, number], b: [number, number]) 
 const xy = (p: V3): [number, number] => [p[0], p[1]]
 const wrap = (d: number) => ((((d + 180) % 360) + 360) % 360) - 180
 
+const FIGURES: FigureKey[] = ['female', 'male', 'neutral']
 /** Where the toes rest standing: the straight leg's ankle plus the foot's drop. */
-const STANDING_TOE = (() => {
-  const P = PROPORTIONS.neutral
+const standingToe = (figure: FigureKey) => {
+  const P = PROPORTIONS[figure]
   return P.hipY - P.limb.thigh - P.limb.shin + P.foot[1]
-})()
+}
 
 /** The three classics move one limb; everything else stays put. */
 const MOVING: Partial<Record<ExerciseId, JointName[]>> = {
@@ -138,7 +139,7 @@ describe('skeletonFor: a whole body for every exercise', () => {
       for (const deg of RANGE[exercise]) {
         const j = skeletonFor(exercise, deg).joints
         for (const name of JOINT_NAMES) expect(j[name][1], `${exercise} ${deg}° ${name}`).toBeGreaterThanOrEqual(0)
-        if (exercise !== 'crunch') expect(Math.min(j.lToe[1], j.rToe[1]), `${exercise} ${deg}° a foot on the floor`).toBeCloseTo(STANDING_TOE, 6)
+        if (exercise !== 'crunch') expect(Math.min(j.lToe[1], j.rToe[1]), `${exercise} ${deg}° a foot on the floor`).toBeCloseTo(standingToe('neutral'), 6)
       }
     }
     for (const exercise of ['elbow_flexion', 'shoulder_abduction', 'ab_twist'] as const) expect(skeletonFor(exercise, 10).joints.headTop[1]).toBeGreaterThan(6)
@@ -148,6 +149,20 @@ describe('skeletonFor: a whole body for every exercise', () => {
     const lying = skeletonFor('crunch', 15).joints
     expect(lying.rShoulder[1]).toBeCloseTo(lying.rHip[1], 6) // flat on the back
     expect(skeletonFor('crunch', 60).joints.rShoulder[1]).toBeGreaterThan(lying.rShoulder[1] + 0.5) // curled up
+  })
+
+  it('stands each figure on its toes where its own mesh has them', () => {
+    // Not the formula above: the toes' height in the mesh as it was made, standing.
+    for (const figure of FIGURES) {
+      const toe = bindJoints(figure).rToe[1]
+      for (const exercise of EXERCISE_IDS) {
+        if (exercise === 'crunch') continue
+        for (const deg of RANGE[exercise]) {
+          const j = skeletonFor(exercise, deg, figure).joints
+          expect(Math.abs(Math.min(j.lToe[1], j.rToe[1]) - toe), `${figure} ${exercise} ${deg}°`).toBeLessThan(0.015)
+        }
+      }
+    }
   })
 
   it('starts the three classics from rest: the forearm, the arm and the shin hanging straight down', () => {
@@ -171,6 +186,42 @@ describe('skeletonFor: a whole body for every exercise', () => {
 })
 
 describe('framing', () => {
+  // The camera sits 4.67 units from what it looks at, with a 36° field of view: half the height it sees there.
+  const HALF_H = Math.hypot(0.7, 0.35, 4.6) * Math.tan((18 * Math.PI) / 180)
+  /** Whether every joint of a body lands in view, framed as given on a canvas of this shape. */
+  const inView = (joints: Record<JointName, V3>, f: { scale: number; offset: V3 }, aspect: number, label: string) => {
+    for (const name of JOINT_NAMES) {
+      const x = joints[name][0] * f.scale + f.offset[0]
+      const y = joints[name][1] * f.scale + f.offset[1]
+      expect(Math.abs(x), `${label} ${name} x`).toBeLessThanOrEqual(HALF_H * aspect)
+      expect(Math.abs(y), `${label} ${name} y`).toBeLessThanOrEqual(HALF_H)
+    }
+  }
+
+  it('keeps every figure whole on every shape of canvas, from a narrow phone to a wide desk', () => {
+    for (const aspect of [0.6, 0.85, 1, 1.45, 2]) {
+      for (const figure of FIGURES) {
+        for (const exercise of EXERCISE_IDS) {
+          const f = framingFor(exercise, figure, aspect)
+          for (const fill of [0, 1]) for (const deg of RANGE[exercise]) inView(skeletonFor(exercise, deg, figure, fill).joints, f, aspect, `${aspect} ${figure} ${exercise} ${deg}° ${fill}`)
+        }
+      }
+    }
+    // A narrow stage shrinks a lying crunch rather than cutting off its feet.
+    expect(framingFor('crunch', 'neutral', 0.6).scale).toBeLessThan(framingFor('crunch', 'neutral', 1.45).scale)
+  })
+
+  it('frames a figure that holds one pose on that pose alone, leaving the movement\'s framing as it was', () => {
+    for (const figure of FIGURES) {
+      const whole = framingFor('shoulder_abduction', figure, 1.45)
+      const held = framingFor('shoulder_abduction', figure, 1.45, 0)
+      inView(skeletonFor('shoulder_abduction', 0, figure).joints, held, 1.45, `${figure} held`)
+      // Arms down needs no more room than the whole raise: the held figure is never drawn smaller.
+      expect(held.scale, figure).toBeGreaterThanOrEqual(whole.scale)
+      expect(framingFor('shoulder_abduction', figure, 1.45)).toEqual(whole)
+    }
+  })
+
   it('keeps the whole body in view at every reading', () => {
     for (const exercise of EXERCISE_IDS) {
       for (const deg of RANGE[exercise]) {
