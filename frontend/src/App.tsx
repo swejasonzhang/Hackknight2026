@@ -4,6 +4,7 @@ import { ScrollToTop } from './components/ScrollToTop'
 import { AppShell } from './layouts/AppShell'
 import { AuthLayout } from './layouts/AuthLayout'
 import { AccountPage } from './pages/AccountPage'
+import { ChallengesPage } from './pages/ChallengesPage'
 import { BodyGallery } from './pages/dev/BodyGallery'
 import { DashboardPage } from './pages/DashboardPage'
 import { LandingPage } from './pages/LandingPage'
@@ -24,6 +25,8 @@ import { ProfilesProvider } from './profiles/ProfilesContext'
  *   /signup, /login account pages
  *   /dashboard      progress for the selected profile, every chart folded behind a plus
  *   /plan           the week to arrange by hand beside the log, one day at a time (?day=YYYY-MM-DD)
+ *   /challenges     fixed plans for a physique in a set time: the one under way, every one to pick
+ *                   (?challenge=<id>), the body each builds by its finish, and the way to start it
  *   /record         record a session in the browser: webcam, pose tracking, reps, save
  *   /welcome        a full page between sign-up and the dashboard: the chat with Arc, then the week
  *                   it built (skippable; ?profile=<id> for an existing profile)
@@ -74,6 +77,7 @@ export default function App() {
         >
           <Route path="/dashboard" element={<DashboardPage />} />
           <Route path="/plan" element={<PlanPage />} />
+          <Route path="/challenges" element={<ChallengesPage />} />
           <Route path="/record" element={<RecordPage />} />
           <Route path="/profiles" element={<ProfilesPage />} />
           <Route path="/leaderboard" element={<LeaderboardPage />} />

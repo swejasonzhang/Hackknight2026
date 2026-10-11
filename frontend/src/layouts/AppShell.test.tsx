@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { AuthProvider } from "../auth/AuthContext";
@@ -53,10 +53,34 @@ describe("AppShell", () => {
     expect(logos).toHaveLength(2);
     for (const logo of logos) expect(logo).toHaveAttribute("href", "/");
     // The leaderboard has its own page, on the rail and (as Ranking) on the phone bar.
-    const boards = screen.getAllByRole("link", { name: "Leaderboard" });
-    expect(boards).toHaveLength(2);
+    const boards = [screen.getByRole("link", { name: "Leaderboard" }), screen.getByRole("link", { name: "Ranking (Leaderboard)" })];
     for (const b of boards) expect(b).toHaveAttribute("href", "/leaderboard");
-    expect(screen.getByText("Ranking")).toBeInTheDocument();
+    expect(boards[1]).toHaveTextContent(/^Ranking$/);
+  });
+
+  it("lists Challenges after Plan, on the rail and (as Goals) on the phone bar", async () => {
+    render(
+      <HintProvider>
+        <AuthProvider>
+          <MemoryRouter initialEntries={["/dashboard"]}>
+            <Routes>
+              <Route element={<AppShell />}>
+                <Route path="/dashboard" element={<p>dashboard</p>} />
+              </Route>
+            </Routes>
+          </MemoryRouter>
+        </AuthProvider>
+      </HintProvider>,
+    );
+    expect(await screen.findByText("dashboard")).toBeInTheDocument();
+    const [rail, bar] = screen.getAllByRole("navigation", { name: "Main" });
+    expect(within(rail!).getAllByRole("link").map((a) => a.textContent)).toEqual(["Dashboard", "Plan", "Challenges", "Profiles", "Leaderboard"]);
+    expect(within(rail!).getByRole("link", { name: "Challenges" })).toHaveAttribute("href", "/challenges");
+    // Five cells on a phone: the long labels are short there, and each name starts with the word shown.
+    const goals = within(bar!).getByRole("link", { name: "Goals (Challenges)" });
+    expect(goals).toHaveAttribute("href", "/challenges");
+    expect(goals).toHaveTextContent(/^Goals$/);
+    expect(within(bar!).getByRole("link", { name: "Home (Dashboard)" })).toHaveTextContent(/^Home$/);
   });
 
   it("leads to the account page from the account tag, on the rail and on the phone bar", async () => {

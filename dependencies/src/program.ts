@@ -94,8 +94,8 @@ export const ProgramEditSchema = z.object({ days: ProgramInputSchema.shape.days 
 })
 export type ProgramEdit = z.infer<typeof ProgramEditSchema>
 
-/** Who wrote the week: Gemini, Arc's own rules, the demo seed, or the member by hand. */
-export const PROGRAM_SOURCES = ['gemini', 'arc', 'demo', 'member'] as const
+/** Who wrote the week: Gemini, Arc's own rules, the demo seed, the member by hand, or a challenge they joined. */
+export const PROGRAM_SOURCES = ['gemini', 'arc', 'demo', 'member', 'challenge'] as const
 export type ProgramSource = (typeof PROGRAM_SOURCES)[number]
 
 export interface ProgramDto extends ProgramInput {

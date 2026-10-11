@@ -8,7 +8,7 @@ import { Alert, Lamp } from '../components/ui'
 
 /** Monday first, the way a training week reads. */
 const WEEK = [1, 2, 3, 4, 5, 6, 0]
-const SOURCE: Record<ProgramDto['source'], string> = { gemini: "Arc's week (Gemini)", arc: "Arc's week", demo: 'Demo week', member: 'Your own week' }
+const SOURCE: Record<ProgramDto['source'], string> = { gemini: "Arc's week (Gemini)", arc: "Arc's week", demo: 'Demo week', member: 'Your own week', challenge: 'Challenge week' }
 const SIDES: { value: Side; label: string }[] = [
   { value: 'right', label: 'Right' },
   { value: 'left', label: 'Left' },

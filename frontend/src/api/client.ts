@@ -2,6 +2,7 @@ import type {
   AskInput,
   AuthResponse,
   BodyDto,
+  ChallengeRunDto,
   CoachMessageDto,
   CoachStatus,
   OnboardingInput,
@@ -22,6 +23,7 @@ import type {
   ProgressDto,
   SessionDto,
   SignupInput,
+  StartChallengeInput,
   UpdatePlanInput,
   UpdateProfileInput,
   UserDto,
@@ -105,6 +107,15 @@ export const api = {
     programs: (profileId: string) => request<ProgramDto[]>(`/api/profiles/${profileId}/programs`),
     /** The member's own week: it becomes the active one, and Arc writes its summary. */
     putProgram: (profileId: string, input: ProgramEdit) => request<ProgramDto>(`/api/profiles/${profileId}/program`, { method: 'PUT', body: input }),
+  },
+  /** A fixed plan for a physique in a set time: the profile's run at one. */
+  challenge: {
+    /** The profile's challenge, brought up to date (a new phase's week written as it begins); 404 when there is none. */
+    get: (profileId: string) => request<ChallengeRunDto>(`/api/profiles/${profileId}/challenge`),
+    /** Starts one: any challenge in progress is left, and the first phase's week becomes the profile's. */
+    start: (profileId: string, input: StartChallengeInput) => request<ChallengeRunDto>(`/api/profiles/${profileId}/challenge`, { method: 'POST', body: input }),
+    /** Leaves the challenge in progress; the week stays as it is. */
+    leave: (profileId: string) => request<void>(`/api/profiles/${profileId}/challenge`, { method: 'DELETE' }),
   },
   /** The household leaderboard: the account's profiles ranked on a window's training. */
   leaderboard: (window: LeaderboardWindow = 'week') => request<LeaderboardDto>(`/api/leaderboard?window=${window}`),

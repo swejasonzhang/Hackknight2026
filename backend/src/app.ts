@@ -5,6 +5,7 @@ import { authenticate } from './auth.ts'
 import { errorHandler, notFound } from './http.ts'
 import { authRouter } from './routes/auth.ts'
 import { bodyRouter } from './routes/body.ts'
+import { challengesRouter } from './routes/challenges.ts'
 import { coachRouter } from './routes/coach.ts'
 import { devRouter } from './routes/dev.ts'
 import { leaderboardRouter } from './routes/leaderboard.ts'
@@ -56,6 +57,8 @@ export function createApp(opts: AppOptions = {}): Express {
 
   // Everything below needs a signed-in user or the CV module's API key
   app.use('/api/profiles', authenticate, profilesRouter)
+  // Ahead of plansRouter: reading the week first moves a challenge on to the phase it has reached.
+  app.use('/api/profiles', challengesRouter)
   app.use('/api/profiles', plansRouter)
   app.use('/api/profiles', progressRouter)
   app.use('/api/profiles', bodyRouter)

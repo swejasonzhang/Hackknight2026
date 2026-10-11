@@ -10,7 +10,7 @@ import { TodayList } from './TodayList'
 
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December']
 const HEADS = [1, 2, 3, 4, 5, 6, 0].map((d) => WEEKDAY_NAMES[d]!)
-const SOURCE: Record<ProgramDto['source'], string> = { gemini: 'Planned by Arc with Gemini', arc: 'Planned by Arc', demo: 'Demo week', member: 'Arranged by you' }
+const SOURCE: Record<ProgramDto['source'], string> = { gemini: 'Planned by Arc with Gemini', arc: 'Planned by Arc', demo: 'Demo week', member: 'Arranged by you', challenge: 'Your challenge week' }
 
 const longDate = (key: DayKey) => {
   const d = dayStart(key)
