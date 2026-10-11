@@ -320,7 +320,7 @@ Production env on `getarc-api` (all in `render.yaml`): `NODE_ENV=production`, `N
 
 ## 10. Status (2026-10-11)
 
-**Ready for the demo.** The whole member journey was run end to end in a browser against a local stack: sign-up, Arc's questions, Arc's week changed in the chat, the dashboard calendar with **Next**, the plan page's log, a simulated recording saved set by set with its weight, the report crossing the movement off and offering **Next**, a session sent by the Python camera app counted in the same day, the household leaderboard with demo data, and account deletion. 560 JavaScript tests (dependencies 139, API 126, web app 295) and 30 Python tests pass in CI on every push.
+**Ready for the demo.** The whole member journey was run end to end in a browser against a local stack: sign-up, Arc's questions, Arc's week changed in the chat, the dashboard calendar with **Next**, the plan page's log, a simulated recording saved set by set with its weight, the report crossing the movement off and offering **Next**, a session sent by the Python camera app counted in the same day, the household leaderboard with demo data, and account deletion. 570 JavaScript tests (dependencies 140, API 131, web app 299) and 30 Python tests pass in CI on every push.
 
 **Still to do.**
 
