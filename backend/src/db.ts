@@ -6,9 +6,19 @@ export interface DbHandle {
   stop(): Promise<void>
 }
 
-/** mongodb+srv://user:secret@cluster.example.net/db -> mongodb+srv://user:***@cluster.example.net/db */
+/**
+ * mongodb+srv://user:secret@cluster.example.net/db -> mongodb+srv://user:***@cluster.example.net/db.
+ * The credentials end at the last @ before the query, so a hand-typed password holding an @ or a /
+ * is still masked whole.
+ */
 export function describeUri(uri: string): string {
-  return uri.replace(/\/\/([^:@/]+):([^@/]+)@/, '//$1:***@')
+  const start = uri.indexOf('//') + 2
+  if (start < 2) return uri
+  const query = uri.indexOf('?', start)
+  const at = uri.lastIndexOf('@', query === -1 ? uri.length : query)
+  if (at < start) return uri
+  const user = uri.slice(start, at).split(':')[0]
+  return `${uri.slice(0, start)}${user}:***${uri.slice(at)}`
 }
 
 /**

@@ -28,10 +28,14 @@ export function parseCommand(transcript: string): VoiceCommand | null {
   if (!text) return null
   const addressed = /\barc\b/.test(text)
   if (!addressed && text.split(' ').length > MAX_PLAIN_WORDS) return null
+  // A question is asked, not obeyed: "am I done?" or "what's next?" goes to Arc to answer, and
+  // never ends the session or skips a set. Only the asking commands (how many, repeat) match it.
+  const asking = QUESTION.test(text.replace(/^arc\s*,?\s*/, '')) && !/^(can|could|would|will) (we|you|i)\b/.test(text.replace(/^arc\s*,?\s*/, ''))
   for (const [command, rule] of RULES) {
     const match = rule.exec(text)
     if (!match) continue
     if (NEGATION.test(text.slice(0, match.index))) continue
+    if (asking && command !== 'status' && command !== 'repeat') continue
     return command
   }
   return null

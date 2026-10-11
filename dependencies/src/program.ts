@@ -140,6 +140,15 @@ export function parseWeekdays(raw: string): number[] {
   const text = raw.toLowerCase()
   if (/\bevery ?day\b|\bdaily\b|\ball week\b/.test(text)) return [0, 1, 2, 3, 4, 5, 6]
   const named = new Set(DAY_PATTERNS.filter(([re]) => re.test(text)).map(([, d]) => d))
+  // A range ("Mon-Fri", "Monday to Friday", "tue through thu") is every day in it, past Saturday into the next week if it wraps.
+  const SHORT = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat']
+  for (const m of text.matchAll(/\b(sun|mon|tue|wed|thu|fri|sat)[a-z]*\.?\s*(?:-|–|—|to|through|thru|till|until)\s*(sun|mon|tue|wed|thu|fri|sat)[a-z]*\b/g)) {
+    const to = SHORT.indexOf(m[2]!)
+    for (let d = SHORT.indexOf(m[1]!); ; d = (d + 1) % 7) {
+      named.add(d)
+      if (d === to) break
+    }
+  }
   if (/\bweekdays?\b/.test(text)) [1, 2, 3, 4, 5].forEach((d) => named.add(d))
   if (/\bweekends?\b/.test(text)) [0, 6].forEach((d) => named.add(d))
   if (named.size) return [...named].sort((a, b) => a - b)

@@ -12,7 +12,8 @@ import { FatigueChart, PeakChart, RepChart, WeeklyChart } from '../components/Pr
 import { LazyJointScene, LazyProgressScene } from '../components/three/lazy'
 import { useRepLoop } from '../components/three/useRepLoop'
 import { Alert, EmptyState, Skeleton, StatTile, Strip } from '../components/ui'
-import { deg, fatigueLabel, formatDate, weekStartIso } from '../format'
+import { deg, fatigueLabel, formatDate } from '../format'
+import { dayKey, weekOf } from '../plan/days'
 import { useStickyTop } from '../components/useStickyTop'
 import { useProfiles } from '../hooks/useProfiles'
 import { PlanCalendar } from '../plan/PlanCalendar'
@@ -75,6 +76,9 @@ export function DashboardPage() {
   }
 
   // The plan and the week, once per profile; a freshly picked profile opens on its plan's movement.
+  // The movement in the URL is honoured for the profile the page opened on; a profile picked after
+  // that opens on its own plan's movement.
+  const lastProfile = useRef<string | null>(null)
   useEffect(() => {
     if (!selectedId) return
     let cancelled = false
@@ -84,7 +88,9 @@ export function DashboardPage() {
       if (cancelled) return
       setPlan(pl)
       setProgram(pr)
-      if (pl && !isExercise(pickedRef.current)) setExercise(pl.exercise)
+      const switched = lastProfile.current !== null && lastProfile.current !== selectedId
+      lastProfile.current = selectedId
+      if (pl && (switched || !isExercise(pickedRef.current))) setExercise(pl.exercise)
     })
     return () => {
       cancelled = true
@@ -130,13 +136,16 @@ export function DashboardPage() {
 
   const noProfiles = !profilesLoading && profiles.length === 0
   const cfg = EXERCISES[exercise]
-  const data = noProfiles ? null : progress
+  // Only this profile's readings for this movement: never the last profile's while the next loads.
+  const data = noProfiles ? null : progress && progress.profileId === selectedId && progress.exercise === exercise ? progress : null
   const latest = data?.sessions.at(-1) ?? null
   const first = data?.sessions[0] ?? null
   const prescription = prescriptionFor(exercise, { plan, program, intake: selected?.intake })
   const goal = data?.targetDeg ?? (prescription.source === 'default' ? null : prescription.targetDeg)
   const bestAll = data && data.sessions.length ? Math.max(...data.sessions.map((s) => s.bestPeakDeg)) : null
-  const thisWeek = data?.sessionsPerWeek.find((w) => w.weekStart === weekStartIso(Date.now()))?.count ?? 0
+  // This week on the member's own calendar, Monday to Sunday where they are.
+  const week = weekOf(dayKey(Date.now()))
+  const thisWeek = data ? data.sessions.filter((s) => week.includes(dayKey(s.date))).length : 0
   const fatigue = latest ? fatigueLabel(latest.fatigueIndex) : null
   // The figure always works through the movement, recorded or not: rep after rep from rest to the
   // goal, the tick on its arc, and back, never past it. The goal is the plan's or the week's, else
@@ -147,7 +156,8 @@ export function DashboardPage() {
   const freshBest = fresh?.sessions.at(-1)?.bestPeakDeg ?? null
   const loop = useRepLoop(exercise, target)
   const noSignal = !noProfiles && data != null && data.sessions.length === 0
-  const firstLoad = (profilesLoading || loading) && !data
+  // The figure stays up through a switch of profile or movement; only the very first load waits.
+  const firstLoad = (profilesLoading || loading) && !progress
 
   const none = <span className="text-lamp-off">–</span>
 

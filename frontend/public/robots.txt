@@ -1,0 +1,17 @@
+# Arc: the landing page and the account pages are public; the app behind them is personal.
+User-agent: *
+Allow: /$
+Allow: /signup
+Allow: /login
+Disallow: /dashboard
+Disallow: /plan
+Disallow: /challenges
+Disallow: /record
+Disallow: /profiles
+Disallow: /leaderboard
+Disallow: /sessions/
+Disallow: /account
+Disallow: /welcome
+Disallow: /api/
+
+Sitemap: https://getarc.health/sitemap.xml

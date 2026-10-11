@@ -135,6 +135,8 @@ export function PlanCalendar({ profileId, exercise, now = Date.now() }: { profil
   }
 
   const grid = monthGrid(month)
+  // The grid's one tab stop: the day picked, or the month's first when the picked day is in another month.
+  const focusKey = grid.includes(selected) ? selected : month
   const weeks = Array.from({ length: 6 }, (_, w) => grid.slice(w * 7, w * 7 + 7))
   const sel = planOn(selected)
   const selSessions = byDay.get(selected) ?? []
@@ -210,7 +212,7 @@ export function PlanCalendar({ profileId, exercise, now = Date.now() }: { profil
                             if (el) buttons.current.set(key, el)
                             else buttons.current.delete(key)
                           }}
-                          tabIndex={key === selected ? 0 : -1}
+                          tabIndex={key === focusKey ? 0 : -1}
                           className="cal-day"
                           data-status={status}
                           data-out={inMonth ? undefined : 'true'}

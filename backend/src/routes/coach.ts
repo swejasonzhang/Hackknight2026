@@ -12,7 +12,7 @@ import { User } from '../models/User.ts'
 import { askArc, onboardingTurn, planFromProgram, sessionSummary, setFeedback } from '../services/arc.ts'
 import { geminiConfigured } from '../services/gemini.ts'
 import { requireProfile } from '../services/profiles.ts'
-import { speak, speakCached, voiceConfigured } from '../services/voice.ts'
+import { speakCached, voiceConfigured } from '../services/voice.ts'
 
 /**
  * Mounted at /api/coach (behind `authenticate`), for signed-in members only: Arc's onboarding
@@ -143,15 +143,16 @@ coachRouter.post('/speak', limit, async (req, res) => {
   res.set('cache-control', 'private, max-age=86400').type('audio/mpeg').send(Buffer.from(audio))
 })
 
-coachRouter.get('/messages/:id/audio', async (req, res) => {
+// Rate-limited like every other paid call, and cached by text, so a replay costs nothing.
+coachRouter.get('/messages/:id/audio', limit, async (req, res) => {
   const userId = requireUser(req)
-  const oid = toObjectId(req.params.id)
+  const oid = toObjectId(String(req.params.id))
   const message = oid ? await CoachMessage.findOne({ _id: oid, ownerId: userId, role: 'arc' }).lean() : null
   if (!message) throw new HttpError(404, 'Message not found')
   if (!voiceConfigured()) throw new HttpError(503, "Arc's voice is not configured")
   let audio: ArrayBuffer
   try {
-    audio = await speak(message.text)
+    audio = await speakCached(message.text)
   } catch {
     throw new HttpError(502, "Arc's voice is unavailable right now")
   }

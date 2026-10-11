@@ -1,5 +1,5 @@
 import type { ProgramDto, SessionDto } from '@arc/dependencies'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { api, ApiRequestError } from '../api/client'
 import { Page } from '../components/motion'
@@ -21,6 +21,9 @@ import { WeekEditor } from '../plan/WeekEditor'
  */
 export function PlanPage() {
   const { profiles, selected, selectedId, loading: profilesLoading } = useProfiles()
+  // The profile on the page now: a save that comes back after a switch was for the one before.
+  const shown = useRef(selectedId)
+  shown.current = selectedId
   const [params, setParams] = useSearchParams()
   const [program, setProgram] = useState<ProgramDto | null>(null)
   const [sessions, setSessions] = useState<SessionDto[] | null>(null)
@@ -95,7 +98,7 @@ export function PlanPage() {
           <div className="order-2 min-w-0 lg:order-1">
             <Strip index={wide ? '01' : '02'} title="Week" aside={program ? 'Yours to change' : 'Build one by hand, or with Arc'}>
               {selectedId && sessions ? (
-                <WeekEditor profileId={selectedId} program={program} onSaved={setProgram} history side={selected?.intake?.side} todayNext={todayNext} />
+                <WeekEditor profileId={selectedId} program={program} onSaved={(saved) => saved.profileId === shown.current && setProgram(saved)} history side={selected?.intake?.side} todayNext={todayNext} />
               ) : (
                 <Skeleton height={420} />
               )}

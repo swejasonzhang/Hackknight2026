@@ -37,7 +37,15 @@ export function ProfilesProvider({ children }: { children: ReactNode }) {
       const list = await api.profiles.list()
       setProfiles(list)
       setError(null)
-      setSelectedIdState((current) => (list.some((p) => p.id === current) ? current : (list[0]?.id ?? '')))
+      setSelectedIdState((current) => {
+        const next = list.some((p) => p.id === current) ? current : (list[0]?.id ?? '')
+        try {
+          localStorage.setItem(STORAGE_KEY, next)
+        } catch {
+          /* private mode */
+        }
+        return next
+      })
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not load profiles')
     } finally {
@@ -58,10 +66,12 @@ export function ProfilesProvider({ children }: { children: ReactNode }) {
     }
   }, [])
 
-  const value = useMemo<ProfilesState>(
-    () => ({ profiles, selected: profiles.find((p) => p.id === selectedId) ?? null, selectedId, setSelectedId, reload, loading, error }),
-    [profiles, selectedId, setSelectedId, reload, loading, error],
-  )
+  // Pages see a profile only once the account's list has it: a remembered id from another account,
+  // or one deleted elsewhere, never goes out to the API.
+  const value = useMemo<ProfilesState>(() => {
+    const selected = profiles.find((p) => p.id === selectedId) ?? null
+    return { profiles, selected, selectedId: selected ? selectedId : '', setSelectedId, reload, loading, error }
+  }, [profiles, selectedId, setSelectedId, reload, loading, error])
   return <ProfilesContext value={value}>{children}</ProfilesContext>
 }
 

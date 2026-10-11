@@ -5,7 +5,7 @@ import { defineConfig } from 'vitest/config'
 export default defineConfig({
   plugins: [react(), tailwindcss()],
   // The 3D body (src/components/three/body/body.bin) is a binary asset: served by URL, inlined in tests.
-  assetsInclude: ['**/*.bin'],
+  assetsInclude: ['**/*.bin', '**/*.bin.gz'],
   server: {
     // Listen on every network interface so teammates and phones on the same Wi-Fi can open
     // http://<this-machine's-IP>:5173. The browser only ever talks to /api; Vite forwards

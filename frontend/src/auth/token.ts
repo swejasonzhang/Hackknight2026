@@ -19,9 +19,11 @@ export function setToken(token: string): void {
   }
 }
 
+/** Signing out forgets the token, and whose profile the browser was showing (the next account's may not have it). */
 export function clearToken(): void {
   try {
     localStorage.removeItem(KEY)
+    localStorage.removeItem('arc.selectedProfileId')
   } catch {
     /* nothing stored */
   }

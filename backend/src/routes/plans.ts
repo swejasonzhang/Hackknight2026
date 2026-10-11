@@ -23,19 +23,28 @@ plansRouter.get('/:id/plans', async (req, res) => {
   res.json(plans.map(toPlanDto))
 })
 
+/** The plan is the member's: the camera app's key reads it, never writes it. */
+function memberOnly(req: Parameters<typeof principalOf>[0]) {
+  const principal = principalOf(req)
+  if (principal.kind !== 'user') throw new HttpError(403, 'Only the member can change their plan')
+  return principal
+}
+
 plansRouter.put('/:id/plan', async (req, res) => {
+  const principal = memberOnly(req)
   const input = validate(PlanInputSchema, req.body)
   const problem = goalProblem(input.exercise, input.targetDeg)
   if (problem) throw new HttpError(400, problem)
-  const profile = await requireProfile(req.params.id, principalOf(req))
+  const profile = await requireProfile(req.params.id, principal)
   await Plan.updateMany({ profileId: profile._id, active: true }, { $set: { active: false } })
   const plan = await Plan.create({ ...input, profileId: profile._id, active: true, createdAt: Date.now() })
   res.status(201).json(toPlanDto(plan))
 })
 
 plansRouter.patch('/:id/plan', async (req, res) => {
+  const principal = memberOnly(req)
   const input = validate(UpdatePlanSchema, req.body)
-  const profile = await requireProfile(req.params.id, principalOf(req))
+  const profile = await requireProfile(req.params.id, principal)
   if (input.exercise != null || input.targetDeg != null) {
     const current = await Plan.findOne({ profileId: profile._id, active: true }).lean<PlanShape>()
     if (!current) throw new HttpError(404, 'No active plan')

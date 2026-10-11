@@ -28,7 +28,7 @@ export interface RecordConfig {
   loadKg?: number | null
 }
 
-type Status = { kind: 'camera' } | { kind: 'model' } | { kind: 'live' } | { kind: 'saving' } | { kind: 'empty' } | { kind: 'error'; message: string }
+type Status = { kind: 'camera' } | { kind: 'model' } | { kind: 'live' } | { kind: 'saving' } | { kind: 'empty' } | { kind: 'error'; message: string } | { kind: 'saveError'; message: string }
 
 /** "shoulder, elbow and wrist": the joints a movement is measured at, in plain words. */
 const LANDMARK_WORDS: Record<number, string> = { 11: 'shoulder', 12: 'shoulder', 13: 'elbow', 14: 'elbow', 15: 'wrist', 16: 'wrist', 23: 'hip', 24: 'hip', 25: 'knee', 26: 'knee', 27: 'ankle', 28: 'ankle' }
@@ -40,11 +40,11 @@ const JOINT_NAMES = Object.fromEntries(
   }),
 ) as Record<ExerciseId, string>
 
-/** How far the pretend person reaches: a little short of the goal, always clearly past the rep threshold. */
+/** How far the pretend person reaches: a little past the goal (never past the movement's end), so a demo recording is seen to reach it. */
 export function simulatedPeak(config: Pick<RecordConfig, 'exercise' | 'plan'>): number {
   const cfg = EXERCISES[config.exercise]
-  const short = (config.plan.targetDeg - cfg.restDeg) * 0.06
-  return Math.min(cfg.maxDeg, Math.max(cfg.enterDeg + (cfg.enterDeg - cfg.exitDeg) * 0.15, config.plan.targetDeg - short))
+  const over = Math.max(3, (config.plan.targetDeg - cfg.restDeg) * 0.04)
+  return Math.min(cfg.maxDeg, Math.max(cfg.enterDeg + (cfg.enterDeg - cfg.exitDeg) * 0.15, config.plan.targetDeg + over))
 }
 
 /** Short spoken acknowledgements, so a hands-free member knows Arc heard them. */
@@ -209,10 +209,13 @@ export function LiveRecorder({ profileId, config, simulate = false, below, figur
       setHeard(command)
       if (command === 'status') return say({ text: statusText(viewRef.current, config) }, false)
       if (command === 'repeat') return lastLineRef.current && say(lastLineRef.current, false)
+      const before = recorder.view
       const next = recorder.command(command, performance.timeOrigin + performance.now())
       viewRef.current = next
       setView(next)
-      if (ACK[command] && command !== 'stop') void speakerRef.current?.say({ text: ACK[command]! })
+      // Acknowledged only when it changed something: Arc never says "Starting." to a set that did not start.
+      const changed = before.phase !== next.phase || before.paused !== next.paused || before.setNumber !== next.setNumber
+      if (ACK[command] && command !== 'stop' && changed) void speakerRef.current?.say({ text: ACK[command]! })
     },
     [config, say],
   )
@@ -273,6 +276,8 @@ export function LiveRecorder({ profileId, config, simulate = false, below, figur
       cancelled = true
       listenerRef.current?.stop()
       speakerRef.current?.stop()
+      // A reply that comes back after the page is gone has nothing to speak with.
+      speakerRef.current = null
     }
   }, [runCommand])
 
@@ -295,7 +300,8 @@ export function LiveRecorder({ profileId, config, simulate = false, below, figur
       navigate(`/sessions/${id}`, { state: { from: '/dashboard', label: 'Dashboard', arcRead: true } })
     } catch (err) {
       savingRef.current = false
-      setStatus({ kind: 'error', message: err instanceof Error ? `The session could not be saved: ${err.message}` : 'The session could not be saved.' })
+      // The recording is all still here: offer to save it again, not to start over.
+      setStatus({ kind: 'saveError', message: err instanceof Error ? `The session could not be saved: ${err.message}` : 'The session could not be saved.' })
     }
   }, [navigate, profileId, withLoad])
 
@@ -409,6 +415,10 @@ export function LiveRecorder({ profileId, config, simulate = false, below, figur
         }
         if (next.phase === 'done') {
           cancelAnimationFrame(raf)
+          // The session is over: the camera goes off now, not when the page is left.
+          stream?.getTracks().forEach((t) => t.stop())
+          tracker?.close()
+          tracker = null
           void save()
         }
       }
@@ -549,7 +559,7 @@ export function LiveRecorder({ profileId, config, simulate = false, below, figur
           </div>
           <LoadField initialKg={config.loadKg} onChange={(kg) => (loadRef.current = kg)} />
 
-          {status.kind === 'error' && (
+          {(status.kind === 'error' || status.kind === 'saveError') && (
             <div role="alert" className="t-mono mt-4 flex items-start gap-2 text-bad">
               <Lamp tone="bad" /> <span>{status.message}</span>
             </div>
@@ -597,7 +607,11 @@ export function LiveRecorder({ profileId, config, simulate = false, below, figur
           </div>
 
           <div className="mt-5 flex flex-wrap gap-2">
-            {status.kind === 'error' || status.kind === 'empty' ? (
+            {status.kind === 'saveError' ? (
+              <button type="button" className="btn btn-block" onClick={() => void save()}>
+                Save again
+              </button>
+            ) : status.kind === 'error' || status.kind === 'empty' ? (
               <button type="button" className="btn btn-block" onClick={() => setAttempt((n) => n + 1)}>
                 Try again
               </button>

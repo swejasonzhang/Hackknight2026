@@ -13,6 +13,11 @@ import { toUserDto, User, type UserShape } from '../models/User.ts'
 
 const BCRYPT_ROUNDS = 10
 
+/** Wrong passwords in the last 15 minutes, per email at login and per account at deletion; after five, it stops checking for a while. */
+const failures = new Map<string, number[]>()
+const FAILURE_WINDOW_MS = 15 * 60_000
+const MAX_FAILURES = 5
+
 /** Mounted at /api/auth */
 export const authRouter = Router()
 
@@ -27,9 +32,18 @@ authRouter.post('/signup', async (req, res) => {
 
 authRouter.post('/login', async (req, res) => {
   const input = validate(LoginSchema, req.body)
+  // Five wrong passwords for an email in 15 minutes, and it stops checking for a while. Keyed by
+  // the email, not the address: behind Render's proxy every visitor shares one.
+  const key = `login:${input.email}`
+  const now = Date.now()
+  const recent = (failures.get(key) ?? []).filter((t) => now - t < FAILURE_WINDOW_MS)
+  if (recent.length >= MAX_FAILURES) throw new HttpError(429, 'Too many attempts. Try again in 15 minutes.')
+  // Counted before the check, so attempts sent all at once cannot slip past the limit.
+  failures.set(key, [...recent, now])
   const user = await User.findOne({ email: input.email }).lean<UserShape>()
   const ok = user ? await bcrypt.compare(input.password, user.passwordHash) : false
   if (!user || !ok) throw new HttpError(401, 'Invalid email or password')
+  failures.delete(key)
   const body: AuthResponse = { token: signToken(user._id.toString()), user: toUserDto(user) }
   res.json(body)
 })
@@ -40,10 +54,6 @@ authRouter.get('/me', authenticate, async (req, res) => {
   res.json(toUserDto(user))
 })
 
-/** Wrong passwords per account in the last 15 minutes; after five, deletion stops checking for a while. */
-const failures = new Map<string, number[]>()
-const FAILURE_WINDOW_MS = 15 * 60_000
-const MAX_FAILURES = 5
 
 /**
  * Deletes the signed-in account and everything in it (profiles, plans, sessions, challenges,
@@ -60,10 +70,11 @@ authRouter.post('/account/delete', authenticate, async (req, res) => {
   if (recent.length >= MAX_FAILURES) throw new HttpError(429, 'Too many attempts. Try again in 15 minutes.')
 
   const input = validate(DeleteAccountSchema, req.body)
+  // Counted before the check, so attempts sent all at once cannot slip past the limit.
+  failures.set(key, [...recent, now])
   const user = await User.findById(userId).lean<UserShape>()
   const ok = user != null && user.email === input.email && (await bcrypt.compare(input.password, user.passwordHash))
   if (!ok) {
-    failures.set(key, [...recent, now])
     // 403, not 401: the session is still valid, and a 401 would sign the member out over a typo.
     throw new HttpError(403, 'That email and password do not match this account')
   }

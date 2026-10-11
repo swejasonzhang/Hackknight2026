@@ -2,6 +2,7 @@ import { EXERCISE_IDS, EXERCISES, MUSCLE_IDS, type ExerciseId, type MuscleId } f
 import { describe, expect, it } from 'vitest'
 import { bindJoints, BONES, PROPORTIONS, restFor, skeletonFor, type FigureKey, type JointName, type V3 } from '../skeleton'
 import bodyData from './body.bin?inline'
+import bodyGzData from './body.bin.gz?inline'
 import { BODY_META } from './bodyMeta'
 import { applyMat, bodyPositions, BONE_NAMES, decodeBody, facingFor, GARMENT_LIFT, garmentPositions, garmentsOf, handleOf, muscleLoad, paintBody, paintGarment, skin, skinMatrices, vertexNormals, visibleTriangles, wearsTop, type Growth, type Mat4, type Palette } from './figure'
 import { HOLDS } from './hold'
@@ -59,6 +60,14 @@ const radius = (positions: Float32Array, vs: number[], a: V3, b: V3) => {
 }
 
 describe('the baked body', () => {
+  it('ships a gzip copy that unpacks to exactly the same bytes', async () => {
+    const packed = Uint8Array.from(atob(bodyGzData.slice(bodyGzData.indexOf(',') + 1)), (c) => c.charCodeAt(0))
+    expect(packed.length).toBeLessThan(bytes.length * 0.65)
+    const unpacked = new Uint8Array(await new Response(new Response(packed).body!.pipeThrough(new DecompressionStream('gzip'))).arrayBuffer())
+    expect(unpacked.length).toBe(bytes.length)
+    expect(unpacked.every((b, i) => b === bytes[i])).toBe(true)
+  })
+
   it('is the very file the bake wrote', async () => {
     const digest = new Uint8Array(await crypto.subtle.digest('SHA-256', bytes))
     expect([...digest].map((b) => b.toString(16).padStart(2, '0')).join('')).toBe(BODY_META.sha256)

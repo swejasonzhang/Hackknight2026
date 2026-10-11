@@ -1,8 +1,9 @@
+import { Suspense } from 'react'
 import { Link, Outlet, useLocation } from 'react-router-dom'
 import { APP_NAME } from '../brand'
 import { Logo } from '../components/icons'
 import { MaskLines } from '../components/motion'
-import { Lamp } from '../components/ui'
+import { Lamp, PageLoading } from '../components/ui'
 
 /** Sign-up, then the chat with Arc at /welcome, then the week it builds. */
 const STEPS = ['Account', 'Arc', 'Week']
@@ -56,7 +57,9 @@ export function AuthLayout() {
       <div className="mx-auto grid max-w-[1280px] gap-10 px-5 py-8 sm:px-8 sm:py-12 lg:grid-cols-12">
         <div className="lg:col-span-7">
           <div className="panel max-w-[640px] p-5 sm:p-7">
-            <Outlet />
+            <Suspense fallback={<PageLoading />}>
+              <Outlet />
+            </Suspense>
           </div>
         </div>
         <aside className="ruler-v hidden pl-8 lg:col-span-4 lg:col-start-9 lg:block" aria-label="Notes">

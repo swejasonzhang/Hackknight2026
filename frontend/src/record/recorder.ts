@@ -77,6 +77,8 @@ export class SessionRecorder {
   private lastT = 0
   private paused = false
   private pausedRestLeft: number | null = null
+  /** Counting starts only once the joint has been back in the rest zone: a rep caught half done (after a pause, or as a set starts) never counts. */
+  private armed = false
   private readonly events: SessionEvent[] = []
 
   constructor(cfg: Config) {
@@ -99,6 +101,7 @@ export class SessionRecorder {
     this.counter = this.newCounter()
     this.form = new FormWatch(this.cfg.exercise, this.cfg.side, this.aspect)
     this.filter = new OneEuroFilter()
+    this.armed = false
     this.startedAt ??= tMs
   }
 
@@ -134,6 +137,11 @@ export class SessionRecorder {
       case 'start':
         if (this.paused) this.resume(tMs)
         else if (this.phase === 'waiting') this.startSet(tMs)
+        else if (this.phase === 'rest') {
+          // Ready before the rest is up: the next set starts now.
+          this.setNumber++
+          this.startSet(tMs)
+        }
         break
       case 'pause':
         if (this.paused) break
@@ -172,9 +180,12 @@ export class SessionRecorder {
     this.paused = false
     if (this.phase === 'rest' && this.pausedRestLeft != null) this.restEndsAt = tMs + this.pausedRestLeft
     this.pausedRestLeft = null
-    // A rep half-done before the pause should not count after it.
+    // A rep half-done before the pause should not count after it, nor its form fault stick to the next.
     this.counter = this.newCounter()
     this.filter = new OneEuroFilter()
+    this.repFault = null
+    this.form.reset()
+    this.armed = false
   }
 
   feed({ tracked, metricDeg, tMs: rawT, pose, aspect }: RecorderSample): RecorderView {
@@ -194,6 +205,10 @@ export class SessionRecorder {
         break
       case 'active': {
         if (!tracked || this.smoothed == null) break
+        if (!this.armed) {
+          if (this.smoothed <= EXERCISES[this.cfg.exercise].exitDeg) this.armed = true
+          else break
+        }
         const before = this.counter.snapshot.phase
         const counted = this.counter.update(this.smoothed, tMs)
         const after = this.counter.snapshot.phase

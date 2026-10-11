@@ -1,11 +1,11 @@
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react'
-import { useEffect, useState } from 'react'
+import { Suspense, useEffect, useState } from 'react'
 import { Link, NavLink, useLocation, useOutlet } from 'react-router-dom'
 import { api } from '../api/client'
 import { useAuth } from '../auth/AuthContext'
 import { Hint } from '../components/Hint'
 import { IconLogOut, Logo } from '../components/icons'
-import { Avatar, Lamp, type Tone } from '../components/ui'
+import { Avatar, Lamp, PageLoading, type Tone } from '../components/ui'
 
 type ApiState = 'checking' | 'ok' | 'down'
 
@@ -102,7 +102,7 @@ export function AppShell() {
       <main className="mx-auto w-full max-w-[1440px] px-4 pt-5 pb-[calc(80px+env(safe-area-inset-bottom))] sm:px-6 sm:pt-6 sm:pb-12 lg:px-8 lg:pt-8">
         <AnimatePresence mode="wait" initial={false}>
           <motion.div key={location.pathname} initial={reduce ? false : { opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={reduce ? undefined : { opacity: 0, y: -8 }} transition={{ duration: 0.26, ease: [0.2, 0, 0, 1] }}>
-            {outlet}
+            <Suspense fallback={<PageLoading />}>{outlet}</Suspense>
           </motion.div>
         </AnimatePresence>
       </main>

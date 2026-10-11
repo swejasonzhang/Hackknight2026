@@ -158,6 +158,17 @@ export function Segmented<T extends string>({ options, value, onChange, label }:
   )
 }
 
+/** A page on its way: a quiet placeholder the height of a screen, so nothing jumps when it lands. */
+export function PageLoading() {
+  return (
+    <div className="min-h-[60vh] px-4 py-10 sm:px-8" role="status" aria-live="polite">
+      <span className="sr-only">Loading…</span>
+      <div className="hatch h-10 w-48" aria-hidden="true" />
+      <div className="hatch mt-6 h-64 w-full" aria-hidden="true" />
+    </div>
+  )
+}
+
 /** A hatched placeholder at the size of what is loading. */
 export function Skeleton({ height = 16, width = '100%', className = '' }: { height?: number; width?: number | string; className?: string }) {
   return <div className={`hatch ${className}`.trim()} style={{ height, width }} aria-hidden="true" />

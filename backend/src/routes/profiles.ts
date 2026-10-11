@@ -3,6 +3,7 @@ import { Router } from 'express'
 import { principalOf, requireUser } from '../auth.ts'
 import { HttpError, validate } from '../http.ts'
 import { ChallengeRun } from '../models/ChallengeRun.ts'
+import { CoachMessage } from '../models/CoachMessage.ts'
 import { Plan } from '../models/Plan.ts'
 import { Program } from '../models/Program.ts'
 import { Profile, toProfileDto, type ProfileShape } from '../models/Profile.ts'
@@ -42,9 +43,12 @@ profilesRouter.patch('/:id', async (req, res) => {
   res.json(toProfileDto(profile))
 })
 
+/** Only the member deletes a profile (never the camera app's key), and everything of it goes: Arc's words with it too. */
 profilesRouter.delete('/:id', async (req, res) => {
-  const profile = await requireProfile(req.params.id, principalOf(req))
+  const userId = requireUser(req)
+  const profile = await requireProfile(req.params.id, { kind: 'user', userId })
   await Promise.all([
+    CoachMessage.deleteMany({ profileId: profile._id }),
     Session.deleteMany({ profileId: profile._id }),
     Plan.deleteMany({ profileId: profile._id }),
     Program.deleteMany({ profileId: profile._id }),
