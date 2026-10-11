@@ -5,7 +5,7 @@
  */
 import { z } from 'zod'
 import { MuscleIdSchema, PlanInputSchema, WeekdaySchema, type CoachIntake, type PlanDto, type PlanInput, type TrainingGoal } from './api.ts'
-import { BODY_AREAS, EXERCISE_LIST, EXERCISES, MUSCLES } from './engine/exercises.ts'
+import { BODY_AREAS, EXERCISE_LIST, EXERCISES, goalProblem, MUSCLES } from './engine/exercises.ts'
 import type { BodyArea, ExerciseId, MuscleId } from './engine/types.ts'
 
 type Range = readonly [number, number]
@@ -83,7 +83,15 @@ export const ProgramInputSchema = z.object({
 export type ProgramInput = z.infer<typeof ProgramInputSchema>
 
 /** A week the member arranged themselves: the days only; Arc writes the summary. */
-export const ProgramEditSchema = z.object({ days: ProgramInputSchema.shape.days })
+export const ProgramEditSchema = z.object({ days: ProgramInputSchema.shape.days }).superRefine((edit, ctx) => {
+  // Every goal inside its movement's range.
+  edit.days.forEach((day, d) =>
+    day.items.forEach((item, i) => {
+      const problem = goalProblem(item.exercise, item.targetDeg)
+      if (problem) ctx.addIssue({ code: 'custom', path: ['days', d, 'items', i, 'targetDeg'], message: problem })
+    }),
+  )
+})
 export type ProgramEdit = z.infer<typeof ProgramEditSchema>
 
 /** Who wrote the week: Gemini, Arc's own rules, the demo seed, or the member by hand. */

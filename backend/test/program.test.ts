@@ -1,3 +1,4 @@
+import { EXERCISES, type ExerciseId } from '@arc/dependencies'
 import { describe, expect, it } from 'vitest'
 import { Program } from '../src/models/Program.ts'
 import { createProfile, service, signup } from './helpers.ts'
@@ -45,7 +46,7 @@ describe('the week Arc builds (GET /api/profiles/:id/program)', () => {
 })
 
 describe("the member's own week (PUT /api/profiles/:id/program)", () => {
-  const item = (exercise: string, muscle?: string) => ({ exercise, side: 'right', sets: 3, reps: 10, restSeconds: 60, targetDeg: 120, ...(muscle ? { muscle } : {}) })
+  const item = (exercise: ExerciseId, muscle?: string) => ({ exercise, side: 'right', sets: 3, reps: 10, restSeconds: 60, targetDeg: EXERCISES[exercise].targetDeg, ...(muscle ? { muscle } : {}) })
   const back = { weekday: 3, title: 'Back · Lats, Upper back, Lower back', items: [item('lat_pulldown'), item('bent_over_row', 'upper_back'), item('deadlift', 'lower_back')] }
   const legs = { weekday: 1, title: 'Legs', items: [item('squat'), item('lunge'), item('seated_knee_extension')] }
 
@@ -79,6 +80,21 @@ describe("the member's own week (PUT /api/profiles/:id/program)", () => {
     expect((await c.put(`/api/profiles/${profileId}/program`).send({ days: [{ ...legs, items: [item('squat', 'neck')] }] })).status).toBe(400)
     expect((await c.put(`/api/profiles/${profileId}/program`).send({ days: [legs, legs] })).status).toBe(400)
     expect((await c.put(`/api/profiles/${profileId}/program`).send({ days: [] })).status).toBe(400)
+  })
+
+  it("keeps every goal inside its movement's range", async () => {
+    const c = await signup()
+    const profileId = await createProfile(c)
+    const deadliftAt90 = { weekday: 1, title: 'Back', items: [{ ...item('deadlift'), targetDeg: 90 }] }
+    const res = await c.put(`/api/profiles/${profileId}/program`).send({ days: [deadliftAt90] })
+    expect(res.status).toBe(400)
+    expect(JSON.stringify(res.body)).toMatch(/deadlift goal must be from 160 to 180 degrees/)
+    // The plan too: a front raise stops a little above shoulder height.
+    const plan = { exercise: 'front_raise', side: 'right', sets: 3, reps: 8, restSeconds: 45, targetDeg: 135 }
+    expect((await c.put(`/api/profiles/${profileId}/plan`).send(plan)).body.error).toBe('The front raise goal must be from 80 to 110 degrees.')
+    expect((await c.put(`/api/profiles/${profileId}/plan`).send({ ...plan, targetDeg: 95 })).status).toBe(201)
+    expect((await c.patch(`/api/profiles/${profileId}/plan`).send({ targetDeg: 150 })).status).toBe(400)
+    expect((await c.patch(`/api/profiles/${profileId}/plan`).send({ sets: 4 })).status).toBe(200)
   })
 
   it("is the member's alone: not another account's, and never the camera app's", async () => {

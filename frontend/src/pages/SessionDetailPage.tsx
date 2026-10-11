@@ -1,5 +1,5 @@
 import { EXERCISES, FATIGUE_MIN_REPS, sideLabel, type SessionDto } from '@arc/dependencies'
-import { useEffect, useState } from 'react'
+import { useEffect, useState, type CSSProperties } from 'react'
 import { Link, useLocation, useParams } from 'react-router-dom'
 import { Bar, BarChart, CartesianGrid, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { api } from '../api/client'
@@ -24,7 +24,7 @@ const AREA = {
   back: 'lg:col-span-4 lg:col-start-1 lg:row-start-1 lg:pb-5',
   title: 'border-b border-rule-strong pb-5 lg:col-span-8 lg:col-start-5 lg:row-start-1',
   numeral: 'lg:col-span-4 lg:col-start-5 lg:row-start-2 lg:pt-6 lg:pb-8',
-  stage: 'lg:col-span-4 lg:col-start-1 lg:row-span-3 lg:row-start-1 lg:sticky lg:self-start',
+  stage: 'lg:col-span-4 lg:col-start-1 lg:row-span-3 lg:row-start-1 lg:sticky lg:top-(--sticky-top) lg:self-start',
   readouts: 'lg:col-span-4 lg:col-start-9 lg:row-start-2 lg:border-l lg:border-rule lg:pt-6 lg:pb-8 lg:pl-8',
   strips: 'lg:col-span-8 lg:col-start-5 lg:row-start-3',
 }
@@ -216,7 +216,7 @@ export function SessionDetailPage() {
       </div>
 
       {/* Stage column: the limb posed at the best rep on the blueprint grid, then the spec list. */}
-      <aside ref={stageRef} className={`${AREA.stage} grid gap-5 sm:grid-cols-2 lg:grid-cols-1`} style={{ top: stageTop }} aria-label="Session stage">
+      <aside ref={stageRef} className={`${AREA.stage} grid gap-5 sm:grid-cols-2 lg:grid-cols-1`} style={{ '--sticky-top': `${stageTop}px` } as CSSProperties} aria-label="Session stage">
         <div className="panel">
           <div className="stage h-[280px] sm:h-[300px] lg:h-[340px]">
             <div className="absolute inset-x-0 top-11 bottom-0">

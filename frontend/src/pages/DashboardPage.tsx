@@ -1,5 +1,5 @@
 import { EXERCISE_IDS, EXERCISES, prescriptionFor, type ExerciseId, type PlanDto, type ProgramDto, type ProgressDto } from '@arc/dependencies'
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, type CSSProperties } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { api } from '../api/client'
 import { ExercisePicker } from '../components/ExercisePicker'
@@ -136,7 +136,8 @@ export function DashboardPage() {
   return (
     <Page className="grid grid-cols-1 gap-8 lg:grid-cols-12 lg:gap-8">
       {/* ---------- Measurement panel ---------- */}
-      <section ref={panelRef} aria-label="Measurement panel" className="panel min-w-0 self-start p-4 sm:p-5 lg:sticky lg:col-span-5" style={{ top: panelTop }}>
+      {/* The offset only means something where the panel is sticky (lg); a phone keeps it in the flow. */}
+      <section ref={panelRef} aria-label="Measurement panel" className="panel min-w-0 self-start p-4 sm:p-5 lg:sticky lg:top-(--sticky-top) lg:col-span-5" style={{ '--sticky-top': `${panelTop}px` } as CSSProperties}>
         <div className="flex items-center justify-between gap-3 border-b border-rule pb-4">
           <ProfilePicker />
           {!noProfiles && (

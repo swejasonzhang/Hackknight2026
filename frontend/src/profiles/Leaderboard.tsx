@@ -41,7 +41,7 @@ function measure(row: LeaderboardRow, metric: LeaderboardMetric): { value: numbe
  * by an Arc score that factors in reps, sets, weight moved and steadiness, or by any one of them
  * (fatigue ranks the steadiest first). The profile being viewed carries the cobalt edge.
  */
-export function Leaderboard({ selectedId, refresh = 0 }: { selectedId: string; refresh?: number }) {
+export function Leaderboard({ selectedId, refresh = 0, className = '' }: { selectedId: string; refresh?: number; className?: string }) {
   const [window, setWindow] = useState<LeaderboardWindow>('week')
   const [metric, setMetric] = useState<LeaderboardMetric>('score')
   const [board, setBoard] = useState<LeaderboardDto | null>(null)
@@ -62,7 +62,7 @@ export function Leaderboard({ selectedId, refresh = 0 }: { selectedId: string; r
   const anyone = board?.rows.some((r) => r.sessions > 0) ?? false
 
   return (
-    <Strip index="01" title="Leaderboard" aside="Your household, ranked" className="mt-10">
+    <Strip index="01" title="Who moved most" aside="Your household, ranked" className={className}>
       <div>
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div role="group" aria-label="When" className="flex flex-wrap gap-2">

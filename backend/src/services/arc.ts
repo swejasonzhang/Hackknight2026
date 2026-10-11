@@ -1,5 +1,7 @@
 import {
   BODY_AREAS,
+  FAULT_FIX,
+  FAULT_WORDS,
   catalogByArea,
   clampToRanges,
   CoachIntakeSchema,
@@ -25,7 +27,9 @@ import {
   type OnboardingTopic,
   type PlanInput,
   type ProgramDay,
+  type FormFault,
   type ProgramItem,
+  type RejectedRep,
   type ProgramInput,
   type ProgramSource,
   type RepRecord,
@@ -394,7 +398,21 @@ export interface SetFeedbackContext {
   plan: SessionPlan
   setNumber: number
   reps: RepRecord[]
+  /** Reps the set did not count for their form. */
+  rejected?: RejectedRep[]
   intake?: CoachIntake | null
+}
+
+/** The reps a set refused for form: how many, in words, and the most common fault. */
+function refused(rejected: RejectedRep[] = []): { count: number; words: string; top: FormFault | null } {
+  const counts = new Map<FormFault, number>()
+  for (const r of rejected) counts.set(r.fault, (counts.get(r.fault) ?? 0) + 1)
+  const sorted = [...counts.entries()].sort((a, b) => b[1] - a[1])
+  return {
+    count: rejected.length,
+    words: sorted.map(([f, n]) => (n > 1 ? `${FAULT_WORDS[f]} (${n})` : FAULT_WORDS[f])).join(', '),
+    top: sorted[0]?.[0] ?? null,
+  }
 }
 
 /** "2.4". */
@@ -417,6 +435,8 @@ function setFeedbackTemplate(c: SetFeedbackContext): string {
   const mean = durations.reduce((a, b) => a + b, 0) / Math.max(1, durations.length)
   const parts = [`Set ${c.setNumber} done: ${plural(c.reps.length, 'rep')}, best ${best} degrees, lowest ${low}.`]
   parts.push(reached === c.reps.length ? `Every rep reached your ${target} degree goal.` : `${reached} of ${c.reps.length} reps reached your ${target} degree goal.`)
+  const off = refused(c.rejected)
+  if (off.count) parts.push(`${plural(off.count, 'rep')} did not count for form: ${off.words}.`)
   parts.push(
     fatigue.index >= 0.25
       ? `Your range dropped from ${first} to ${last} degrees by the end.`
@@ -427,8 +447,10 @@ function setFeedbackTemplate(c: SetFeedbackContext): string {
   const slowing = durations.length >= 2 && durations.at(-1)! > durations[0]! * 1.15
   parts.push(`Reps took ${seconds(mean)} seconds on average${slowing ? `, slowing to ${seconds(durations.at(-1)!)} by the end` : ''}.`)
   const more = c.setNumber < c.plan.sets
-  const step =
-    fatigue.index >= 0.25
+  // A fault that cost reps comes first: counted reps need good form.
+  const step = off.top
+    ? FAULT_FIX[off.top]
+    : fatigue.index >= 0.25
       ? `take the full ${c.plan.restSeconds} seconds and lower each rep slowly`
       : reached === c.reps.length
         ? 'try one more rep, or a slower lowering'
@@ -446,12 +468,13 @@ export async function setFeedback(c: SetFeedbackContext): Promise<{ text: string
   const context = [
     `Member: ${firstName(c.name)}${c.intake ? `; goals: ${c.intake.goals}; limits: ${c.intake.limitations}` : ''}`,
     `Exercise: ${EXERCISES[c.exercise].name}, ${c.side} side; goal ${c.plan.targetDeg} degrees`,
-    `Set ${c.setNumber} of ${c.plan.sets} just ended: ${c.reps.length} of ${c.plan.reps} reps; peaks in order: ${c.reps.map((r) => Math.round(r.peakDeg)).join(', ')} degrees; fatigue score ${Math.round(fatigue.index * 100)} out of 100`,
+    `Set ${c.setNumber} of ${c.plan.sets} just ended: ${c.reps.length} of ${c.plan.reps} reps counted; peaks in order: ${c.reps.map((r) => Math.round(r.peakDeg)).join(', ')} degrees; fatigue score ${Math.round(fatigue.index * 100)} out of 100`,
+    refused(c.rejected).count ? `Reps not counted because of form: ${refused(c.rejected).words}` : 'Every rep was counted: the form held.',
     c.setNumber < c.plan.sets ? `Next: ${c.plan.restSeconds} seconds of rest, then set ${c.setNumber + 1} starts by itself.` : 'This was the last set.',
   ].join('\n')
   try {
     const text = await generate({
-      system: `${PERSONA}\n\nThe member just finished a set and is resting. In one or two short spoken sentences: say the set number, the reps and the best angle, how the range held, and one cue for the next set (or, after the last set, that the session is done). If the fatigue score is above 40, suggest taking the whole rest.`,
+      system: `${PERSONA}\n\nThe member just finished a set and is resting. In one or two short spoken sentences: say the set number, the reps counted and the best angle, how the range held, and one cue for the next set (or, after the last set, that the session is done). Only reps with good form are counted: if some were not counted, say how many and the one thing to change. If the fatigue score is above 40, suggest taking the whole rest.`,
       turns: [{ role: 'user', text: context }],
       maxOutputTokens: 160,
     })

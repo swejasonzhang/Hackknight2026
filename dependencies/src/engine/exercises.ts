@@ -36,7 +36,8 @@ export const EXERCISES: Record<ExerciseId, ExerciseConfig> = {
     exitDeg: 40,
     targetDeg: 140,
     restDeg: 0,
-    maxDeg: 180,
+    // An elbow bends to about 150 degrees: the hand meets the shoulder.
+    maxDeg: 150,
     minRepMs: 800,
   },
   tricep_extension: {
@@ -92,7 +93,8 @@ export const EXERCISES: Record<ExerciseId, ExerciseConfig> = {
     exitDeg: 30,
     targetDeg: 90,
     restDeg: 0,
-    maxDeg: 180,
+    // A lateral raise stops just past shoulder height.
+    maxDeg: 105,
     minRepMs: 1000,
   },
   front_raise: {
@@ -111,7 +113,8 @@ export const EXERCISES: Record<ExerciseId, ExerciseConfig> = {
     exitDeg: 30,
     targetDeg: 95,
     restDeg: 10,
-    maxDeg: 170,
+    // A front raise stops a little above shoulder height.
+    maxDeg: 110,
     minRepMs: 1000,
   },
   chest_press: {
@@ -364,3 +367,16 @@ export function exercisesFor(muscle: MuscleId): { primary: ExerciseConfig[]; sec
 export function sideLabel(exercise: ExerciseId, side: Side): string {
   return EXERCISES[exercise].sided ? side : 'both sides'
 }
+
+/** The goals a movement can take: from where a rep starts counting to the furthest it goes. */
+export function goalRange(exercise: ExerciseId): { min: number; max: number } {
+  const { enterDeg, maxDeg } = EXERCISES[exercise]
+  return { min: enterDeg, max: maxDeg }
+}
+
+/** Why a goal does not suit a movement, or null when it does. */
+export function goalProblem(exercise: ExerciseId, targetDeg: number): string | null {
+  const { min, max } = goalRange(exercise)
+  return targetDeg >= min && targetDeg <= max ? null : `The ${EXERCISES[exercise].name.toLowerCase()} goal must be from ${min} to ${max} degrees.`
+}
+

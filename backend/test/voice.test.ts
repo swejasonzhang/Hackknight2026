@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { CoachMessage } from '../src/models/CoachMessage.ts'
 import { resetSpeechCache } from '../src/services/voice.ts'
-import { createProfile, service, signup } from './helpers.ts'
+import { createProfile, makeSession, service, signup } from './helpers.ts'
 
 const realFetch = globalThis.fetch
 type Call = { url: string; init: RequestInit }
@@ -125,5 +125,30 @@ describe("Arc's own reads are specific (Gemini off)", () => {
     expect(text).toMatch(/2 of 6 reps reached your 140/i)
     expect(text).toMatch(/second/i) // tempo
     expect(text).toMatch(/next set/i) // one concrete step
+  })
+
+  it('counts only good-form reps: says how many did not count, why, and makes the fix the next step', async () => {
+    const c = await signup()
+    const profileId = await createProfile(c)
+    const reps = [140, 141, 139, 142].map((peakDeg, i) => ({ index: i + 1, peakDeg, startedAt: 1_000 + i * 3000, endedAt: 3_000 + i * 3000, durationMs: 2000 }))
+    const rejected = [
+      { at: 4_000, fault: 'upper_arm_moved' },
+      { at: 9_000, fault: 'upper_arm_moved' },
+      { at: 12_000, fault: 'too_fast' },
+    ]
+    const text = (await c.post('/api/coach/sets').send({ profileId, exercise: 'elbow_flexion', side: 'right', plan: { sets: 3, reps: 4, restSeconds: 45, targetDeg: 140 }, setNumber: 1, reps, rejected })).body.text as string
+    expect(text).toMatch(/3 reps did not count for form: the upper arm moved \(2\), too quick\./)
+    expect(text).toMatch(/Next set, keep your upper arm still\./)
+    expect((await c.post('/api/coach/sets').send({ profileId, exercise: 'elbow_flexion', side: 'right', plan: { sets: 3, reps: 4, restSeconds: 45, targetDeg: 140 }, setNumber: 1, reps, rejected: [{ at: 1, fault: 'cheating' }] })).status).toBe(400)
+  })
+
+  it('keeps the reps a set refused with the session', async () => {
+    const c = await signup()
+    const profileId = await createProfile(c)
+    const body = makeSession(profileId)
+    body.sets[0]!.rejected = [{ at: body.sets[0]!.endedAt, fault: 'body_swing' }]
+    const saved = (await c.post('/api/sessions').send(body)).body
+    expect(saved.sets[0].rejected).toEqual([{ at: body.sets[0]!.endedAt, fault: 'body_swing' }])
+    expect(saved.sets[1]).not.toHaveProperty('rejected')
   })
 })

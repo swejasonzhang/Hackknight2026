@@ -5,6 +5,7 @@ import { api, ApiRequestError } from '../api/client'
 import { Page } from '../components/motion'
 import { ProfilePicker } from '../components/ProfilePicker'
 import { Alert, EmptyState, PageHeader, Skeleton, Strip } from '../components/ui'
+import { useMediaQuery } from '../hooks/useMediaQuery'
 import { useProfiles } from '../hooks/useProfiles'
 import { nextEntry, plannedDay } from '../plan/checklist'
 import { DayLog } from '../plan/DayLog'
@@ -57,6 +58,8 @@ export function PlanPage() {
   const setDay = (next: DayKey) => setParams({ day: next }, { replace: true })
   const todayNext = sessions ? (nextEntry(plannedDay(program, sessions, today)?.list ?? [])?.item.exercise ?? null) : null
   const noProfiles = !profilesLoading && profiles.length === 0
+  // Side by side on a wide screen (the week first); stacked on a phone (the log first).
+  const wide = useMediaQuery('(min-width: 1024px)')
 
   return (
     <Page>
@@ -88,8 +91,9 @@ export function PlanPage() {
         </div>
       ) : (
         <div className="mt-6 grid gap-8 lg:grid-cols-[minmax(0,4fr)_minmax(0,6fr)] lg:gap-10">
-          <div className="min-w-0">
-            <Strip index="01" title="Week" aside={program ? 'Yours to change' : 'Build one by hand, or with Arc'}>
+          {/* On a phone the day's log comes first: it is what the page is opened for mid-week. */}
+          <div className="order-2 min-w-0 lg:order-1">
+            <Strip index={wide ? '01' : '02'} title="Week" aside={program ? 'Yours to change' : 'Build one by hand, or with Arc'}>
               {selectedId && sessions ? (
                 <WeekEditor profileId={selectedId} program={program} onSaved={setProgram} history side={selected?.intake?.side} todayNext={todayNext} />
               ) : (
@@ -97,8 +101,8 @@ export function PlanPage() {
               )}
             </Strip>
           </div>
-          <div className="min-w-0">
-            <Strip index="02" title="Log" aside="One day at a time">
+          <div className="order-1 min-w-0 lg:order-2">
+            <Strip index={wide ? '02' : '01'} title="Log" aside="One day at a time">
               {sessions ? <DayLog sessions={sessions} day={day} today={today} onDayChange={setDay} program={program} /> : <Skeleton height={420} />}
             </Strip>
           </div>

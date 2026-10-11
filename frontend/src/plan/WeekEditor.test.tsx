@@ -95,6 +95,19 @@ describe('WeekEditor', () => {
     expect(names()).toEqual(['Squat'])
   })
 
+  it("keeps each goal inside its movement's range", () => {
+    render(<WeekEditor profileId="p1" program={PROGRAM} onSaved={() => {}} />)
+    const monday = day('Monday')
+    fireEvent.click(within(monday).getByRole('button', { name: 'Change squat' }))
+    const goal = within(monday).getByRole('spinbutton', { name: 'Goal (°) for squat' })
+    expect(goal).toHaveAttribute('min', '90')
+    expect(goal).toHaveAttribute('max', '120')
+    fireEvent.change(goal, { target: { value: '160' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Save my week' }))
+    expect(screen.getByRole('alert')).toHaveTextContent('Monday: The squat goal must be from 90 to 120 degrees.')
+    expect(putProgram).not.toHaveBeenCalled()
+  })
+
   it('will not save a training day with nothing in it', () => {
     render(<WeekEditor profileId="p1" program={PROGRAM} onSaved={() => {}} />)
     fireEvent.click(screen.getByRole('button', { name: 'Thursday: rest day' }))

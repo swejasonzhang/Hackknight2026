@@ -857,7 +857,7 @@
     background: var(--navy);
     color: #fff;
     display: grid;
-    grid-template-columns: 52px repeat(3, minmax(0, 1fr)) 52px;
+    grid-template-columns: 48px repeat(4, minmax(0, 1fr)) 48px;
     z-index: 30;
   }
   .bar-link {
@@ -866,14 +866,23 @@
     align-items: center;
     justify-content: center;
     height: 56px;
+    min-width: 0;
     font-family: var(--font-mono);
     font-weight: 500;
-    font-size: 11px;
-    letter-spacing: 0.14em;
+    /* Four links on a phone: tight tracking keeps DASHBOARD inside its cell at 360 px and up. */
+    font-size: 10px;
+    letter-spacing: 0.05em;
+    white-space: nowrap;
     text-transform: uppercase;
     color: var(--rail-muted);
     text-decoration: none;
     border-left: 1px solid rgb(255 255 255 / 0.12);
+  }
+  @media (max-width: 359px) {
+    .bar-link {
+      font-size: 9px;
+      letter-spacing: 0;
+    }
   }
   .bar-link[aria-current='page'] {
     color: #fff;

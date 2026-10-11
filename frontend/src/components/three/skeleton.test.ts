@@ -153,10 +153,13 @@ describe('skeletonFor: a whole body for every exercise', () => {
     }
   })
 
-  it('clamps readings to what the movement can show', () => {
+  it("clamps readings to the movement's own range of motion", () => {
     expect(clampMetric('seated_knee_extension', 40)).toBe(90)
     expect(clampMetric('elbow_flexion', -10)).toBe(0)
-    expect(clampMetric('shoulder_abduction', 200)).toBe(180)
+    // Each movement's own range: a lateral raise stops just past shoulder height, a curl at 150.
+    expect(clampMetric('shoulder_abduction', 200)).toBe(105)
+    expect(clampMetric('elbow_flexion', 175)).toBe(150)
+    expect(clampMetric('front_raise', 160)).toBe(110)
     expect(clampMetric('squat', 150)).toBe(EXERCISES.squat.maxDeg)
   })
 })
