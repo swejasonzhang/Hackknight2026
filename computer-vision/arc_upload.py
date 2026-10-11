@@ -41,7 +41,7 @@ TARGET_DEG = {
     "tricep_extension": 170.0,
     "shoulder_press": 170.0,
     "shoulder_abduction": 90.0,
-    "front_raise": 135.0,
+    "front_raise": 95.0,
     "chest_press": 170.0,
     "pec_fly": 160.0,
     "lat_pulldown": 120.0,
@@ -106,6 +106,7 @@ def session_from_export(export: dict, plan: dict, profile_id: str, started_at: f
         for number, reps in sorted(sets.items())
     ]
     last = set_records[-1]["endedAt"]
+    load = {"loadKg": plan["loadKg"]} if plan.get("loadKg") is not None else {}
     return {
         "profileId": profile_id,
         "exercise": exercise,
@@ -115,6 +116,7 @@ def session_from_export(export: dict, plan: dict, profile_id: str, started_at: f
         "plan": {"sets": plan["sets"], "reps": plan["reps"], "restSeconds": plan["restSeconds"], "targetDeg": TARGET_DEG[exercise]},
         "sets": set_records,
         "complete": True,
+        **load,
     }
 
 

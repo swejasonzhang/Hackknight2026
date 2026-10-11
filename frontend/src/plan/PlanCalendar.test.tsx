@@ -64,11 +64,16 @@ describe('PlanCalendar', () => {
     const today = await screen.findByRole('button', { name: /^Wednesday 14 October, today/i })
     expect(today.closest('[role="gridcell"]')).toHaveAttribute('aria-selected', 'true')
     const details = screen.getByRole('region', { name: /selected day/i })
-    const first = week.days[1]!.items[0]!
-    // Wednesday is a legs day: the week works a different area each training day.
-    expect(within(details).getByText(`${EXERCISES[first.exercise].name} · ${sideLabel(first.exercise, 'right')} · ${first.sets} × ${first.reps} · ${first.restSeconds} s rest · goal ${first.targetDeg}°`)).toBeInTheDocument()
-    expect(EXERCISES[first.exercise].area).toBe('legs')
-    expect(within(details).getByRole('link', { name: /start recording/i })).toHaveAttribute('href', '/record')
+    const [first, second] = week.days[1]!.items
+    // Wednesday is a legs day: the week works a different area each training day, several movements a day.
+    expect(EXERCISES[first!.exercise].area).toBe('legs')
+    const list = within(details).getByRole('group', { name: /workout for wednesday 14 october/i })
+    expect(list).toHaveTextContent(`0 of ${week.days[1]!.items.length} done`)
+    expect(list).toHaveTextContent(`${EXERCISES[first!.exercise].name}${sideLabel(first!.exercise, 'right')} · ${first!.sets} × ${first!.reps} · goal ${first!.targetDeg}°`)
+    expect(within(list).getByRole('region', { name: 'Quads' })).toBeInTheDocument()
+    // The way on: the first movement next, any of them on its own.
+    expect(within(details).getByRole('link', { name: `Next: ${EXERCISES[first!.exercise].name}` })).toHaveAttribute('href', `/record?exercise=${first!.exercise}`)
+    expect(within(details).getByRole('link', { name: `Record ${EXERCISES[second!.exercise].name.toLowerCase()}` })).toHaveAttribute('href', `/record?exercise=${second!.exercise}`)
     expect(within(details).getByRole('link', { name: /open in the log/i })).toHaveAttribute('href', '/plan?day=2026-10-14')
   })
 
@@ -76,8 +81,11 @@ describe('PlanCalendar', () => {
     renderCalendar()
     fireEvent.click(await screen.findByRole('button', { name: /^Monday 12 October/i }))
     const details = screen.getByRole('region', { name: /selected day/i })
-    expect(within(details).getByRole('link', { name: /Bicep curl · best 128°/ })).toHaveAttribute('href', '/sessions/s12')
-    expect(within(details).queryByRole('link', { name: /start recording/i })).not.toBeInTheDocument()
+    // The curl was done: crossed out, its session a tap away; the rest of the day was not recorded.
+    expect(within(details).getByText('Bicep curl')).toHaveClass('line-through')
+    expect(within(details).getByRole('link', { name: 'Open →' })).toHaveAttribute('href', '/sessions/s12')
+    expect(within(details).getAllByText('Not recorded').length).toBe(week.days[0]!.items.length - 1)
+    expect(within(details).queryByRole('link', { name: /^next:/i })).not.toBeInTheDocument()
     fireEvent.click(day(/^Tuesday 13 October/i))
     expect(within(screen.getByRole('region', { name: /selected day/i })).getByText(/^A rest day/)).toBeInTheDocument()
   })

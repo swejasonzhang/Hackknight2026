@@ -9,6 +9,7 @@ import { FieldMessage, useFieldRule } from '../components/TextField'
 import { Alert, Avatar, EmptyState, Lamp, PageHeader, Skeleton } from '../components/ui'
 import { formatDate } from '../format'
 import { useProfiles } from '../hooks/useProfiles'
+import { Leaderboard } from '../profiles/Leaderboard'
 
 /* The ledger is a real <table> on tablet and desktop; on a phone every row becomes a stacked
  * block (tag beside the name line, then contact, notes, status and actions under it). */
@@ -259,6 +260,8 @@ export function ProfilesPage() {
           Load demo data
         </button>
       </section>
+
+      {count > 0 && <Leaderboard selectedId={selectedId} refresh={count} />}
     </Page>
   )
 }

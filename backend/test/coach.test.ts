@@ -87,7 +87,11 @@ describe('Arc, the coach', () => {
       // Muscle size, someone new: the bottom of 3-5 sets and 8-12 reps, the top of 60-180 s rest.
       expect(res.body.program).toMatchObject({ source: 'arc', active: true })
       expect(res.body.program.days.map((d: { weekday: number }) => d.weekday)).toEqual([1, 3, 5])
-      expect(res.body.program.days[0].items).toEqual([{ exercise: 'seated_knee_extension', side: 'left', sets: 3, reps: 8, restSeconds: 180, targetDeg: 175 }])
+      // Someone new: two leg movements on the first day, the focus first, each for its muscle group.
+      expect(res.body.program.days[0].items).toEqual([
+        { exercise: 'seated_knee_extension', side: 'left', sets: 3, reps: 8, restSeconds: 180, targetDeg: 175, muscle: 'quads' },
+        { exercise: 'squat', side: 'left', sets: 3, reps: 8, restSeconds: 180, targetDeg: 100, muscle: 'quads' },
+      ])
       expect(res.body.plan).toMatchObject({ exercise: 'seated_knee_extension', side: 'left', sets: 3, reps: 8, restSeconds: 180, targetDeg: 175 })
       expect(res.body.reply).toMatch(/Monday, Wednesday and Friday/)
 

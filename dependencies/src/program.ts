@@ -4,9 +4,9 @@
  * it as a calendar, and every prescription stays inside the training goal's ranges.
  */
 import { z } from 'zod'
-import { PlanInputSchema, WeekdaySchema, type CoachIntake, type PlanDto, type PlanInput, type TrainingGoal } from './api.ts'
-import { BODY_AREAS, EXERCISE_LIST, EXERCISES } from './engine/exercises.ts'
-import type { BodyArea, ExerciseId } from './engine/types.ts'
+import { MuscleIdSchema, PlanInputSchema, WeekdaySchema, type CoachIntake, type PlanDto, type PlanInput, type TrainingGoal } from './api.ts'
+import { BODY_AREAS, EXERCISE_LIST, EXERCISES, MUSCLES } from './engine/exercises.ts'
+import type { BodyArea, ExerciseId, MuscleId } from './engine/types.ts'
 
 type Range = readonly [number, number]
 
@@ -54,10 +54,20 @@ export function clampToRanges(p: { sets: number; reps: number; restSeconds: numb
 
 // ---- the program ----
 
+/** One movement of a training day, with the muscle group it was picked for. */
+export const ProgramItemSchema = PlanInputSchema.extend({
+  /** The muscle group this movement works for the day; when absent, the movement's first target. */
+  muscle: MuscleIdSchema.optional(),
+})
+export type ProgramItem = z.infer<typeof ProgramItemSchema>
+
+/** Movements a training day can hold: several for each muscle group it works. */
+export const MAX_DAY_ITEMS = 8
+
 export const ProgramDaySchema = z.object({
   weekday: WeekdaySchema,
   title: z.string().trim().min(1).max(60),
-  items: z.array(PlanInputSchema).min(1).max(4),
+  items: z.array(ProgramItemSchema).min(1).max(MAX_DAY_ITEMS),
 })
 export type ProgramDay = z.infer<typeof ProgramDaySchema>
 
@@ -72,8 +82,13 @@ export const ProgramInputSchema = z.object({
 })
 export type ProgramInput = z.infer<typeof ProgramInputSchema>
 
-/** Who wrote the week: Gemini, Arc's own rules, or the demo seed. */
-export type ProgramSource = 'gemini' | 'arc' | 'demo'
+/** A week the member arranged themselves: the days only; Arc writes the summary. */
+export const ProgramEditSchema = z.object({ days: ProgramInputSchema.shape.days })
+export type ProgramEdit = z.infer<typeof ProgramEditSchema>
+
+/** Who wrote the week: Gemini, Arc's own rules, the demo seed, or the member by hand. */
+export const PROGRAM_SOURCES = ['gemini', 'arc', 'demo', 'member'] as const
+export type ProgramSource = (typeof PROGRAM_SOURCES)[number]
 
 export interface ProgramDto extends ProgramInput {
   id: string
@@ -194,13 +209,57 @@ export function isDiverseWeek(days: Pick<ProgramDay, 'weekday' | 'items'>[]): bo
 /** "upper body, legs and back". */
 const listOf = (items: string[]) => (items.length <= 1 ? (items[0] ?? '') : `${items.slice(0, -1).join(', ')} and ${items.at(-1)}`)
 
+// ---- muscle groups through a day ----
+
+/** The muscle group an item works for its day: the one it was picked for, else its movement's first target. */
+export function muscleOf(item: Pick<ProgramItem, 'exercise' | 'muscle'>): MuscleId {
+  return item.muscle ?? EXERCISES[item.exercise].muscles.primary[0]!
+}
+
+export interface MuscleGroup<T> {
+  muscle: MuscleId
+  /** The group's items, each with its place in the day's order. */
+  items: { item: T; index: number }[]
+}
+
+/** A day's movements gathered under the muscle group each works, groups in the order the day reaches them. */
+export function muscleGroupsOf<T extends Pick<ProgramItem, 'exercise' | 'muscle'>>(items: readonly T[]): MuscleGroup<T>[] {
+  const groups: MuscleGroup<T>[] = []
+  items.forEach((item, index) => {
+    const muscle = muscleOf(item)
+    const group = groups.find((g) => g.muscle === muscle)
+    if (group) group.items.push({ item, index })
+    else groups.push({ muscle, items: [{ item, index }] })
+  })
+  return groups
+}
+
+/** A day's title from what it holds: its body area (or areas) and its muscle groups, e.g. "Back · Lats, Upper back". */
+export function titleForDay(items: readonly Pick<ProgramItem, 'exercise' | 'muscle'>[]): string {
+  const areas = [...new Set(items.map((i) => EXERCISES[i.exercise].area))].map(areaName)
+  const muscles = muscleGroupsOf(items).map((g) => MUSCLES[g.muscle].name)
+  const title = `${areas.join(' + ')} · ${muscles.join(', ')}`
+  return title.length <= 60 ? title : `${title.slice(0, 59).replace(/[ ,]+[^ ,]*$/, '')}…`
+}
+
+/** Arc's words for a week the member arranged: how many days, which ones, and what each works. */
+export function describeWeek(days: readonly Pick<ProgramDay, 'weekday' | 'items'>[]): string {
+  const sorted = [...days].sort((a, b) => mondayFirst(a.weekday, b.weekday))
+  const count = sorted.length
+  const moves = sorted.reduce((n, d) => n + d.items.length, 0)
+  const each = sorted.map((d) => `${WEEKDAY_NAMES[d.weekday]} ${listOf(muscleGroupsOf(d.items).map((g) => MUSCLES[g.muscle].name.toLowerCase()))}`)
+  const text = `Your own week: ${count} ${count === 1 ? 'day' : 'days'} and ${moves} ${moves === 1 ? 'movement' : 'movements'}. ${each.join('; ')}.`
+  return text.length <= 800 ? text : `${text.slice(0, 797)}…`
+}
+
 /**
  * Arc's own week from the answers, used whenever Gemini is off or sends something unusable. Each
  * training day works one body area, in turn from the focus's area (upper body, legs, back, core),
  * so no area comes two training days running and the week covers as many areas as it has days.
  * The focus movement opens the week; an area that comes round again uses its other movements.
- * Someone new does one movement a day, everyone else two. Sets and reps sit higher in the goal's
- * range with experience, rest lower.
+ * Each day holds several movements for the area's muscle groups: two for someone new, three for
+ * everyone else (as many as the area has). Sets and reps sit higher in the goal's range with
+ * experience, rest lower.
  */
 export function programFromIntake(intake: CoachIntake): ProgramInput {
   const goal = intake.trainingGoal ?? 'hypertrophy'
@@ -210,12 +269,12 @@ export function programFromIntake(intake: CoachIntake): ProgramInput {
   const sets = Math.round(at(range.sets, level))
   const reps = Math.round(at(range.reps, level))
   const restSeconds = clamp(Math.round(at(range.restSeconds, 1 - level) / 15) * 15, range.restSeconds)
-  const item = (exercise: PlanInput['exercise']): PlanInput => ({ exercise, side: intake.side, sets, reps, restSeconds, targetDeg: EXERCISES[exercise].targetDeg })
+  const item = (exercise: PlanInput['exercise']): ProgramItem => ({ exercise, side: intake.side, sets, reps, restSeconds, targetDeg: EXERCISES[exercise].targetDeg, muscle: EXERCISES[exercise].muscles.primary[0]! })
 
   const weekdays = (intake.trainingDays?.length ? [...new Set(intake.trainingDays)] : spreadDays(intake.daysPerWeek)).sort(mondayFirst)
   const focus = EXERCISES[intake.focus]
   const start = AREA_CYCLE.indexOf(focus.area)
-  const perDay = intake.experience === 'new' ? 1 : 2
+  const perDay = intake.experience === 'new' ? 2 : 3
   const seen = new Map<BodyArea, number>()
   const days: ProgramDay[] = weekdays.map((weekday, i) => {
     const area = AREA_CYCLE[(start + i) % AREA_CYCLE.length]!
@@ -246,25 +305,28 @@ export interface Prescription extends PlanInput {
 }
 
 /**
- * What Record runs for the movement picked on the dashboard: the saved plan when it is for that
- * movement; else the week's prescription for it (the one on `date` first, else its first day);
- * else the member's goal ranges on their side (3 x 8 with 45 s rest without an intake), always
- * with the movement's own goal angle unless a plan or the week sets one.
+ * What Record runs for a movement: the day's own prescription when the week holds it on `date`
+ * (the week as the member arranged it); else the saved plan when it is for that movement; else
+ * the week's first day that holds it; else the member's goal ranges on their side (3 x 8 with
+ * 45 s rest without an intake), always with the movement's own goal angle unless the plan or the
+ * week sets one.
  */
 export function prescriptionFor(
   exercise: ExerciseId,
   { plan, program, intake, date = new Date() }: { plan?: Pick<PlanDto, keyof PlanInput> | null; program?: Pick<ProgramInput, 'days'> | null; intake?: CoachIntake | null; date?: Date },
 ): Prescription {
+  const fromWeek = (item: ProgramItem): Prescription => {
+    const { side, sets, reps, restSeconds, targetDeg } = item
+    return { exercise, side, sets, reps, restSeconds, targetDeg, source: 'week' }
+  }
+  const today = program ? programDayOn(program, date)?.items.find((i) => i.exercise === exercise) : undefined
+  if (today) return fromWeek(today)
   if (plan && plan.exercise === exercise) {
     const { side, sets, reps, restSeconds, targetDeg } = plan
     return { exercise, side, sets, reps, restSeconds, targetDeg, source: 'plan' }
   }
-  if (program) {
-    const today = programDayOn(program, date)?.items.find((i) => i.exercise === exercise)
-    const any = program.days.flatMap((d) => d.items).find((i) => i.exercise === exercise)
-    const item = today ?? any
-    if (item) return { ...item, source: 'week' }
-  }
+  const any = program?.days.flatMap((d) => d.items).find((i) => i.exercise === exercise)
+  if (any) return fromWeek(any)
   const targetDeg = EXERCISES[exercise].targetDeg
   if (!intake) return { exercise, side: 'right', sets: 3, reps: 8, restSeconds: 45, targetDeg, source: 'default' }
   const own = programFromIntake({ ...intake, focus: exercise }).days[0]!.items[0]!

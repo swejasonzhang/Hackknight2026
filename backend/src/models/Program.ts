@@ -1,4 +1,4 @@
-import { EXERCISE_IDS, type PlanInput, type ProgramDay, type ProgramDto, type ProgramSource } from '@arc/dependencies'
+import { EXERCISE_IDS, MUSCLE_IDS, PROGRAM_SOURCES, type ProgramDay, type ProgramDto, type ProgramItem, type ProgramSource } from '@arc/dependencies'
 import { model, Schema, type Types } from 'mongoose'
 
 export interface ProgramShape {
@@ -11,9 +11,10 @@ export interface ProgramShape {
   createdAt: number
 }
 
-const ItemSchema = new Schema<PlanInput>(
+const ItemSchema = new Schema<ProgramItem>(
   {
     exercise: { type: String, enum: [...EXERCISE_IDS], required: true },
+    muscle: { type: String, enum: [...MUSCLE_IDS] },
     side: { type: String, enum: ['left', 'right'], required: true },
     sets: { type: Number, required: true },
     reps: { type: Number, required: true },
@@ -37,7 +38,7 @@ const ProgramSchema = new Schema<ProgramShape>({
   profileId: { type: Schema.Types.ObjectId, ref: 'Profile', required: true, index: true },
   summary: { type: String, required: true, maxlength: 800 },
   days: { type: [DaySchema], required: true },
-  source: { type: String, enum: ['gemini', 'arc', 'demo'], required: true },
+  source: { type: String, enum: [...PROGRAM_SOURCES], required: true },
   active: { type: Boolean, required: true, default: true, index: true },
   createdAt: { type: Number, required: true },
 })
@@ -52,7 +53,7 @@ export function toProgramDto(p: ProgramShape): ProgramDto {
     days: p.days.map((d) => ({
       weekday: d.weekday,
       title: d.title,
-      items: d.items.map(({ exercise, side, sets, reps, restSeconds, targetDeg }) => ({ exercise, side, sets, reps, restSeconds, targetDeg })),
+      items: d.items.map(({ exercise, side, sets, reps, restSeconds, targetDeg, muscle }) => ({ exercise, side, sets, reps, restSeconds, targetDeg, ...(muscle ? { muscle } : {}) })),
     })),
     source: p.source,
     active: p.active,

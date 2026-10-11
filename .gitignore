@@ -23,6 +23,8 @@ dist-ssr
 __pycache__/
 *.pyc
 .venv/
+# the camera app writes each run's workout here; it is output, not source
+computer-vision/workout_session.json
 
 # macOS Finder duplicate copies ("name 2.ext") must never be committed
 * 2

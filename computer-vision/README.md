@@ -12,7 +12,7 @@ uv run main.py   # opens the webcam window
 
 ## Starting from a plan
 
-`uv run main.py --exercise elbow_flexion --side right --sets 3 --reps 8 --rest 45` starts straight into an Arc plan with no prompts. `arc_routine.py` maps each of Arc's fifteen movement ids onto this app's catalog: all fourteen catalog exercises, once each (`elbow_flexion` is Bicep Curls, `shoulder_abduction` Lateral Raise, `squat` Squats and so on), plus the seated knee extension, defined there on the hip, knee and ankle. One-sided exercises follow `--side`; whole-body ones use the catalog's own landmarks. With no flags, `uv run main.py` builds the routine interactively.
+`uv run main.py --exercise elbow_flexion --side right --sets 3 --reps 8 --rest 45` starts straight into an Arc plan with no prompts; `--weight 10` adds the weight held, in kilograms (0 for bodyweight), which is saved with the session and counts toward the household leaderboard. `arc_routine.py` maps each of Arc's fifteen movement ids onto this app's catalog: all fourteen catalog exercises, once each (`elbow_flexion` is Bicep Curls, `shoulder_abduction` Lateral Raise, `squat` Squats and so on), plus the seated knee extension, defined there on the hip, knee and ankle. One-sided exercises follow `--side`; whole-body ones use the catalog's own landmarks. With no flags, `uv run main.py` builds the routine interactively.
 
 ## Saving the session to Arc
 

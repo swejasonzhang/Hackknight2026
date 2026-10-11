@@ -6,6 +6,7 @@ import { errorHandler, notFound } from './http.ts'
 import { authRouter } from './routes/auth.ts'
 import { coachRouter } from './routes/coach.ts'
 import { devRouter } from './routes/dev.ts'
+import { leaderboardRouter } from './routes/leaderboard.ts'
 import { plansRouter } from './routes/plans.ts'
 import { profilesRouter } from './routes/profiles.ts'
 import { progressRouter } from './routes/progress.ts'
@@ -59,6 +60,7 @@ export function createApp(opts: AppOptions = {}): Express {
   app.use('/api/profiles', profileSessionsRouter)
   app.use('/api/sessions', authenticate, sessionsRouter)
   app.use('/api/coach', authenticate, coachRouter)
+  app.use('/api/leaderboard', authenticate, leaderboardRouter)
   if (opts.allowDevRoutes ?? true) app.use('/api/dev', authenticate, devRouter)
 
   app.use('/api', notFound)

@@ -1,14 +1,16 @@
-import { EXERCISES, programDayOn, sideLabel, WEEKDAY_NAMES, type ExerciseId, type ProgramDto, type SessionDto } from '@arc/dependencies'
+import { EXERCISES, programDayOn, WEEKDAY_NAMES, type ExerciseId, type ProgramDto, type SessionDto } from '@arc/dependencies'
 import { useEffect, useId, useMemo, useRef, useState, type KeyboardEvent } from 'react'
 import { Link } from 'react-router-dom'
 import { api, ApiRequestError } from '../api/client'
 import { IconChevronLeft, IconChevronRight } from '../components/icons'
 import { Alert, EmptyState, Lamp, Skeleton, Strip } from '../components/ui'
+import { checklistFor } from './checklist'
 import { dayKey, dayStart, groupByDay, monthGrid, shiftDay, shiftMonth, weekOf, type DayKey } from './days'
+import { TodayList } from './TodayList'
 
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December']
 const HEADS = [1, 2, 3, 4, 5, 6, 0].map((d) => WEEKDAY_NAMES[d]!)
-const SOURCE: Record<ProgramDto['source'], string> = { gemini: 'Planned by Arc with Gemini', arc: 'Planned by Arc', demo: 'Demo week' }
+const SOURCE: Record<ProgramDto['source'], string> = { gemini: 'Planned by Arc with Gemini', arc: 'Planned by Arc', demo: 'Demo week', member: 'Arranged by you' }
 
 const longDate = (key: DayKey) => {
   const d = dayStart(key)
@@ -136,6 +138,9 @@ export function PlanCalendar({ profileId, exercise, now = Date.now() }: { profil
   const weeks = Array.from({ length: 6 }, (_, w) => grid.slice(w * 7, w * 7 + 7))
   const sel = planOn(selected)
   const selSessions = byDay.get(selected) ?? []
+  const checklist = sel ? checklistFor(sel, selSessions) : []
+  // Sessions the plan did not hold still show, under the checklist.
+  const extra = selSessions.filter((s) => !checklist.some((e) => e.session?.id === s.id))
   const selStatus = statusOf(selected)
 
   const label = (key: DayKey) => {
@@ -259,20 +264,16 @@ export function PlanCalendar({ profileId, exercise, now = Date.now() }: { profil
           {sel ? (
             <>
               <div className="t-label mt-4 text-navy">{sel.title}</div>
-              <ul className="mt-2">
-                {sel.items.map((item, i) => (
-                  <li key={i} className="border-b border-rule py-2 font-mono text-[12.5px] leading-[1.5] text-ink-2 last:border-b-0">
-                    {EXERCISES[item.exercise].name} · {sideLabel(item.exercise, item.side)} · {item.sets} × {item.reps} · {item.restSeconds} s rest · goal {item.targetDeg}°
-                  </li>
-                ))}
-              </ul>
+              <div className="mt-2">
+                <TodayList list={checklist} canRecord={selected === today} back={{ from: '/dashboard', label: 'Dashboard' }} label={`Workout for ${longDate(selected)}`} />
+              </div>
             </>
           ) : (
             <p className="mt-3 text-[14px] text-ink-2">A rest day. Recovery is part of the plan.</p>
           )}
-          {selSessions.length > 0 && (
+          {extra.length > 0 && (
             <ul className="mt-4 flex flex-col gap-1">
-              {selSessions.map((s) => (
+              {extra.map((s) => (
                 <li key={s.id}>
                   <Link to={`/sessions/${s.id}`} className="flex items-center gap-2 text-[14px]">
                     <Lamp tone="good" />
@@ -283,11 +284,6 @@ export function PlanCalendar({ profileId, exercise, now = Date.now() }: { profil
             </ul>
           )}
           <div className="mt-5 flex flex-wrap items-center gap-3">
-            {selected === today && sel && selStatus !== 'done' && (
-              <Link to="/record" className="btn btn-block btn-sm">
-                <Lamp tone="primary" /> Start recording
-              </Link>
-            )}
             <Link to={`/plan?day=${selected}`} className="t-label text-cobalt">
               Open in the log →
             </Link>

@@ -1,43 +1,49 @@
-import type { PlanDto, SessionDto } from '@arc/dependencies'
+import type { ProgramDto, SessionDto } from '@arc/dependencies'
 import { useEffect, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
-import { api } from '../api/client'
+import { api, ApiRequestError } from '../api/client'
 import { Page } from '../components/motion'
-import { PlanEditor } from '../components/PlanEditor'
 import { ProfilePicker } from '../components/ProfilePicker'
 import { Alert, EmptyState, PageHeader, Skeleton, Strip } from '../components/ui'
-import { useStickyTop } from '../components/useStickyTop'
 import { useProfiles } from '../hooks/useProfiles'
+import { nextEntry, plannedDay } from '../plan/checklist'
 import { DayLog } from '../plan/DayLog'
 import { dayKey, defaultDay, parseDayKey, type DayKey } from '../plan/days'
+import { WeekEditor } from '../plan/WeekEditor'
 
 /**
- * The plan and the log side by side, 30 to 70: on the left the plan (what recording its
- * movement uses; other movements follow the week; sticky on desktop), on the right the log, one
- * day at a time. The day lives in the
- * URL (`/plan?day=2026-10-09`), so a session opened from the log comes back to the same day.
+ * The week beside the log, 40 to 60: on the left the week in force, to arrange by hand (any days,
+ * several movements a day for the muscle groups picked, every number; earlier weeks to start
+ * from); on the right the log, one day at a time, a training day showing what was planned and
+ * crossing it out as it gets done. The day lives in the URL (`/plan?day=2026-10-09`), so a
+ * session opened from the log comes back to the same day.
  */
 export function PlanPage() {
   const { profiles, selected, selectedId, loading: profilesLoading } = useProfiles()
   const [params, setParams] = useSearchParams()
-  const [plan, setPlan] = useState<PlanDto | null>(null)
+  const [program, setProgram] = useState<ProgramDto | null>(null)
   const [sessions, setSessions] = useState<SessionDto[] | null>(null)
   const [error, setError] = useState<string | null>(null)
-  const [planRef, planTop] = useStickyTop<HTMLDivElement>(32)
 
   useEffect(() => {
     if (!selectedId) return
     let cancelled = false
     setSessions(null)
     setError(null)
-    Promise.all([api.plan.get(selectedId).catch(() => null), api.sessions.list(selectedId)])
+    Promise.all([
+      api.plan.program(selectedId).catch((err: unknown) => {
+        if (err instanceof ApiRequestError && err.status === 404) return null
+        throw err
+      }),
+      api.sessions.list(selectedId),
+    ])
       .then(([p, s]) => {
         if (cancelled) return
-        setPlan(p)
+        setProgram(p)
         setSessions(s)
       })
       .catch((err: unknown) => {
-        if (!cancelled) setError(err instanceof Error ? err.message : 'Could not load the log')
+        if (!cancelled) setError(err instanceof Error ? err.message : 'Could not load the week')
       })
     return () => {
       cancelled = true
@@ -46,8 +52,10 @@ export function PlanPage() {
 
   const today = dayKey(Date.now())
   const requested = parseDayKey(params.get('day'))
-  const day: DayKey = requested && requested <= today ? requested : defaultDay(sessions ?? [])
+  // Today when it is a training day, so the day's workout is the first thing on the page.
+  const day: DayKey = requested && requested <= today ? requested : sessions && plannedDay(program, sessions, today) ? today : defaultDay(sessions ?? [])
   const setDay = (next: DayKey) => setParams({ day: next }, { replace: true })
+  const todayNext = sessions ? (nextEntry(plannedDay(program, sessions, today)?.list ?? [])?.item.exercise ?? null) : null
   const noProfiles = !profilesLoading && profiles.length === 0
 
   return (
@@ -55,7 +63,7 @@ export function PlanPage() {
       <PageHeader
         eyebrow="Plan · log"
         title={noProfiles ? 'Plan' : (selected?.name ?? 'Plan')}
-        subtitle="Set your own numbers for a movement, then step through the days to see each workout and how it moved."
+        subtitle="Arrange your week: any days, several movements a day for the muscles you pick. Then step through the days: what was planned, and what got done."
         actions={<ProfilePicker />}
       />
       <div className="rule-strong" />
@@ -70,7 +78,7 @@ export function PlanPage() {
         <div className="mt-6">
           <EmptyState
             title="No profiles yet"
-            description="A plan belongs to a person. Add a profile first, or load the demo profile to see a log of six weeks."
+            description="A week belongs to a person. Add a profile first, or load the demo profile to see a log of six weeks."
             action={
               <Link className="btn btn-block" to="/profiles">
                 Go to profiles
@@ -79,15 +87,19 @@ export function PlanPage() {
           />
         </div>
       ) : (
-        <div className="mt-6 grid gap-8 lg:grid-cols-[minmax(0,3fr)_minmax(0,7fr)] lg:gap-10">
-          <div ref={planRef} className="min-w-0 lg:sticky lg:self-start" style={{ top: planTop }}>
-            <Strip index="01" title="Plan" aside="Used when you record its movement">
-              {selectedId && sessions ? <PlanEditor profileId={selectedId} plan={plan} onSaved={setPlan} compact /> : <Skeleton height={360} />}
+        <div className="mt-6 grid gap-8 lg:grid-cols-[minmax(0,4fr)_minmax(0,6fr)] lg:gap-10">
+          <div className="min-w-0">
+            <Strip index="01" title="Week" aside={program ? 'Yours to change' : 'Build one by hand, or with Arc'}>
+              {selectedId && sessions ? (
+                <WeekEditor profileId={selectedId} program={program} onSaved={setProgram} history side={selected?.intake?.side} todayNext={todayNext} />
+              ) : (
+                <Skeleton height={420} />
+              )}
             </Strip>
           </div>
           <div className="min-w-0">
             <Strip index="02" title="Log" aside="One day at a time">
-              {sessions ? <DayLog sessions={sessions} day={day} today={today} onDayChange={setDay} /> : <Skeleton height={420} />}
+              {sessions ? <DayLog sessions={sessions} day={day} today={today} onDayChange={setDay} program={program} /> : <Skeleton height={420} />}
             </Strip>
           </div>
         </div>

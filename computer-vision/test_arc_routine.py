@@ -125,6 +125,15 @@ class CommandLineTest(unittest.TestCase):
         self.assertEqual(args, ["--exercise", "elbow_flexion", "--side", "right", "--sets", "3", "--reps", "8", "--rest", "45"])
         self.assertEqual(arc_routine.plan_from_arguments(args), PLAN)
 
+    def test_the_weight_held_rides_along_and_must_be_sensible(self):
+        weighted = {**PLAN, "loadKg": 12.5}
+        args = arc_routine.plan_arguments(weighted)
+        self.assertEqual(args[-2:], ["--weight", "12.5"])
+        self.assertEqual(arc_routine.plan_from_arguments(args), weighted)
+        for bad in (-1, 501, "heavy", True):
+            with self.assertRaises(PlanError):
+                validate_plan({**PLAN, "loadKg": bad})
+
     def test_a_profile_to_send_the_session_to_leaves_the_plan_alone(self):
         args = arc_routine.plan_arguments(PLAN) + ["--profile", "p1"]
         self.assertEqual(arc_routine.plan_from_arguments(args), PLAN)

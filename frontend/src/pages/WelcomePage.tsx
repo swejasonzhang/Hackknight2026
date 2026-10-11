@@ -1,4 +1,4 @@
-import { catalogByArea, EXERCISES, ONBOARDING_TOPICS, WEEKDAY_NAMES, type CatalogGroup, type ChatTurn, type OnboardingReply, type OnboardingTopic, type ProgramDto } from '@arc/dependencies'
+import { catalogByArea, EXERCISES, muscleOf, MUSCLES, ONBOARDING_TOPICS, sideLabel, WEEKDAY_NAMES, type CatalogGroup, type ChatTurn, type OnboardingReply, type OnboardingTopic, type ProgramDto, type Side } from '@arc/dependencies'
 import { motion, useReducedMotion } from 'motion/react'
 import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
@@ -6,6 +6,7 @@ import { api } from '../api/client'
 import { IconMic, IconSend, IconVolume, IconVolumeOff, Logo } from '../components/icons'
 import { Alert, Lamp } from '../components/ui'
 import { useProfiles } from '../hooks/useProfiles'
+import { WeekEditor } from '../plan/WeekEditor'
 import { createListener, type ListenerState } from '../voice/listener'
 import { createSpeaker } from '../voice/speaker'
 import { elevenLabsVoice } from '../voice/status'
@@ -60,6 +61,8 @@ export function WelcomePage() {
   const [thinking, setThinking] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [done, setDone] = useState<OnboardingReply | null>(null)
+  // The member's own changes to the week Arc built, once saved.
+  const [week, setWeek] = useState<ProgramDto | null>(null)
   const [voiceOn, setVoiceOn] = useState(true)
   const [mic, setMic] = useState<ListenerState>('off')
   const listEnd = useRef<HTMLDivElement>(null)
@@ -141,15 +144,20 @@ export function WelcomePage() {
 
   const step = done ? ONBOARDING_TOPICS.length : topic ? ONBOARDING_TOPICS.indexOf(topic) : 0
   const progress = Math.round((step / ONBOARDING_TOPICS.length) * 100)
-  const program = done?.program
+  const program = week ?? done?.program
 
   return (
     <div className="flex min-h-[100dvh] flex-col bg-vellum text-ink">
       {/* ---- top bar: the mark, progress through the questions, Arc's voice, the way out ---- */}
       <header className="sticky top-0 z-20 bg-navy text-white">
         <div className="mx-auto flex h-14 w-full max-w-[1180px] items-center gap-3 px-4 sm:px-6">
-          <Logo size={24} tone="paper" />
-          <span className="font-display text-[15px] font-bold tracking-[-0.01em]">Arc</span>
+          {/* The logo always leads back to the landing page. */}
+          <Link to="/" aria-label="Arc home page" className="flex items-center gap-3 text-white no-underline hover:no-underline">
+            <Logo size={24} tone="paper" />
+            <span aria-hidden="true" className="font-display text-[15px] font-bold tracking-[-0.01em]">
+              Arc
+            </span>
+          </Link>
           <span className="t-meta hidden text-rail-muted sm:inline">Getting to know you</span>
           <span className="flex-1" />
           <span className="t-meta text-rail-muted" aria-live="polite">
@@ -241,7 +249,7 @@ export function WelcomePage() {
             </div>
           )}
 
-          {program && <WeekCard program={program} />}
+          {program && done?.profileId && <WeekCard program={program} profileId={done.profileId} side={done.intake?.side} onChange={setWeek} />}
           <div ref={listEnd} className="scroll-mb-40" />
         </section>
 
@@ -329,14 +337,36 @@ export function WelcomePage() {
   )
 }
 
-/** The week Arc built, Monday to Sunday, with the way to the dashboard's calendar. */
-function WeekCard({ program }: { program: ProgramDto }) {
+/**
+ * The week Arc built, Monday to Sunday, with the way to the dashboard's calendar. The member can
+ * change it right here: any day, any movement for the muscle groups they pick, every number.
+ */
+function WeekCard({ program, profileId, side, onChange }: { program: ProgramDto; profileId: string; side?: Side; onChange: (program: ProgramDto) => void }) {
+  const [editing, setEditing] = useState(false)
   return (
     <section className="panel mt-8 p-4 sm:p-5" aria-label="Your week">
-      <div className="t-label flex items-center gap-2">
-        <Lamp tone="good" /> Your week is ready
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="t-label flex items-center gap-2">
+          <Lamp tone="good" /> {program.source === 'member' ? 'Your week, as you arranged it' : 'Your week is ready'}
+        </div>
+        <button type="button" className="btn btn-ghost t-label" aria-expanded={editing} onClick={() => setEditing(!editing)}>
+          {editing ? 'Close the editor' : 'Change it'}
+        </button>
       </div>
       <p className="mt-3 max-w-[62ch] text-[15px] leading-[1.55] text-ink">{program.summary}</p>
+      {editing ? (
+        <div className="mt-4">
+          <WeekEditor
+            profileId={profileId}
+            program={program}
+            side={side}
+            onSaved={(saved) => {
+              onChange(saved)
+              setEditing(false)
+            }}
+          />
+        </div>
+      ) : (
       <ol className="mt-4 border-t border-rule-strong">
         {WEEK.map((d) => {
           const day = program.days.find((x) => x.weekday === d)
@@ -348,7 +378,7 @@ function WeekCard({ program }: { program: ProgramDto }) {
                   <span className="block text-[15px] font-medium text-ink">{day.title}</span>
                   {day.items.map((item, i) => (
                     <span key={i} className="block font-mono text-[12.5px] leading-[1.6] text-ink-2">
-                      {EXERCISES[item.exercise].name} · {item.side} · {item.sets} × {item.reps} · {item.restSeconds} s rest
+                      {MUSCLES[muscleOf(item)].name} · {EXERCISES[item.exercise].name} · {sideLabel(item.exercise, item.side)} · {item.sets} × {item.reps} · {item.restSeconds} s rest
                     </span>
                   ))}
                 </span>
@@ -359,6 +389,7 @@ function WeekCard({ program }: { program: ProgramDto }) {
           )
         })}
       </ol>
+      )}
       <div className="mt-5 flex flex-wrap gap-2">
         <Link to="/dashboard" className="btn btn-block">
           <Lamp tone="primary" /> See it on your dashboard

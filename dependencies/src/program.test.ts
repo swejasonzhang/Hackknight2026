@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
-import { CoachIntakeSchema, PlanInputSchema } from './api.ts'
-import { EXERCISES } from './engine/exercises.ts'
-import { EXERCISE_IDS } from './engine/types.ts'
+import { CoachIntakeSchema, PlanInputSchema, type PlanInput } from './api.ts'
+import { EXERCISE_LIST, EXERCISES } from './engine/exercises.ts'
+import { EXERCISE_IDS, type ExerciseId, type MuscleId } from './engine/types.ts'
 import {
   clampToRanges,
   parseHeightCm,
@@ -9,12 +9,18 @@ import {
   parseWeekdays,
   parseWeightKg,
   areaOfDay,
+  describeWeek,
   isDiverseWeek,
+  MAX_DAY_ITEMS,
+  muscleGroupsOf,
+  muscleOf,
   prescriptionFor,
+  ProgramDaySchema,
   programDayOn,
   programFromIntake,
   ProgramInputSchema,
   spreadDays,
+  titleForDay,
   TRAINING_RANGES,
   weekdayList,
 } from './program.ts'
@@ -122,7 +128,8 @@ describe('programFromIntake', () => {
   })
 
   it('starts with the focus area and uses its other movements when an area comes round again', () => {
-    const week = programFromIntake({ ...intake, focus: 'squat', experience: 'regular', trainingDays: [0, 1, 2, 3, 4, 5, 6], daysPerWeek: 7 })
+    // Someone new does two of the three leg movements, so the second legs day turns to the third.
+    const week = programFromIntake({ ...intake, focus: 'squat', experience: 'new', trainingDays: [0, 1, 2, 3, 4, 5, 6], daysPerWeek: 7 })
     expect(week.days.map((d) => areaOfDay(d))).toEqual(['legs', 'back', 'core', 'upper', 'legs', 'back', 'core'])
     expect(week.days[0]!.items.map((i) => i.exercise)).toEqual(['squat', 'lunge'])
     expect(week.days[4]!.items.map((i) => i.exercise)).toEqual(['seated_knee_extension', 'squat'])
@@ -154,10 +161,13 @@ describe('programFromIntake', () => {
     expect(program.days.map((d) => d.weekday)).toEqual([1, 4])
   })
 
-  it('gives someone new one movement a day, and adds variety for everyone else', () => {
-    expect(programFromIntake({ ...intake, experience: 'new' }).days.every((d) => d.items.length === 1)).toBe(true)
+  it('fills each day with several movements for its muscle groups: two for someone new, three for everyone else', () => {
+    const fresh = programFromIntake({ ...intake, experience: 'new' })
+    for (const day of fresh.days) expect(day.items.length).toBe(Math.min(2, EXERCISE_LIST.filter((e) => e.area === areaOfDay(day)).length))
     const varied = programFromIntake({ ...intake, experience: 'regular' })
-    expect(new Set(varied.days.flatMap((d) => d.items.map((i) => i.exercise))).size).toBeGreaterThan(1)
+    for (const day of varied.days) expect(day.items.length).toBe(Math.min(3, EXERCISE_LIST.filter((e) => e.area === areaOfDay(day)).length))
+    // Each movement names the muscle group it is there for.
+    for (const item of varied.days.flatMap((d) => d.items)) expect(item.muscle).toBe(EXERCISES[item.exercise].muscles.primary[0])
   })
 })
 
@@ -185,13 +195,21 @@ describe('prescriptionFor: what Record runs for the movement picked', () => {
   const plan = { exercise: 'squat' as const, side: 'left' as const, sets: 5, reps: 6, restSeconds: 90, targetDeg: 95 }
   const monday = new Date(2026, 9, 12)
 
-  it("uses the saved plan when it is for that movement", () => {
-    expect(prescriptionFor('squat', { plan, program, intake, date: monday })).toEqual({ ...plan, source: 'plan' })
+  const tuesday = new Date(2026, 9, 13)
+  const numbers = ({ exercise, side, sets, reps, restSeconds, targetDeg }: PlanInput) => ({ exercise, side, sets, reps, restSeconds, targetDeg })
+
+  it("uses the day's own prescription when the week holds the movement that day", () => {
+    const squat = programDayOn(program, monday)!.items.find((i) => i.exercise === 'squat')!
+    expect(prescriptionFor('squat', { plan, program, intake, date: monday })).toEqual({ ...numbers(squat), source: 'week' })
   })
 
-  it("otherwise uses the week: today's prescription for it first, else its first day", () => {
+  it('else the saved plan when it is for that movement', () => {
+    expect(prescriptionFor('squat', { plan, program, intake, date: tuesday })).toEqual({ ...plan, source: 'plan' })
+  })
+
+  it("else the week's first day that holds it", () => {
     const lunge = program.days.flatMap((d) => d.items).find((i) => i.exercise === 'lunge')!
-    expect(prescriptionFor('lunge', { plan, program, intake, date: monday })).toEqual({ ...lunge, source: 'week' })
+    expect(prescriptionFor('lunge', { plan, program, intake, date: tuesday })).toEqual({ ...numbers(lunge), source: 'week' })
   })
 
   it("falls back to the goal's ranges on the member's side, with the movement's own goal angle", () => {
@@ -209,5 +227,41 @@ describe('prescriptionFor: what Record runs for the movement picked', () => {
     expect(isDiverseWeek([day(1, 'squat'), day(3, 'elbow_flexion'), day(5, 'squat')])).toBe(false) // only two areas in three days
     expect(isDiverseWeek([day(1, 'squat'), day(3, 'elbow_flexion'), day(5, 'deadlift')])).toBe(true)
     expect(isDiverseWeek([day(1, 'squat')])).toBe(true)
+  })
+})
+
+describe('muscle groups through a day', () => {
+  const item = (exercise: ExerciseId, muscle?: MuscleId) => ({ exercise, side: 'right' as const, sets: 3, reps: 8, restSeconds: 60, targetDeg: EXERCISES[exercise].targetDeg, ...(muscle ? { muscle } : {}) })
+
+  it("gathers a day's movements under the muscle each works, in the order the day reaches them", () => {
+    const day = [item('lat_pulldown'), item('bent_over_row', 'upper_back'), item('deadlift', 'lower_back'), item('bent_over_row')]
+    expect(muscleGroupsOf(day).map((g) => [g.muscle, g.items.map((x) => x.index)])).toEqual([
+      ['lats', [0, 3]],
+      ['upper_back', [1]],
+      ['lower_back', [2]],
+    ])
+    expect(muscleOf(item('deadlift'))).toBe('hamstrings')
+  })
+
+  it('titles a day by its area and muscle groups, within sixty characters', () => {
+    expect(titleForDay([item('lat_pulldown'), item('bent_over_row', 'upper_back'), item('deadlift', 'lower_back')])).toBe('Back · Lats, Upper back, Lower back')
+    expect(titleForDay([item('squat'), item('crunch')])).toBe('Legs + Core · Quads, Abs')
+    const long = titleForDay(EXERCISE_IDS.slice(0, 8).map((e) => item(e)))
+    expect(long.length).toBeLessThanOrEqual(60)
+  })
+
+  it("says what a member's own week holds, day by day", () => {
+    const text = describeWeek([
+      { weekday: 3, items: [item('squat'), item('lunge')] },
+      { weekday: 1, items: [item('lat_pulldown'), item('deadlift', 'lower_back')] },
+    ])
+    expect(text).toBe('Your own week: 2 days and 4 movements. Monday lats and lower back; Wednesday quads.')
+  })
+
+  it('takes up to eight movements a day, each with the muscle it was picked for', () => {
+    const day = { weekday: 1, title: 'Back', items: Array.from({ length: MAX_DAY_ITEMS }, () => item('deadlift', 'lower_back')) }
+    expect(ProgramDaySchema.safeParse(day).success).toBe(true)
+    expect(ProgramDaySchema.safeParse({ ...day, items: [...day.items, item('squat')] }).success).toBe(false)
+    expect(ProgramDaySchema.safeParse({ ...day, items: [{ ...item('squat'), muscle: 'neck' }] }).success).toBe(false)
   })
 })

@@ -51,7 +51,7 @@ const LINKS = [
 
 /**
  * The signed-in frame: a 56 px navy instrument rail (wordmark, three vertical mono labels with a
- * sliding cobalt edge, a ruler, the API lamp, the account tag and log out) beside the vellum
+ * sliding cobalt edge in equal cells, the API lamp, the account tag and log out) beside the vellum
  * bench where each page lays out its own panels. On phones the rail becomes a bottom bar.
  * There is no top bar: the profile switcher lives in the dashboard's measurement panel.
  */

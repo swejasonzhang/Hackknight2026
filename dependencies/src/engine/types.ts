@@ -201,6 +201,8 @@ export interface SessionRecord {
   complete?: boolean
   /** Voice commands the member gave while recording, in order. */
   events?: SessionEvent[]
+  /** The weight held, in kilograms (0 for bodyweight); absent when it was not given. */
+  loadKg?: number
   /** Arc's plain-English read of the session (Gemini, or a template when Gemini is off). */
   coachSummary?: CoachSummary | null
 }

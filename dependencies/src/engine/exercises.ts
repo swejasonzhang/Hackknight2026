@@ -106,9 +106,10 @@ export const EXERCISES: Record<ExerciseId, ExerciseConfig> = {
     joints: sided([LM.LEFT_HIP, LM.LEFT_SHOULDER, LM.LEFT_WRIST], [LM.RIGHT_HIP, LM.RIGHT_SHOULDER, LM.RIGHT_WRIST]),
     metricLabel: 'Shoulder flexion',
     metricFromInnerAngle: inner,
-    enterDeg: 120,
+    // Just above shoulder height, as the cue says; the camera app still extends to 135 (backlog D7).
+    enterDeg: 80,
     exitDeg: 30,
-    targetDeg: 135,
+    targetDeg: 95,
     restDeg: 10,
     maxDeg: 170,
     minRepMs: 1000,

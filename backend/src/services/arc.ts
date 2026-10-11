@@ -25,6 +25,7 @@ import {
   type OnboardingTopic,
   type PlanInput,
   type ProgramDay,
+  type ProgramItem,
   type ProgramInput,
   type ProgramSource,
   type RepRecord,
@@ -278,7 +279,7 @@ export async function onboardingTurn(messages: ChatTurn[], name: string, finish 
 
 const PROGRAM_SYSTEM = `${PERSONA}
 
-Build the member's training week as JSON. Use exactly the training days you are given (weekday numbers, 0 is Sunday). Give each training day one body area (upper body, back, legs or core) with one to three movements from that area of the catalog, and never the same area on two training days in a row; with three or more training days, use at least three areas. The first training day opens with their focus movement on their side; the rest of the week works the other areas, so no muscle group is trained every day. Keep sets, reps and rest inside the ranges for their goal: lower in the range for someone new, higher for someone who trains regularly. Give someone new one movement a day; add variety for everyone else. Respect their limits: leave out a movement that would load an injured area. Give each day a short title of at most five words. Write summary as two or three short spoken sentences to the member about their week.`
+Build the member's training week as JSON. Use exactly the training days you are given (weekday numbers, 0 is Sunday). Give each training day one body area (upper body, back, legs or core) with two to four movements from that area of the catalog, several for the area's muscle groups, and never the same area on two training days in a row; with three or more training days, use at least three areas. The first training day opens with their focus movement on their side; the rest of the week works the other areas, so no muscle group is trained every day. Keep sets, reps and rest inside the ranges for their goal: lower in the range for someone new, higher for someone who trains regularly. Give someone new two movements a day and everyone else three or four. Respect their limits: leave out a movement that would load an injured area. Give each day a short title of at most five words. Write summary as two or three short spoken sentences to the member about their week.`
 
 const PROGRAM_SCHEMA = {
   type: 'OBJECT',
@@ -333,8 +334,8 @@ export function programFromGemini(raw: unknown, intake: CoachIntake): ProgramInp
     if (typeof day?.weekday !== 'number' || byWeekday.has(day.weekday) || !Array.isArray(day.items)) continue
     const items = (day.items as RawItem[])
       .filter((i) => typeof i?.exercise === 'string' && i.exercise in EXERCISES)
-      .slice(0, 3)
-      .map((i): PlanInput => {
+      .slice(0, 4)
+      .map((i): ProgramItem => {
         const exercise = i.exercise as ExerciseId
         const n = (v: unknown, d: number) => (typeof v === 'number' && Number.isFinite(v) ? v : d)
         return {
@@ -342,6 +343,7 @@ export function programFromGemini(raw: unknown, intake: CoachIntake): ProgramInp
           side: i.side === 'left' || i.side === 'right' ? i.side : intake.side,
           ...clampToRanges({ sets: n(i.sets, 3), reps: n(i.reps, 10), restSeconds: n(i.restSeconds, 90) }, goal),
           targetDeg: EXERCISES[exercise].targetDeg,
+          muscle: EXERCISES[exercise].muscles.primary[0]!,
         }
       })
     if (!items.length) continue

@@ -10,10 +10,13 @@ import type {
   CreateProfileInput,
   DeleteAccountInput,
   ExerciseId,
+  LeaderboardDto,
+  LeaderboardWindow,
   LoginInput,
   PlanDto,
   PlanInput,
   ProgramDto,
+  ProgramEdit,
   ProfileDto,
   ProgressDto,
   SessionDto,
@@ -94,7 +97,13 @@ export const api = {
       request<PlanDto>(`/api/profiles/${profileId}/plan`, { method: 'PATCH', body: input }),
     /** The week Arc built: training days and what each holds (404 until Arc has built one). */
     program: (profileId: string) => request<ProgramDto>(`/api/profiles/${profileId}/program`),
+    /** Every week the profile has had, newest first. */
+    programs: (profileId: string) => request<ProgramDto[]>(`/api/profiles/${profileId}/programs`),
+    /** The member's own week: it becomes the active one, and Arc writes its summary. */
+    putProgram: (profileId: string, input: ProgramEdit) => request<ProgramDto>(`/api/profiles/${profileId}/program`, { method: 'PUT', body: input }),
   },
+  /** The household leaderboard: the account's profiles ranked on a window's training. */
+  leaderboard: (window: LeaderboardWindow = 'week') => request<LeaderboardDto>(`/api/leaderboard?window=${window}`),
   sessions: {
     list: (profileId: string, exercise?: ExerciseId) =>
       request<SessionDto[]>(`/api/profiles/${profileId}/sessions${exercise ? `?exercise=${exercise}` : ''}`),

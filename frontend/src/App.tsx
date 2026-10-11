@@ -22,7 +22,7 @@ import { ProfilesProvider } from './profiles/ProfilesContext'
  *                   user's buttons lead back into the app
  *   /signup, /login account pages
  *   /dashboard      progress for the selected profile, every chart folded behind a plus
- *   /plan           the plan beside the log, one day at a time (?day=YYYY-MM-DD)
+ *   /plan           the week to arrange by hand beside the log, one day at a time (?day=YYYY-MM-DD)
  *   /record         record a session in the browser: webcam, pose tracking, reps, save
  *   /welcome        a full page between sign-up and the dashboard: the chat with Arc, then the week
  *                   it built (skippable; ?profile=<id> for an existing profile)
