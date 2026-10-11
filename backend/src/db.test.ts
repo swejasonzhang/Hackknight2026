@@ -5,6 +5,10 @@ describe('describeUri', () => {
   it('masks the password and nothing else', () => {
     expect(describeUri('mongodb+srv://ada:s3cr3t@cluster0.example.net/ptg?x=1')).toBe('mongodb+srv://ada:***@cluster0.example.net/ptg?x=1')
     expect(describeUri('mongodb://127.0.0.1:27017/ptg')).toBe('mongodb://127.0.0.1:27017/ptg')
+    // A hand-typed password holding an @ or a / is masked whole, and an @ in the query is left alone.
+    expect(describeUri('mongodb+srv://ada:p@ss/w0rd@cluster0.example.net/ptg')).toBe('mongodb+srv://ada:***@cluster0.example.net/ptg')
+    expect(describeUri('mongodb+srv://ada:a/b@c@cluster0.example.net/?appName=x@y')).toBe('mongodb+srv://ada:***@cluster0.example.net/?appName=x@y')
+    expect(describeUri('mongodb://host/db?note=a@b')).toBe('mongodb://host/db?note=a@b')
   })
 })
 

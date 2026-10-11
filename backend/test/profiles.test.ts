@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { createProfile, makeSession, signup } from './helpers.ts'
+import { CoachMessage } from '../src/models/CoachMessage.ts'
+import { createProfile, makeSession, service, signup } from './helpers.ts'
 
 describe('profiles', () => {
   it('POST /api/profiles creates a profile and returns it with an id', async () => {
@@ -37,6 +38,24 @@ describe('profiles', () => {
     expect(ok.body.name).toBe('Grace')
     expect((await c.get('/api/profiles/64b64b64b64b64b64b64b64b')).status).toBe(404)
     expect((await c.get('/api/profiles/not-an-id')).status).toBe(404)
+  })
+
+  it('lets only the member delete a profile: the camera app\'s key is refused and nothing goes', async () => {
+    const c = await signup()
+    const id = await createProfile(c)
+    expect((await service().delete(`/api/profiles/${id}`)).status).toBe(403)
+    expect((await c.get(`/api/profiles/${id}`)).status).toBe(200)
+  })
+
+  it('deletes Arc\'s messages about a profile with it', async () => {
+    const c = await signup()
+    const id = await createProfile(c)
+    const other = await createProfile(c, 'Ben')
+    const reps = [{ index: 1, peakDeg: 120, startedAt: 1000, endedAt: 3000, durationMs: 2000 }]
+    for (const profileId of [id, other]) await c.post('/api/coach/sets').send({ profileId, exercise: 'elbow_flexion', side: 'right', plan: { sets: 1, reps: 1, restSeconds: 45, targetDeg: 140 }, setNumber: 1, reps })
+    expect(await CoachMessage.countDocuments({})).toBe(2)
+    expect((await c.delete(`/api/profiles/${id}`)).status).toBe(204)
+    expect(await CoachMessage.countDocuments({})).toBe(1)
   })
 
   it('DELETE /api/profiles/:id removes the profile with its plans and sessions', async () => {

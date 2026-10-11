@@ -2,11 +2,21 @@ import { describe, expect, it } from 'vitest'
 import mongoose from 'mongoose'
 import { Plan } from '../src/models/Plan.ts'
 import { Program } from '../src/models/Program.ts'
-import { createProfile, signup } from './helpers.ts'
+import { createProfile, service, signup } from './helpers.ts'
 
 const plan = { exercise: 'elbow_flexion', side: 'right', sets: 3, reps: 8, restSeconds: 45, targetDeg: 140 }
 
 describe('plans', () => {
+  it('lets the camera app\'s key read a plan but never write one', async () => {
+    const c = await signup()
+    const id = await createProfile(c)
+    await c.put(`/api/profiles/${id}/plan`).send(plan)
+    expect((await service().get(`/api/profiles/${id}/plan`)).status).toBe(200)
+    expect((await service().put(`/api/profiles/${id}/plan`).send({ ...plan, reps: 20 })).status).toBe(403)
+    expect((await service().patch(`/api/profiles/${id}/plan`).send({ reps: 20 })).status).toBe(403)
+    expect((await c.get(`/api/profiles/${id}/plan`)).body.reps).toBe(plan.reps)
+  })
+
   it('serves a goal saved before its movement\'s range was narrowed inside the range it has now', async () => {
     const c = await signup()
     const id = await createProfile(c)

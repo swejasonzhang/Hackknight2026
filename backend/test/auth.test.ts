@@ -83,4 +83,25 @@ describe('access control', () => {
     const id = await createProfile(a)
     expect((await a.get(`/api/profiles/${id}`)).body.ownerId).toBe(a.userId)
   })
+
+  it('stops checking a login after five wrong passwords for that email, even when they are sent at once', async () => {
+    const c = await signup('Grace Hopper')
+    const me = (await c.get('/api/auth/me')).body.email as string
+    const login = (password: string) => anon.post('/api/auth/login').send({ email: me, password })
+    const wrong = await Promise.all(Array.from({ length: 7 }, () => login('wrong password!')))
+    expect(wrong.filter((r) => r.status === 401)).toHaveLength(5)
+    expect(wrong.filter((r) => r.status === 429)).toHaveLength(2)
+    // Locked for a while, even with the right password.
+    expect((await login('correct horse battery')).status).toBe(429)
+  })
+
+  it('clears the count of wrong passwords when the right one is given', async () => {
+    const c = await signup('Ada Byron')
+    const me = (await c.get('/api/auth/me')).body.email as string
+    const login = (password: string) => anon.post('/api/auth/login').send({ email: me, password })
+    for (let i = 0; i < 4; i++) expect((await login('wrong password!')).status).toBe(401)
+    expect((await login('correct horse battery')).status).toBe(200)
+    for (let i = 0; i < 4; i++) expect((await login('wrong password!')).status).toBe(401)
+    expect((await login('correct horse battery')).status).toBe(200)
+  })
 })
