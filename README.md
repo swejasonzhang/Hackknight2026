@@ -75,7 +75,7 @@ flowchart LR
 |---|---|
 | Time from first commit to last merge | 48 hours |
 | Pull requests merged, each through CI | 44 |
-| Automated tests | 604 (140 engine, 131 API, 303 web app, 30 Python) |
+| Automated tests | 600 (140 engine, 131 API, 299 web app, 30 Python) |
 | TypeScript written | about 25,000 lines, a third of it tests |
 | Architecture decision records | 34, in [docs/adr](docs/adr/) |
 | Movements tracked / muscle groups modelled | 15 / 17 |
@@ -87,6 +87,8 @@ flowchart LR
 | Jason Zhang ([@swejasonzhang](https://github.com/swejasonzhang)) | The web app and API: browser pose tracking, the rep and form engine, the 3D body, Arc's integration, the data model, CI and deployment |
 | Kelvin ([@kekcodenoob](https://github.com/kekcodenoob)) | The Python camera app: OpenCV and MediaPipe tracking, the original exercise catalog, guiding arrows for form and pacing |
 | Jerome White ([@Jaw718](https://github.com/Jaw718)) | The `ai-coach` module: the Gemini and ElevenLabs voice coach, the onboarding survey and the training-plan ranges that Arc's weeks are built within |
+
+Jason built his part with Claude Code, an AI coding agent: he specified each feature, tested it by hand and merged every pull request through CI.
 
 ## Run it locally
 
