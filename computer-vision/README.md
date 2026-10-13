@@ -30,4 +30,4 @@ CV_API_KEY=… uv run main.py --exercise squat --side right --sets 3 --reps 8 --
 
 Tests: `python3 -m unittest` (plan mapping and the thresholds in `test_arc_routine.py`, every movement counting a rep exactly where the browser does; the upload in `test_arc_upload.py`; CI runs both).
 
-The web app also records in the browser itself (MediaPipe's JavaScript pose model, root README section 4b), showing a movement indicator toward the goal rather than this app's skeleton, so members need neither Python nor this app; this app remains the computer-vision team's tool and saves to the same place.
+The web app also records in the browser itself (MediaPipe's JavaScript pose model, [docs/REFERENCE.md](../docs/REFERENCE.md) section 4b), showing a movement indicator toward the goal rather than this app's skeleton, so members need neither Python nor this app; this app remains the computer-vision team's tool and saves to the same place.

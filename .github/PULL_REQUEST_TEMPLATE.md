@@ -15,6 +15,6 @@ Closes #<issue> · BACKLOG.md: <id and title>
 
 - [ ] Every acceptance criterion has a test
 - [ ] CI green
-- [ ] API change: schema + server test + route + client wrapper + README table
+- [ ] API change: schema + server test + route + client wrapper + API table in docs/REFERENCE.md
 - [ ] Works in the running app (`npm run dev`)
 - [ ] ADR added if a non-obvious decision was made
